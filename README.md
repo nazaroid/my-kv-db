@@ -12,3 +12,5 @@ https://github.com/itmo-java-basics-2021/lab-base-code/tree/master/src/main/java
 
 grafana + prometheus
 https://github.com/gvolpe/trading/blob/main/docker-compose.yml
+
+потом прикрутить SQL
