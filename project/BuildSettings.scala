@@ -8,7 +8,7 @@ import sbtassembly.MergeStrategy
 import sbtassembly.PathList
 
 object BuildSettings {
-  val javaVersion = "25"
+  val javaVersion = "1.8"
 
   lazy val Integration = config("it") extend Test
   lazy val publishSnapshot = taskKey[Unit]("Custom docker:publish")

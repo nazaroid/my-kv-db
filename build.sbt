@@ -21,7 +21,6 @@ lazy val root = (project in file("."))
   )
 
 lazy val `server` = (project in file("modules/server"))
-  .dependsOn(`cust-cat-api-common` % "compile->compile;test->test;it->it")
   .enablePlugins(DockerPlugin, JavaAppPackaging)
   .disablePlugins(AssemblyPlugin)
   .configs(Integration)
