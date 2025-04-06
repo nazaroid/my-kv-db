@@ -10,7 +10,7 @@ lazy val root = (project in file("."))
   )
   .settings(
     commonSettings,
-    name := "server",
+    name := "kvdb",
     version := GLOBAL_VERSION,
     Compile / unmanagedSourceDirectories := Nil,
     Compile / unmanagedResourceDirectories := Nil,
@@ -39,7 +39,7 @@ lazy val `server` = (project in file("modules/server"))
     Integration / testOptions += Tests
       .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/server/integration-tests-html-report"),
     dockerBaseImage := "openjdk:25-oraclelinux8",
-    Docker / packageName := "ser/customer-catalog/server",
+    Docker / packageName := "org/nazaroid/kvdb/server",
     Docker / version := version.value,
     envVars += (sys.props.get("config") match {
       case Some(confName: String) => "config" -> confName
