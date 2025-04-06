@@ -1,5 +1,58 @@
-*.class
-*.log
+### Maven ###
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
+### Intellij ###
+*.iml
+.idea/
+
+### Mac folder preferences ###
+.DS_Store
+
+### Scala ###
+scalastyle-output.xml
+
+### Git ###
+**/git.properties
+
+### Java ###
+*.class
+
+### Other ###
+*.log
+data
+
+### sbt specific ###
+scalatest
+.cache
+.history
+.lib/
+dist/*
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+.bsp
+
+client.js
+
+journal/
+snapshots/
+
+figwheel_server.log
+
+# Python
+__pycache__/
+/lib/
+
+.bloop/
+.metals/
+.vscode/
+project/

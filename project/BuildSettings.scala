@@ -6,7 +6,6 @@ import sbtassembly.AssemblyKeys.*
 import sbtassembly.AssemblyPlugin.autoImport.ShadeRule
 import sbtassembly.MergeStrategy
 import sbtassembly.PathList
-import MultiBuildAreaSupport.*
 
 object BuildSettings {
   val javaVersion = "25"
@@ -36,10 +35,8 @@ object BuildSettings {
     scalaVersion := Dependencies.Scala.version,
     javacOptions ++= Seq("-source", javaVersion, "-target", javaVersion),
     updateOptions := updateOptions.value.withGigahorse(false),
-    publishTo := { if (isSnapshot.value) Some(privateSnapshots) else Some(privateReleases) },
     publishSnapshot := dockerPublishConditional(false).value,
     publishRelease := dockerPublishConditional(true).value,
-    dockerRepository := { if (isSnapshot.value) Some(dockerSnapshotRegistry) else Some(dockerReleaseRegistry) },
     update / logLevel := Level.Warn,
     Global / cancelable := true,
     Test / parallelExecution := false,

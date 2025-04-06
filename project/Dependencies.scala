@@ -19,7 +19,6 @@ object Dependencies {
     val scalaTest = "org.scalatest" %% "scalatest" % "3.2.18" % Test
 
     val all: Seq[ModuleID] = Seq(
-      testContainers,
       scalaTest,
       CatsEffect.catsTest
     )

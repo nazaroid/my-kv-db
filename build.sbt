@@ -1,6 +1,5 @@
 import BuildSettings.*
 import Dependencies.*
-import git.plugin.CustomGit.gitVersionSettings
 
 val GLOBAL_VERSION = "25.2.1.0"
 
@@ -32,7 +31,6 @@ lazy val `server` = (project in file("modules/server"))
     version := GLOBAL_VERSION,
     libraryDependencies ++= CatsEffect.all ++ Testing.all,
     excludeDependencies -= ExclusionRule("log4j", "log4j"),
-    gitVersionSettings(filename = "git.properties"),
     Test / testOptions += Tests
       .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/server/unit-tests-html-report"),
     inConfig(Integration)(Defaults.testSettings),
