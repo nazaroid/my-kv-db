@@ -1,4 +1,4 @@
-package com.uzumdata.cc.api.composition
+package org.nazaroid.kvdb.api.composition
 
 import cats.Parallel
 import cats.data.Kleisli
@@ -7,8 +7,8 @@ import cats.effect.kernel.Ref
 import cats.effect.std.Dispatcher
 import cats.implicits.*
 import com.datastax.oss.driver.api.core.cql.PreparedStatement
-import com.uzumdata.cc.api.algebra.{Engine, FeatureDbMigrator}
-import com.uzumdata.cc.api.{AppConfig, AppMetrics}
+import org.nazaroid.kvdb.api.algebra.{Engine, FeatureDbMigrator}
+import org.nazaroid.kvdb.api.{AppConfig, AppMetrics}
 import fs2.io.net.Network
 import org.typelevel.log4cats.Logger
 

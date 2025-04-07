@@ -1,77 +1,188 @@
-package com.uzumdata.cc.api.algebra
-
-import io.circe.JsonObject
+package org.nazaroid.kvdb.api.algebra
 
 import java.util.UUID
+import java.nio.file.Path
 
-trait Engine[F[_]] {
-  def run(): F[Unit]
+class DatabaseException extends Exception
+
+@FunctionalInterface trait DatabaseFactory {
+  /**
+   * Создает базу данных с указанным именем, если такая база еще не существует.
+   *
+   * @param dbName имя базы данных
+   * @param dbRoot путь до директории, в которой будет создана база данных
+   * @return объект созданной бд
+   * @throws DatabaseException если база данных с данным именем уже существует или если произошла ошибка ввода-вывода
+   */
+  @throws[DatabaseException]
+  def createNonExistent(dbName: String, dbRoot: Path): Nothing
 }
 
-trait FeatureDbMigrator[F[_]] {
-  def migrateOrExit(): F[Unit]
+trait Database {
+  /**
+   * Возвращает имя базы данных.
+   *
+   * @return имя базы данных
+   */
+  def getName: String
+
+  /**
+   * Создает таблицу с указанным именем, если это имя еще не занято.
+   *
+   * @param tableName имя таблицы
+   * @throws DatabaseException если таблица с данным именем уже существует или если произошла ошибка ввода-вывода
+   */
+  @throws[DatabaseException]
+  def createTableIfNotExists(tableName: String): Unit
+
+  /**
+   * Записывает значение в указанную таблицу по переданному ключу.
+   *
+   * @param tableName   таблица, в которую нужно записать значение
+   * @param objectKey   ключ, по которому нужно записать значение
+   * @param objectValue значение, которое нужно записать
+   * @throws DatabaseException если указанная таблица не была найдена или если произошла ошибка ввода-вывода
+   */
+  @throws[DatabaseException]
+  def write(tableName: String, objectKey: String, objectValue: Array[Byte]): Unit
+
+  /**
+   * Считывает значение из указанной таблицы по заданному ключу.
+   *
+   * @param tableName таблица, из которой нужно считать значение
+   * @param objectKey ключ, по которому нужно получить значение
+   * @return значение, которое находится по ключу
+   * @throws DatabaseException если не была найдена указанная таблица, или произошла ошибка ввода-вывода
+   */
+  @throws[DatabaseException]
+  def read(tableName: String, objectKey: String): Option[Array[Byte]]
+
+  @throws[DatabaseException]
+  def delete(tableName: String, objectKey: String): Unit
 }
 
-trait FeatureDb[F[_]] {
-  def switchTable(): F[Unit]
+trait DatabaseCache {
+  def get(key: String): Array[Byte]
 
-  def runSwitchTableLoop(): F[Unit]
+  def set(key: String, value: Array[Byte]): Unit
 
-  def retrieveColumnNames(): F[Set[String]]
+  def delete(key: String): Unit
+}
+/**
+ * Таблица - логическая сущность, представляющая собой набор файлов-сегментов, которые объединены одним
+ * именем и используются для хранения однотипных данных (данных, представляющих собой одну и ту же сущность,
+ * например, таблица "Пользователи")
+ * <p>
+ * - имеет единый размер сегмента
+ * - представляет из себя директорию в файловой системе, именованную как таблица
+ * и хранящую файлы-сегменты данной таблицы
+ */
+trait Table {
+  /**
+   * Возвращает имя таблицы.
+   *
+   * @return имя таблицы
+   */
+  def getName: String
 
-  def retrieveByAccountId(accountId: Long, columnSelector: FeatureDb.DbColumnSet): F[Option[JsonObject]]
+  /**
+   * Записывает в таблицу переданное значение по указанному ключу.
+   *
+   * @param objectKey   ключ, по которому нужно записать значение
+   * @param objectValue значение, которое нужно записать
+   * @throws DatabaseException если произошла ошибка ввода-вывода
+   */
+  @throws[DatabaseException]
+  def write(objectKey: String, objectValue: Array[Byte]): Unit
 
-  def retrieveByUzumId(uzumId: UUID, columnSelector: FeatureDb.DbColumnSet): F[Option[JsonObject]]
+  /**
+   * Считывает значение из таблицы по заданному ключу.
+   *
+   * @param objectKey ключ, по которому нужно получить значение
+   * @return значение, которое находится по ключу
+   * @throws DatabaseException если произошла ошибка ввода-вывода
+   */
+  @throws[DatabaseException]
+  def read(objectKey: String): Option[Array[Byte]]
 
-  def retrieveByMsisdnHash(msisdn_hash: String, columnSelector: FeatureDb.DbColumnSet): F[Option[JsonObject]]
-
-  def retrieveByUbankId(ubankId: Int, columnSelector: FeatureDb.DbColumnSet): F[Option[JsonObject]]
-
-  def retrieveByNasiyaId(nasiyaId: Int, columnSelector: FeatureDb.DbColumnSet): F[Option[JsonObject]]
-
-  def retrieveByTezkorId(tezkorId: UUID, columnSelector: FeatureDb.DbColumnSet): F[Option[JsonObject]]
+  @throws[DatabaseException]
+  def delete(objectKey: String): Unit
 }
 
-object FeatureDb {
-  type DbColumnSet = Map[String, DbColumnType]
+trait Segment {
+  /**
+   * Возвращает имя сегмента.
+   *
+   * @return имя сегмента
+   */
+  def getName: String
 
-  type DbColumnType = String
+  /**
+   * Записывает значение по указанному ключу в сегмент.
+   *
+   * @param objectKey   ключ, по которому нужно записать значение
+   * @param objectValue значение, которое нужно записать
+   * @return {@code true} - если значение записалось, {@code false} - если нет
+   * @throws IOException если произошла ошибка ввода-вывода.
+   */
+  @throws[IOException]
+  def write(objectKey: String, objectValue: Array[Byte]): Boolean
 
-  object DbColumnTypes {
-    val `text`    = "text"
-    val `uuid`    = "uuid"
-    val `int`     = "int"
-    val `bigint`  = "bigint"
-    val `boolean` = "boolean"
-    val `double`  = "double"
-  }
+  /**
+   * Считывает значение из сегмента по переданному ключу.
+   *
+   * @param objectKey ключ, по которому нужно получить значение
+   * @return значение, которое находится по ключу
+   * @throws IOException если произошла ошибка ввода-вывода
+   */
+  @throws[IOException]
+  def read(objectKey: String): Option[Array[Byte]]
+
+  /**
+   * Возвращает {@code true} - если данный сегмент открыт только на чтение, {@code false} - если данный сегмент открыт на чтение и запись.
+   *
+   * @return {@code true} - если данный сегмент открыт только на чтение, {@code false} - если данный сегмент открыт на чтение и запись
+   */
+  def isReadOnly: Boolean
+
+  @throws[IOException]
+  def delete(objectKey: String): Boolean
 }
 
-type CredentialData = Map[String, String]
 
-trait CredentialsSource[F[_]] {
-  def isStatic: Boolean
-  def get():    F[CredentialData]
+/**
+ * Представляет собой единицу хранения в БД
+ */
+trait DatabaseRecord {
+  /**
+   * Возвращает ключ
+   */
+  def getKey: Array[Byte]
+
+  /**
+   * Возвращает значение
+   */
+  def getValue: Array[Byte]
+
+  /**
+   * Возвращает размер хранимой записи в базе данных. Используется для определения offset (сдвига)
+   */
+  def size: Long
+
+  /**
+   * Индикатор, есть ли значение
+   */
+  def isValuePresented: Boolean
 }
 
-trait UserCredsValidator[F[_]] {
-  def refreshCreds():                      F[Unit]
-  def runRefreshCredsLoop():               F[Unit]
-  def isValid(login: String, pwd: String): F[Boolean]
+trait WritableDatabaseRecord extends DatabaseRecord {
+  /**
+   * Возвращает размер ключа в байтах
+   */
+  def getKeySize: Int
+
+  /**
+   * Возвращает размер значения в байтах. -1, если значение отсутствует
+   */
+  def getValueSize: Int
 }
-
-object FeatureSpec {
-  type FeatureSetDef = Map[String, FeatureDef]
-
-  final case class FeatureDef(obfuscated_name: Option[String], db_type: FeatureDb.DbColumnType)
-}
-
-trait FeatureSpecAccessor[F[_]] {
-  def get(): F[FeatureSpec.FeatureSetDef]
-}
-
-trait HotFeatureSpecAccessor[F[_]] extends FeatureSpecAccessor[F] {
-  def runRefreshLoop(): F[Unit]
-  def refresh(): F[Unit]
-}
-

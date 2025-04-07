@@ -1,8 +1,8 @@
-package com.uzumdata.cc.api.composition
+package org.nazaroid.kvdb.api.composition
 
 import cats.effect.Async
 import cats.effect.std.Dispatcher
-import com.uzumdata.cc.api.{AppConfig, AppMetrics}
+import org.nazaroid.kvdb.api.{AppConfig, AppMetrics}
 
 final class CommonModule[F[_]: Async](
   c: AppConfig,

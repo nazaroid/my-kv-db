@@ -1,10 +1,10 @@
-package com.uzumdata.cc.api.domain
+package org.nazaroid.kvdb.api.domain
 
 import cats.Parallel
 import cats.effect.*
 import cats.syntax.all.*
-import com.uzumdata.cc.api.algebra.*
-import com.uzumdata.cc.api.{AppConfig, AppMetrics}
+import org.nazaroid.kvdb.api.algebra.*
+import org.nazaroid.kvdb.api.{AppConfig, AppMetrics}
 import fs2.io.net.Network
 import org.typelevel.log4cats.Logger
 

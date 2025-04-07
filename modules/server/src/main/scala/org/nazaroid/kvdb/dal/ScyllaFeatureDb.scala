@@ -1,17 +1,17 @@
-package com.uzumdata.cc.api.dal
+package org.nazaroid.kvdb.api.dal
 
 import cats.effect.{Async, Concurrent, Ref}
 import cats.implicits.*
 import com.codahale.metrics.MetricRegistry
 import com.datastax.oss.driver.api.core.CqlSession
 import com.datastax.oss.driver.api.core.cql.*
-import com.uzumdata.cc.api.algebra.FeatureDb
-import com.uzumdata.cc.api.algebra.FeatureDb.{DbColumnSet, DbColumnType, DbColumnTypes}
-import com.uzumdata.cc.api.common.scylla.ScyllaDriverOpts.RowOpts
-import com.uzumdata.cc.api.composition.AppState
-import com.uzumdata.cc.api.dal.ScyllaFeatureDb.*
-import com.uzumdata.cc.api.{AppConfig, AppMetrics}
-import com.uzumdata.cc.utils.effects.scheduling.Ticker
+import org.nazaroid.kvdb.api.algebra.FeatureDb
+import org.nazaroid.kvdb.api.algebra.FeatureDb.{DbColumnSet, DbColumnType, DbColumnTypes}
+import org.nazaroid.kvdb.api.common.scylla.ScyllaDriverOpts.RowOpts
+import org.nazaroid.kvdb.api.composition.AppState
+import org.nazaroid.kvdb.api.dal.ScyllaFeatureDb.*
+import org.nazaroid.kvdb.api.{AppConfig, AppMetrics}
+import org.nazaroid.kvdb.utils.effects.scheduling.Ticker
 import io.circe.syntax.EncoderOps
 import io.circe.{Json, JsonObject}
 import io.prometheus.client.CollectorRegistry

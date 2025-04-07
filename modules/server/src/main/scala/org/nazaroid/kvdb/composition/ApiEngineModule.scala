@@ -1,12 +1,12 @@
-package com.uzumdata.cc.api.composition
+package org.nazaroid.kvdb.api.composition
 
 import cats.Parallel
 import cats.effect.Async
 import cats.syntax.all.*
-import com.uzumdata.cc.api.algebra.Engine
-import com.uzumdata.cc.api.dal.*
-import com.uzumdata.cc.api.domain.{ApiEngine, UserRequestPolicy}
-import com.uzumdata.cc.pg.PgConnConfig
+import org.nazaroid.kvdb.api.algebra.Engine
+import org.nazaroid.kvdb.api.dal.*
+import org.nazaroid.kvdb.api.domain.{ApiEngine, UserRequestPolicy}
+import org.nazaroid.kvdb.pg.PgConnConfig
 import doobie.Transactor
 import fs2.io.net.Network
 import org.typelevel.log4cats.Logger

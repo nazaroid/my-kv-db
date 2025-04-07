@@ -1,4 +1,4 @@
-package com.uzumdata.cc.api
+package org.nazaroid.kvdb.api
 
 import io.github.embeddedkafka.EmbeddedKafka
 import org.scalatest.flatspec.AnyFlatSpecLike

@@ -1,4 +1,4 @@
-package com.uzumdata.cc.api
+package org.nazaroid.kvdb.api
 
 import cats.effect.IO
 import cats.effect.std.Dispatcher

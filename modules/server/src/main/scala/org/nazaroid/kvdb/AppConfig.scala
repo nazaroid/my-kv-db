@@ -1,7 +1,7 @@
-package com.uzumdata.cc.api
+package org.nazaroid.kvdb.api
 
-import com.uzumdata.cc.api.common.scylla.ScyllaConnConfig
-import com.uzumdata.cc.pg.PgConnConfig
+import org.nazaroid.kvdb.api.common.scylla.ScyllaConnConfig
+import org.nazaroid.kvdb.pg.PgConnConfig
 import pureconfig.*
 import pureconfig.generic.derivation.default.*
 

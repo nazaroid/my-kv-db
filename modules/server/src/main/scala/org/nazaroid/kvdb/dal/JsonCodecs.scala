@@ -1,7 +1,7 @@
-package com.uzumdata.cc.api.dal
+package org.nazaroid.kvdb.api.dal
 
-import com.uzumdata.cc.api.algebra.FeatureSpec
-import com.uzumdata.cc.api.algebra.FeatureSpec.FeatureDef
+import org.nazaroid.kvdb.api.algebra.FeatureSpec
+import org.nazaroid.kvdb.api.algebra.FeatureSpec.FeatureDef
 import io.circe.*
 import io.circe.generic.semiauto.*
 

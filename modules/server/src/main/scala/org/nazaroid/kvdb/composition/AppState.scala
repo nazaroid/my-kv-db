@@ -1,9 +1,9 @@
-package com.uzumdata.cc.api.composition
+package org.nazaroid.kvdb.api.composition
 
 import cats.effect.{Async, Ref}
 import com.datastax.oss.driver.api.core.cql.PreparedStatement
-import com.uzumdata.cc.api.algebra.CredentialData
-import com.uzumdata.cc.api.algebra.FeatureSpec.FeatureSetDef
+import org.nazaroid.kvdb.api.algebra.CredentialData
+import org.nazaroid.kvdb.api.algebra.FeatureSpec.FeatureSetDef
 
 import java.util.concurrent.ConcurrentHashMap
 

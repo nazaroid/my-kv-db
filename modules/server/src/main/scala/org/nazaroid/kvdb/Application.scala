@@ -1,12 +1,12 @@
-package com.uzumdata.cc.api
+package org.nazaroid.kvdb.api
 
 import cats.Parallel
 import cats.effect.std.Dispatcher
 import cats.effect.{Async, IO, IOApp}
 import cats.implicits.*
 import com.typesafe.config.ConfigFactory
-import com.uzumdata.cc.api.composition.DiContainer
-import com.uzumdata.cc.metrics.MetricExporter
+import org.nazaroid.kvdb.api.composition.DiContainer
+import org.nazaroid.kvdb.metrics.MetricExporter
 import fs2.io.net.Network
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import pureconfig.ConfigSource
