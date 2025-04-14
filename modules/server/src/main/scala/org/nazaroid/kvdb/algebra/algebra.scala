@@ -186,3 +186,23 @@ trait WritableDatabaseRecord extends DatabaseRecord {
    */
   def getValueSize: Int
 }
+
+
+
+trait KvsIndex[K, V] {
+  /**
+   * Оповещает индекс об обновлении значения по определенному ключу.
+   *
+   * @param key   ключ, который обновился
+   * @param value новое значение
+   */
+  def onIndexedEntityUpdated(key: K, value: V): Unit
+
+  /**
+   * Ищет значение в индексе по указанному ключу.
+   *
+   * @param key ключ, по которому нужно провести поиск значение
+   * @return {@code Optional<V>}
+   */
+  def searchForKey(key: K): Option[V]
+}
