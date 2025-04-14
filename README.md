@@ -5,17 +5,23 @@ https://drive.google.com/drive/u/1/folders/1BpJo8j4xkWuLI-9Zls8dZNmtWIdH_zwQ
 https://docs.google.com/document/d/1sww6oOqIgJuGDw4UU746usO1lyFgargHtrjEj3av__k/edit?tab=t.0
 https://app.diagrams.net/?libs=general;citrix#
 
-
-
 https://www.youtube.com/watch?v=NITGB4SH-j8&t=335s
 https://github.com/itmo-java-basics-2021/lab-base-code/tree/master/src/main/java/com/itmo/java
+
+crc - Циклический избыточный код (англ. Cyclic redundancy check[нет в источнике], CRC[1]) — алгоритм нахождения контрольной суммы, предназначенный для проверки целостности данных[2].
+https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B8%D0%B9_%D0%B8%D0%B7%D0%B1%D1%8B%D1%82%D0%BE%D1%87%D0%BD%D1%8B%D0%B9_%D0%BA%D0%BE%D0%B4
+в bitcast считается для каждой строки (см bitcask-intro.pdf на google диске)
 
 ## TODO
 
 * реализовать сценарий create_db, create_tb, write, read
   * база данных и таблица - это папки
   * segment - это append only - file
-  * index 
+  * table index - получить сегмент по ключу (Key -> Segment)
+  * segment index - получить offset в segment по ключу ( (Segment, Key) -> SegmentOffsetInfo)
+  * Замечание: в bitcast вместо этих двух индексов есть индкекс keydir: giving the file, offset, and size of the most recently
+    written entry for that key
+
 
 grafana + prometheus
 https://github.com/gvolpe/trading/blob/main/docker-compose.yml

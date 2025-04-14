@@ -206,3 +206,7 @@ trait KvsIndex[K, V] {
    */
   def searchForKey(key: K): Option[V]
 }
+
+trait SegmentOffsetInfo {
+  def getOffset: Long
+}
