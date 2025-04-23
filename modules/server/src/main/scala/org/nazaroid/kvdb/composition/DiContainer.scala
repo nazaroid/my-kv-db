@@ -1,4 +1,4 @@
-package org.nazaroid.kvdb.api.composition
+package org.nazaroid.kvdb.composition
 
 import cats.Parallel
 import cats.data.Kleisli
@@ -6,58 +6,36 @@ import cats.effect.Async
 import cats.effect.kernel.Ref
 import cats.effect.std.Dispatcher
 import cats.implicits.*
-import com.datastax.oss.driver.api.core.cql.PreparedStatement
-import org.nazaroid.kvdb.api.algebra.{Engine, FeatureDbMigrator}
-import org.nazaroid.kvdb.api.{AppConfig, AppMetrics}
-import fs2.io.net.Network
+import org.nazaroid.kvdb.AppConfig
+import org.nazaroid.kvdb.api.algebra.DbServer
 import org.typelevel.log4cats.Logger
 
-import java.util.concurrent.ConcurrentHashMap
-
-// noinspection ScalaUnusedSymbol
-class DiContainer[F[_]: Async: Logger: Parallel: Network] {
-
-  private val appMetrics = new AppMetrics()
+class DiContainer[F[_]: Async: Logger: Parallel] {
 
   private val appState =
     AppState(
-      Ref.unsafe(""),
-      Ref.unsafe(new ConcurrentHashMap[String, PreparedStatement]()),
-      Ref.unsafe(Map.empty),
-      Ref.unsafe(Map.empty)
+      Ref.unsafe("")
     )
 
-  def resolveEngine(
+  def resolveDbServer(
     appConfig: AppConfig
   )(implicit
     d: Dispatcher[F]
-  ): F[Engine[F]] = {
+  ): F[DbServer[F]] = {
     commonModuleK >>> {
       for {
-        engine <- apiEngineK
-      } yield engine
+        dbServer <- dbServerK
+      } yield dbServer
     }
   }.run(appConfig)
 
-  private def apiEngineK(
+  private def dbServerK(
     implicit
     d: Dispatcher[F]
-  ): Kleisli[F, CommonModule[F], Engine[F]] =
+  ): Kleisli[F, CommonModule[F], DbServer[F]] =
     Kleisli { commonModule =>
-      new ApiEngineModule(commonModule).resolve
+      new DbServerModule(commonModule).resolve
     }
-
-  def resolveScyllaMigrator(
-    appConfig: AppConfig
-  )(implicit
-    d: Dispatcher[F]
-  ): F[FeatureDbMigrator[F]] = {
-    commonModuleK >>> {
-      for {
-        migrator <- scyllaMigratorK
-      } yield migrator
-    }
-  }.run(appConfig)
 
   private def commonModuleK(
     implicit
@@ -65,16 +43,8 @@ class DiContainer[F[_]: Async: Logger: Parallel: Network] {
   ): Kleisli[F, AppConfig, CommonModule[F]] =
     Kleisli { (appConfig: AppConfig) =>
       {
-        new CommonModule(appConfig, appState, appMetrics, d).pure[F]
+        new CommonModule(appConfig, appState, d).pure[F]
       }
 
-    }
-
-  private def scyllaMigratorK(
-    implicit
-    d: Dispatcher[F]
-  ): Kleisli[F, CommonModule[F], FeatureDbMigrator[F]] =
-    Kleisli { commonModule =>
-      new ScyllaMigratorModule(commonModule).resolve
     }
 }

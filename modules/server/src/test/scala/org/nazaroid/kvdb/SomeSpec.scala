@@ -1,9 +1,8 @@
-package org.nazaroid.kvdb.api
+package org.nazaroid.kvdb
 
-import io.github.embeddedkafka.EmbeddedKafka
 import org.scalatest.flatspec.AnyFlatSpecLike
 
-final class SomeSpec extends AnyFlatSpecLike with EmbeddedKafka {
+final class SomeSpec extends AnyFlatSpecLike {
   it should "write your test here" in {
 
   }

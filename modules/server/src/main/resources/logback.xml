@@ -14,12 +14,7 @@
     <logger name="io.grpc" level="WARN"/>
     <logger name="akka" level="INFO"/>
     <logger name="net.schmizz" level="ERROR"/>
-    <logger name="com.uzumdata" level="${APP_LOGGING_LEVEL:-DEBUG}"/>
-    <logger name="org.apache.kafka" level="INFO"/>
-    <logger name="fs2.kafka" level="INFO"/>
-    <logger name="org.redisson" level="INFO"/>
-    <logger name="doobie" level="DEBUG" />
-    <logger name="com.datastax" level="INFO"/>
+    <logger name="org.nazaroid" level="${APP_LOGGING_LEVEL:-DEBUG}"/>
     <logger name="org.http4s" level="INFO"/>
 
     <root level="${APP_LOGGING_LEVEL:-DEBUG}">

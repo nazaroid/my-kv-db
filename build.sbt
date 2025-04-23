@@ -28,7 +28,7 @@ lazy val `server` = (project in file("modules/server"))
     commonSettings,
     name := "server",
     version := GLOBAL_VERSION,
-    libraryDependencies ++= CatsEffect.all ++ Testing.all,
+    libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Prometheus.all ++ Testing.all,
     excludeDependencies -= ExclusionRule("log4j", "log4j"),
     Test / testOptions += Tests
       .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/server/unit-tests-html-report"),

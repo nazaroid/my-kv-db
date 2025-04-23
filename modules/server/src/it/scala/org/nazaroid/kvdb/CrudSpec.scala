@@ -3,12 +3,8 @@ package org.nazaroid.kvdb.api
 import cats.effect.IO
 import cats.effect.std.Dispatcher
 import cats.effect.unsafe.IORuntime
-import fs2.io.net.Network
 import io.prometheus.client.CollectorRegistry
-import org.http4s.Method.GET
-import org.http4s.ember.client.EmberClientBuilder
-import org.http4s.headers.Authorization
-import org.http4s.{BasicCredentials, EntityDecoder, Request, Uri}
+import org.nazaroid.kvdb.composition.DiContainer
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -19,12 +15,20 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
 
 // noinspection ScalaUnusedSymbol
-final class StubSpec extends AnyFlatSpecLike{
+final class CrudSpec extends AnyFlatSpecLike{
 
+  it should "`set` and `get` the same value" in {
+    val di = new DiContainer[IO]()
+    for {
+      dbSrv <- di.resolveDbServer()
+      db <- dbSrv.createDatabase("db")
+      tbl <- db.createTable("tbl")
+      _ <- tbl.set("key", "value")
+      v <- tbl.get("key")
+    } yield {
+      assert(v == "value")
+    }
 
-
-  it should "success" in {
-    ???
   }
 }
 

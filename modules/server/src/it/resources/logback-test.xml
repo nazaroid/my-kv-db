@@ -12,11 +12,7 @@
         </encoder>
     </appender>
 
-    <logger name="com.uzumdata" level="DEBUG"/>
-    <logger name="com.flyway" level="WARN"/>
-    <logger name="slick" level="WARN"/>
-    <!--logger name="slick.jdbc.JdbcBackend.statement" level="DEBUG" /-->
-    <!--logger name="slick.jdbc.StatementInvoker.result" level="DEBUG" /-->
+    <logger name="org.nazaroid" level="DEBUG"/>
 
     <root level="INFO">
         <appender-ref ref="STDERR"/>

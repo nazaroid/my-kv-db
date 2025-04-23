@@ -12,7 +12,17 @@ crc - Циклический избыточный код (англ. Cyclic redun
 https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B8%D0%B9_%D0%B8%D0%B7%D0%B1%D1%8B%D1%82%D0%BE%D1%87%D0%BD%D1%8B%D0%B9_%D0%BA%D0%BE%D0%B4
 в bitcast считается для каждой строки (см bitcask-intro.pdf на google диске)
 
+
+## Архитектура
+- уровень endpoint: http/grpc
+-- (позже) Уровень запросов: SQL/JSON 
+- сервисный уровень: API: инстанс
+- движок (файловый уровень) : модуль bitcask
+
+
 ## TODO
+
+(cv CrudSpec)
 
 * реализовать сценарий create_db, create_tb, write, read
   * база данных и таблица - это папки
@@ -21,6 +31,11 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
   * segment index - получить offset в segment по ключу ( (Segment, Key) -> SegmentOffsetInfo)
   * Замечание: в bitcast вместо этих двух индексов есть индкекс keydir: giving the file, offset, and size of the most recently
     written entry for that key
+  * 
+* реализовать сценарий с удалением значения
+
+
+
 
 
 grafana + prometheus

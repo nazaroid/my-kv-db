@@ -1,18 +1,17 @@
-package org.nazaroid.kvdb.api
+package org.nazaroid.kvdb
 
 import cats.Parallel
 import cats.effect.std.Dispatcher
 import cats.effect.{Async, IO, IOApp}
 import cats.implicits.*
 import com.typesafe.config.ConfigFactory
-import org.nazaroid.kvdb.api.composition.DiContainer
-import org.nazaroid.kvdb.metrics.MetricExporter
-import fs2.io.net.Network
+import org.nazaroid.kvdb.composition.DiContainer
+import org.nazaroid.kvdb.utils.metrics.MetricExporter
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import pureconfig.ConfigSource
 import pureconfig.module.catseffect.syntax.*
 
-final class Application[F[_]: Async: Parallel: Network](implicit d: Dispatcher[F]) {
+final class Application[F[_]: Async: Parallel](implicit d: Dispatcher[F]) {
 
   // noinspection ScalaUnusedSymbol
   def start(): F[Unit] =
@@ -24,11 +23,10 @@ final class Application[F[_]: Async: Parallel: Network](implicit d: Dispatcher[F
           .loadF[F, AppConfig]()
         _      <- if (appConfig.metricsEnabled) new MetricExporter(appConfig.metricsPort).start() else ().pure[F]
         di     <- new DiContainer[F]().pure[F]
-        _      <- di.resolveScyllaMigrator(appConfig).flatMap(_.migrateOrExit())
-        engine <- di.resolveEngine(appConfig)
+        dbSrb <- di.resolveDbServer(appConfig)
         _ <- fs2
           .Stream
-          .emits(Seq(engine.run()))
+          .emits(Seq(dbSrb.run()))
           .parEvalMapUnbounded(identity)
           .compile
           .drain
