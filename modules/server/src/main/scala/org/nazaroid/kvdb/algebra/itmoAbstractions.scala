@@ -1,6 +1,6 @@
 package org.nazaroid.kvdb.algebra.itmo
 
-import org.nazaroid.kvdb.api.algebra.DatabaseException
+import org.nazaroid.kvdb.algebra.DatabaseException
 
 import java.nio.file.Path
 import java.io.IOException

@@ -7,7 +7,7 @@ import cats.effect.kernel.Ref
 import cats.effect.std.Dispatcher
 import cats.implicits.*
 import org.nazaroid.kvdb.AppConfig
-import org.nazaroid.kvdb.api.algebra.DbServer
+import org.nazaroid.kvdb.algebra.DbServer
 import org.typelevel.log4cats.Logger
 
 class DiContainer[F[_]: Async: Logger: Parallel] {

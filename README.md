@@ -18,7 +18,13 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
 -- (позже) Уровень запросов: SQL/JSON 
 - сервисный уровень: API: инстанс
 - движок (файловый уровень) : модуль bitcask
-
+-- DSL + интерпретатор
+- https://typelevel.org/cats/datatypes/freemonad.html
+- App Layer
+- Svc Layer
+- Persistence Layer
+  https://gitlab.com/VictorWinbringer/ddd_scala/-/blob/main/src/main/scala/vw/ddd_scala/core/domain/services/UuidsRepository.scala?ref_type=heads
+-- гексагональная арх-ра
 
 ## TODO
 
