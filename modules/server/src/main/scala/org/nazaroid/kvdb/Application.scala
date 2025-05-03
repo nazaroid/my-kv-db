@@ -21,9 +21,9 @@ final class Application[F[_]: Async: Parallel](implicit d: Dispatcher[F]) {
         appConfig <- ConfigSource
           .fromConfig(ConfigFactory.load(confName).getConfig(AppConfig.appName))
           .loadF[F, AppConfig]()
-        _      <- if (appConfig.metricsEnabled) new MetricExporter(appConfig.metricsPort).start() else ().pure[F]
-        di     <- new DiContainer[F]().pure[F]
-        dbSrb <- di.resolveDbServer(appConfig)
+        _     <- if (appConfig.metricsEnabled) new MetricExporter(appConfig.metricsPort).start() else ().pure[F]
+        di    <- new DiContainer[F]().pure[F]
+        dbSrb <- di.resolveDbServer(appConfig.dbSrvConf)
         _ <- fs2
           .Stream
           .emits(Seq(dbSrb.run()))

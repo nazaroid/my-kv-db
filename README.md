@@ -37,7 +37,18 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
   * segment index - получить offset в segment по ключу ( (Segment, Key) -> SegmentOffsetInfo)
   * Замечание: в bitcast вместо этих двух индексов есть индкекс keydir: giving the file, offset, and size of the most recently
     written entry for that key
-  * 
+
+  реализовать DbServerModule
+  выделить слои (Config, Env, Di)
+     App  
+     Service (Http / Grpc) 
+     Engine (DbServer)
+  переделать тест на Http (Чтобы принимал запросы по Http)
+  потом начать делать BitCast
+  потом переделать на DSL + Free
+     (AppL (run), 
+     ServiceL (startEndpoint httpCfg | grpcCfg)
+     DbSrvL (create, createDb))
 * реализовать сценарий с удалением значения
 
 

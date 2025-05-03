@@ -24,6 +24,23 @@ object Dependencies {
     )
   }
 
+  object Http4s {
+    val Http4sVersion = "0.23.27"
+    val smithy4sVersion = "0.19.0-41-91762fb"
+    val all: Seq[ModuleID] = Seq(
+      "org.http4s" %% "http4s-ember-server" % Http4sVersion,
+      "org.http4s" %% "http4s-ember-client" % Http4sVersion,
+      "org.http4s" %% "http4s-circe" % Http4sVersion,
+      "org.http4s" %% "http4s-dsl" % Http4sVersion,
+      "com.disneystreaming.smithy4s" %% "smithy4s-http4s" % smithy4sVersion excludeAll(
+        ExclusionRule("org.scala-lang.modules")
+        ),
+      "com.disneystreaming.smithy4s" %% "smithy4s-http4s-swagger" % smithy4sVersion excludeAll(
+        ExclusionRule("org.scala-lang.modules")
+        )
+    )
+  }
+
   object Fs2 {
     private val fs2Streams = "co.fs2" %% "fs2-core" % "3.10.2"
 

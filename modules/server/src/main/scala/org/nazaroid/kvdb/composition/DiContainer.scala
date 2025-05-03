@@ -6,19 +6,19 @@ import cats.effect.Async
 import cats.effect.kernel.Ref
 import cats.effect.std.Dispatcher
 import cats.implicits.*
-import org.nazaroid.kvdb.AppConfig
-import org.nazaroid.kvdb.algebra.DbServer
+import org.nazaroid.kvdb.algebra.{DbServer, DbSrvConf}
+import org.nazaroid.kvdb.srv.DbSrvState
 import org.typelevel.log4cats.Logger
 
 class DiContainer[F[_]: Async: Logger: Parallel] {
 
-  private val appState =
-    AppState(
+  private val state =
+    DbSrvState(
       Ref.unsafe("")
     )
 
   def resolveDbServer(
-    appConfig: AppConfig
+    conf: DbSrvConf
   )(implicit
     d: Dispatcher[F]
   ): F[DbServer[F]] = {
@@ -27,7 +27,7 @@ class DiContainer[F[_]: Async: Logger: Parallel] {
         dbServer <- dbServerK
       } yield dbServer
     }
-  }.run(appConfig)
+  }.run(conf)
 
   private def dbServerK(
     implicit
@@ -40,10 +40,10 @@ class DiContainer[F[_]: Async: Logger: Parallel] {
   private def commonModuleK(
     implicit
     d: Dispatcher[F]
-  ): Kleisli[F, AppConfig, CommonModule[F]] =
-    Kleisli { (appConfig: AppConfig) =>
+  ): Kleisli[F, DbSrvConf, CommonModule[F]] =
+    Kleisli { (conf: DbSrvConf) =>
       {
-        new CommonModule(appConfig, appState, d).pure[F]
+        new CommonModule(conf, state, d).pure[F]
       }
 
     }
