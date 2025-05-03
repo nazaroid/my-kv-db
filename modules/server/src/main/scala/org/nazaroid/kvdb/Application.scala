@@ -5,7 +5,7 @@ import cats.effect.std.Dispatcher
 import cats.effect.{Async, IO, IOApp}
 import cats.implicits.*
 import com.typesafe.config.ConfigFactory
-import org.nazaroid.kvdb.composition.DiContainer
+import org.nazaroid.kvdb.srv.composition.DiContainer
 import org.nazaroid.kvdb.utils.metrics.MetricExporter
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import pureconfig.ConfigSource

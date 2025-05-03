@@ -1,4 +1,4 @@
-package org.nazaroid.kvdb.composition
+package org.nazaroid.kvdb.srv.composition
 
 import cats.Parallel
 import cats.effect.Async

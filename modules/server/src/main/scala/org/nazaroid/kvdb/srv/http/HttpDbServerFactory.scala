@@ -4,7 +4,7 @@ import cats.effect.IO
 import cats.effect.std.Dispatcher
 import cats.effect.unsafe.IORuntime
 import org.nazaroid.kvdb.algebra.{DbServer, DbSrvConf}
-import org.nazaroid.kvdb.composition.DiContainer
+import org.nazaroid.kvdb.srv.composition.DiContainer
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
