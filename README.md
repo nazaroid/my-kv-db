@@ -38,14 +38,17 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
   * Замечание: в bitcast вместо этих двух индексов есть индкекс keydir: giving the file, offset, and size of the most recently
     written entry for that key
 
-  реализовать DbServerModule
-  выделить слои (Config, Env, Di)
+
+  (+) выделить слои (Config, Env, Di)
      App  
      Service (Http / Grpc) 
      Engine (DbServer)
-  переделать тест на Http (Чтобы принимал запросы по Http)
-  потом начать делать BitCast
-  потом переделать на DSL + Free
+
+  реализовать DbServerModule
+  реализовать HttpDbServer
+  сделать Engine на Map[String, String]
+  потом начать делать BitCask
+  потом переделать на DSL + Free (можно только AppL и ServiceL)
      (AppL (run), 
      ServiceL (startEndpoint httpCfg | grpcCfg)
      DbSrvL (create, createDb))
