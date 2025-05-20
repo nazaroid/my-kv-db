@@ -14,13 +14,14 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
 
 
 ## Архитектура
-- уровень endpoint: http/grpc
+- уровень server: http/grpc
 -- (позже) Уровень запросов: SQL/JSON 
 - сервисный уровень: API: инстанс
 - движок (файловый уровень) : модуль bitcask
 -- DSL + интерпретатор
 - https://typelevel.org/cats/datatypes/freemonad.html
 - App Layer
+- Server Layer
 - Svc Layer
 - Persistence Layer
   https://gitlab.com/VictorWinbringer/ddd_scala/-/blob/main/src/main/scala/vw/ddd_scala/core/domain/services/UuidsRepository.scala?ref_type=heads
@@ -41,11 +42,15 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
 
   (+) выделить слои (Config, Env, Di)
      App  
-     Service (Http / Grpc) 
-     Engine (DbServer)
+     Server (Http / Grpc) 
+     Engine (BitCaskDbEngine)
 
   реализовать DbServerModule
   реализовать HttpDbServer
+   - POST http://$host:$port/db
+   - POST http://$host:$port/db/tbl
+   - POST http://$host:$port/db/key
+   - GET  http://$host:$port/db/key
   сделать Engine на Map[String, String]
   потом начать делать BitCask
   потом переделать на DSL + Free (можно только AppL и ServiceL)
