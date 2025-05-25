@@ -47,10 +47,10 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
 
   реализовать DbServerModule
   реализовать HttpDbServer
-   - POST http://$host:$port/db
-   - POST http://$host:$port/db/tbl
-   - POST http://$host:$port/db/key
-   - GET  http://$host:$port/db/key
+   - POST http://$host:$port/data/db
+   - POST http://$host:$port/data/db/tbl
+   - POST http://$host:$port/data/db/key
+   - GET  http://$host:$port/data/db/key
   сделать Engine на Map[String, String]
   потом начать делать BitCask
   потом переделать на DSL + Free (можно только AppL и ServiceL)

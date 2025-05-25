@@ -1,11 +1,8 @@
+import Dependencies.{CatsEffect, Fs2, Http4s, Prometheus, Testing}
 import com.typesafe.sbt.SbtNativePackager.Docker
-import com.typesafe.sbt.packager.Keys.dockerRepository
 import sbt.Keys.*
 import sbt.{Def, *}
 import sbtassembly.AssemblyKeys.*
-import sbtassembly.AssemblyPlugin.autoImport.ShadeRule
-import sbtassembly.MergeStrategy
-import sbtassembly.PathList
 
 object BuildSettings {
   val javaVersion = "1.8"
@@ -32,6 +29,7 @@ object BuildSettings {
 
   lazy val commonSettings: Seq[Setting[?]] = Seq(
     organization := s"org.nazaroid.db",
+    libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Http4s.all ++ Prometheus.all ++ Testing.all,
     scalaVersion := Dependencies.Scala.version,
     javacOptions ++= Seq("-source", javaVersion, "-target", javaVersion),
     updateOptions := updateOptions.value.withGigahorse(false),

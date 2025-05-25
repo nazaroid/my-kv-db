@@ -5,7 +5,8 @@ val GLOBAL_VERSION = "25.2.1.0"
 
 lazy val root = (project in file("."))
   .aggregate(
-    `server`
+    `server`,
+    `prometheus`
   )
   .settings(
     commonSettings,
@@ -20,7 +21,24 @@ lazy val root = (project in file("."))
     publishLocal := {}
   )
 
+lazy val `prometheus` = (project in file("modules/prometheus"))
+  .enablePlugins(DockerPlugin, JavaAppPackaging)
+  .disablePlugins(AssemblyPlugin)
+  .configs(Integration)
+  .settings(
+    commonSettings,
+    name := "prometheus",
+    version := GLOBAL_VERSION,
+    excludeDependencies -= ExclusionRule("log4j", "log4j"),
+    Test / testOptions += Tests
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/prometheus/unit-tests-html-report"),
+    inConfig(Integration)(Defaults.testSettings),
+    Integration / testOptions += Tests
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/prometheus/integration-tests-html-report")
+  )
+
 lazy val `server` = (project in file("modules/server"))
+  .dependsOn(`prometheus` % "compile->compile;test->test;it->it")
   .enablePlugins(DockerPlugin, JavaAppPackaging)
   .disablePlugins(AssemblyPlugin)
   .configs(Integration)

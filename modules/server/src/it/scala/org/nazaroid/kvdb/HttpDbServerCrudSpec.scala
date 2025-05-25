@@ -25,22 +25,22 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
         srv      <- dbServerFactory.create(config)
         instance <- srv.run()
 
-        req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/db"))
+        req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db"))
         _    <- logger.info(f"create db request: $req")
         resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
         _    <- logger.info(f"create db response: $resp")
 
-        req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/db/tbl"))
+        req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl"))
         _    <- logger.info(f"create tbl request: $req")
         resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
         _    <- logger.info(f"create tbl response: $resp")
 
-        req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/db/tbl/key")).withEntity("value")
+        req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key")).withEntity("value")
         _    <- logger.info(f"set value request: $req")
         resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
         _    <- logger.info(f"set value response: $resp")
 
-        req = Request[IO](GET, Uri.unsafeFromString(s"http://$host:$port/db/tbl/key"))
+        req = Request[IO](GET, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key"))
         _    <- logger.info(f"get value request: $req")
         resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
         _    <- logger.info(f"get value response: $resp")
