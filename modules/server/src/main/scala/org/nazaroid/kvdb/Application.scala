@@ -5,13 +5,14 @@ import cats.effect.std.Dispatcher
 import cats.effect.{Async, IO, IOApp}
 import cats.implicits.*
 import com.typesafe.config.ConfigFactory
-import org.nazaroid.kvdb.srv.composition.DiContainer
+import fs2.io.net.Network
+import org.nazaroid.kvdb.srv.http.HttpDbServerFactory
 import org.nazaroid.kvdb.utils.metrics.MetricExporter
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import pureconfig.ConfigSource
 import pureconfig.module.catseffect.syntax.*
 
-final class Application[F[_]: Async: Parallel](implicit d: Dispatcher[F]) {
+final class Application[F[_]: Async: Parallel: Network](implicit d: Dispatcher[F]) {
 
   // noinspection ScalaUnusedSymbol
   def start(): F[Unit] =
@@ -21,15 +22,8 @@ final class Application[F[_]: Async: Parallel](implicit d: Dispatcher[F]) {
         appConfig <- ConfigSource
           .fromConfig(ConfigFactory.load(confName).getConfig(AppConfig.appName))
           .loadF[F, AppConfig]()
-        _     <- if (appConfig.metricsEnabled) new MetricExporter(appConfig.metricsPort).start() else ().pure[F]
-        di    <- new DiContainer[F]().pure[F]
-        dbSrb <- di.resolveDbServer(appConfig.dbSrvConf)
-        _ <- fs2
-          .Stream
-          .emits(Seq(dbSrb.run()))
-          .parEvalMapUnbounded(identity)
-          .compile
-          .drain
+        _ <- if (appConfig.metricsEnabled) new MetricExporter(appConfig.metricsPort).start() else ().pure[F]
+        _ <- new HttpDbServerFactory().start(appConfig.dbSrvConf).pure[F]
       } yield ()
     }
 }

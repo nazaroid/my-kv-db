@@ -1,7 +1,8 @@
 package org.nazaroid.kvdb
 
 import cats.effect.IO
-import cats.effect.unsafe.implicits.global
+import cats.effect.kernel.Async
+import cats.effect.unsafe.IORuntime
 import org.http4s.Method.{GET, POST}
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.{EntityDecoder, Request, Uri}
@@ -19,11 +20,9 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
     val config = DbSrvConf()
     import config.*
     {
-      val dbServerFactory = new HttpDbServerFactory()
       for {
         logger   <- Slf4jLogger.create[IO]
-        srv      <- dbServerFactory.create(config)
-        instance <- srv.run()
+        instance <- new HttpDbServerFactory[IO]().start(config)
 
         req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db"))
         _    <- logger.info(f"create db request: $req")
@@ -44,12 +43,12 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
         _    <- logger.info(f"get value request: $req")
         resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
         _    <- logger.info(f"get value response: $resp")
-        _    <- instance.stop()
+        _    <- Async[IO].blocking(instance.stop())
       } yield {
         assert(resp == "value")
       }
 
-    }.unsafeRunSync()
+    }.unsafeRunSync()(IORuntime.builder().build())
   }
 }
 

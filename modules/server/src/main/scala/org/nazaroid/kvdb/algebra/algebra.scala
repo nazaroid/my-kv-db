@@ -1,29 +1,30 @@
 package org.nazaroid.kvdb.algebra
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 class DatabaseException extends Exception
 
+//noinspection ScalaStyle
 final case class DbSrvConf(
   host:           String = "127.0.0.1",
   port:           Int = 9000,
   maxConnections: Int = 1024,
-  idleTimeout:    FiniteDuration = 60 seconds)
+  idleTimeout:    FiniteDuration = 60.seconds)
 
 trait DbServerFactory[F[_]] {
   def create(conf: DbSrvConf): F[DbServer[F]]
 }
 
-trait ServerRuntime[F[_]] {
+trait DbRuntime[F[_]] {
   def shutdown(): Unit
 }
 
 trait DbServer[F[_]] {
-  def run(): F[DbServerHandle[F]]
+  def run(): F[DbServerHandle]
 }
 
-trait DbServerHandle[F[_]] {
-  def stop(): F[Unit]
+trait DbServerHandle {
+  def stop(): Unit
 }
 
 trait DbEngine[F[_]] {

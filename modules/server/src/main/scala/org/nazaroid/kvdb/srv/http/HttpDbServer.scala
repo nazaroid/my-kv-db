@@ -1,29 +1,26 @@
 package org.nazaroid.kvdb.srv.http
 
-import cats.effect.implicits.given
+import cats.effect.*
 import cats.implicits.given
-import cats.effect.{Async, Resource, unsafe}
 import com.comcast.ip4s.{Ipv4Address, Port}
+import fs2.io.net.Network
 import io.prometheus.client.CollectorRegistry
-import org.http4s.HttpRoutes
+import org.http4s.*
 import org.http4s.Status.Ok
 import org.http4s.Uri.Path.Root
-import org.http4s.ember.server.EmberServerBuilder
-import org.nazaroid.kvdb.algebra.{DbServer, DbServerHandle, DbSrvConf, ServerRuntime}
-import org.typelevel.log4cats.Logger as String
-import smithy4s.http.HttpMethod.GET
-import org.http4s.metrics.prometheus.Prometheus
-import org.http4s.*
 import org.http4s.dsl.Http4sDsl
 import org.http4s.ember.server.*
-import org.http4s.headers.`Content-Type`
+import org.http4s.metrics.prometheus.Prometheus
 import org.http4s.server.*
-import cats.effect.*
-import cats.syntax.all.*
+import org.http4s.server.middleware.Metrics
+import org.nazaroid.kvdb.algebra.{DbRuntime, DbServer, DbServerHandle, DbSrvConf}
+import org.nazaroid.kvdb.srv.http.middlewares.Err
+import org.typelevel.log4cats.Logger
 
-class HttpDbServer[F[_]: Async: ServerRuntime](config: DbSrvConf) extends DbServer[F] {
+class HttpDbServer[F[_]: Async: DbRuntime: Logger: Network](config: DbSrvConf) extends DbServer[F] with Err[F] {
+  import dsl.*
 
-  override def run(): F[DbServerHandle[F]] = {
+  override def run(): F[DbServerHandle] = {
     val host = Ipv4Address
       .fromString(config.host)
       .getOrElse(throw new IllegalArgumentException(config.host))
@@ -42,22 +39,24 @@ class HttpDbServer[F[_]: Async: ServerRuntime](config: DbSrvConf) extends DbServ
         .build
     )
 
-    new DbServerHandle[F] {
-        override def stop(): F[Unit] = {
-          CollectorRegistry.defaultRegistry.clear()
-          Async[F].blocking(summon[ServerRuntime[F]].shutdown())
-        }
-      }.pure[F]
+    new DbServerHandle {
+      override def stop(): Unit = {
+        CollectorRegistry.defaultRegistry.clear()
+        Async[F].blocking(summon[DbRuntime[F]].shutdown())
+      }
+    }.pure[F]
   }
 
   private def routes: Resource[F, HttpRoutes[F]] =
     for {
-      data <- DataController()
+      data   <- DataController()
       health <- HealthController()
     } yield Router(
-      "/data" -> data,
+      "/data"   -> data,
       "/health" -> health
     )
+
+  private object dsl extends Http4sDsl[F]
 
   private object DataController {
 
