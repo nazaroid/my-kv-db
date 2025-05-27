@@ -3,7 +3,7 @@ package org.nazaroid.kvdb.srv.http
 import cats.effect.unsafe.IORuntime
 import io.prometheus.client.CollectorRegistry
 
-final class DbRuntimeIO(val io: IORuntime = IORuntime.builder().build()) {
+final class DbRuntime(val io: IORuntime = IORuntime.builder().build()) {
 
   def shutdown(): Unit = {
     {

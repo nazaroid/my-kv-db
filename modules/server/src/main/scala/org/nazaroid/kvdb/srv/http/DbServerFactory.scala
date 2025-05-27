@@ -4,12 +4,12 @@ import cats.effect.IO
 import cats.effect.implicits.given
 import cats.effect.std.Dispatcher
 import fs2.io.net.Network
-import org.nazaroid.kvdb.algebra.{DbServerFactory, DbSrvConf}
+import org.nazaroid.kvdb.algebra.DbSrvConf
 import org.nazaroid.kvdb.srv.composition.DiContainer
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-final class DbServerFactoryIO(val rt: DbRuntimeIO = new DbRuntimeIO()) extends DbServerFactory {
+final class DbServerFactory(val rt: DbRuntime = new DbRuntime()) {
 
   def runSync(conf: DbSrvConf): Unit = start(conf).unsafeRunSync()(rt.io)
 
