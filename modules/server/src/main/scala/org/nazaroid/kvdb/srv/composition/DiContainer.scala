@@ -7,11 +7,11 @@ import cats.effect.kernel.Ref
 import cats.effect.std.Dispatcher
 import cats.implicits.*
 import fs2.io.net.Network
-import org.nazaroid.kvdb.algebra.{DbRuntime, DbServer, DbSrvConf}
+import org.nazaroid.kvdb.algebra.{DbServer, DbSrvConf}
 import org.nazaroid.kvdb.srv.DbSrvState
 import org.typelevel.log4cats.Logger
 
-class DiContainer[F[_]: Async: Logger: Parallel: DbRuntime: Network] {
+class DiContainer[F[_]: Async: Logger: Parallel: Network] {
 
   private val state =
     DbSrvState(

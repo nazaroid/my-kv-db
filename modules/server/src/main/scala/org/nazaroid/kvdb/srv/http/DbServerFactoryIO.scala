@@ -9,7 +9,7 @@ import org.nazaroid.kvdb.srv.composition.DiContainer
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-final class HttpDbServerFactory(implicit val rt: DbRuntimeIO) extends DbServerFactory[IO] {
+final class DbServerFactoryIO(val rt: DbRuntimeIO = new DbRuntimeIO()) extends DbServerFactory {
 
   def startSync(conf: DbSrvConf): Unit = start(conf).unsafeRunSync()(rt.io)
 

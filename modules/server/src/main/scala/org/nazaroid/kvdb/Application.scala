@@ -6,7 +6,7 @@ import cats.effect.{Async, IO, IOApp}
 import cats.implicits.*
 import com.typesafe.config.ConfigFactory
 import fs2.io.net.Network
-import org.nazaroid.kvdb.srv.http.HttpDbServerFactory
+import org.nazaroid.kvdb.srv.http.DbServerFactoryIO
 import org.nazaroid.kvdb.utils.metrics.MetricExporter
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import pureconfig.ConfigSource
@@ -23,7 +23,7 @@ final class Application[F[_]: Async: Parallel: Network](implicit d: Dispatcher[F
           .fromConfig(ConfigFactory.load(confName).getConfig(AppConfig.appName))
           .loadF[F, AppConfig]()
         _ <- if (appConfig.metricsEnabled) new MetricExporter(appConfig.metricsPort).start() else ().pure[F]
-        _ <- Async[F].blocking(new HttpDbServerFactory().startSync(appConfig.dbSrvConf))
+        _ <- Async[F].blocking(new DbServerFactoryIO().startSync(appConfig.dbSrvConf))
       } yield ()
     }
 }

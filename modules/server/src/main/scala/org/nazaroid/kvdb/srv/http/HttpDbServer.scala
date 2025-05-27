@@ -13,11 +13,11 @@ import org.http4s.ember.server.*
 import org.http4s.metrics.prometheus.Prometheus
 import org.http4s.server.*
 import org.http4s.server.middleware.Metrics
-import org.nazaroid.kvdb.algebra.{DbRuntime, DbServer, DbSrvConf}
+import org.nazaroid.kvdb.algebra.{DbServer, DbSrvConf}
 import org.nazaroid.kvdb.srv.http.middlewares.Err
 import org.typelevel.log4cats.Logger
 
-class HttpDbServer[F[_]: Async: DbRuntime: Logger: Network](config: DbSrvConf) extends DbServer[F] with Err[F] {
+final class HttpDbServer[F[_]: Async: Logger: Network](config: DbSrvConf) extends DbServer[F] with Err[F] {
   import dsl.*
 
   override def run(): F[Unit] = {
