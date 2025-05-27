@@ -25,7 +25,7 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
       for {
         logger <- Slf4jLogger.create[IO]
         rt = new DbRuntimeIO()
-        _ <- Async[IO].blocking(new DbServerFactoryIO(rt).startAsync(config))
+        _ <- Async[IO].blocking(new DbServerFactoryIO(rt).runAsync(config))
         _ <- Async[IO].sleep(100.millis)
         req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db"))
         _    <- logger.info(f"create db request: $req")

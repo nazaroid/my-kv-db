@@ -12,8 +12,8 @@ final case class DbSrvConf(
   idleTimeout:    FiniteDuration = 60.seconds)
 
 trait DbServerFactory {
-  def startSync(conf: DbSrvConf):  Unit
-  def startAsync(conf: DbSrvConf): Unit
+  def runSync(conf: DbSrvConf):  Unit
+  def runAsync(conf: DbSrvConf): Unit
 }
 
 trait DbServer[F[_]] {
