@@ -13,14 +13,14 @@ import org.http4s.ember.server.*
 import org.http4s.metrics.prometheus.Prometheus
 import org.http4s.server.*
 import org.http4s.server.middleware.Metrics
-import org.nazaroid.kvdb.algebra.{DbRuntime, DbServer, DbServerHandle, DbSrvConf}
+import org.nazaroid.kvdb.algebra.{DbRuntime, DbServer, DbSrvConf}
 import org.nazaroid.kvdb.srv.http.middlewares.Err
 import org.typelevel.log4cats.Logger
 
 class HttpDbServer[F[_]: Async: DbRuntime: Logger: Network](config: DbSrvConf) extends DbServer[F] with Err[F] {
   import dsl.*
 
-  override def run(): F[DbServerHandle] = {
+  override def run(): F[Unit] = {
     val host = Ipv4Address
       .fromString(config.host)
       .getOrElse(throw new IllegalArgumentException(config.host))
@@ -28,23 +28,20 @@ class HttpDbServer[F[_]: Async: DbRuntime: Logger: Network](config: DbSrvConf) e
       .fromInt(config.port)
       .getOrElse(throw new IllegalArgumentException(config.port.toString))
 
-    val resource = routes.flatMap(r =>
-      EmberServerBuilder
-        .default[F]
-        .withHost(host)
-        .withPort(port)
-        .withHttpApp(r.orNotFound)
-        .withIdleTimeout(config.idleTimeout)
-        .withMaxConnections(config.maxConnections)
-        .build
-    )
-
-    new DbServerHandle {
-      override def stop(): Unit = {
-        CollectorRegistry.defaultRegistry.clear()
-        Async[F].blocking(summon[DbRuntime[F]].shutdown())
-      }
-    }.pure[F]
+    routes
+      .flatMap(r =>
+        EmberServerBuilder
+          .default[F]
+          .withHost(host)
+          .withPort(port)
+          .withHttpApp(r.orNotFound)
+          .withIdleTimeout(config.idleTimeout)
+          .withMaxConnections(config.maxConnections)
+          .build
+      )
+      .useForever
+      .as(ExitCode.Success)
+      .map(_ => ())
   }
 
   private def routes: Resource[F, HttpRoutes[F]] =
@@ -66,7 +63,7 @@ class HttpDbServer[F[_]: Async: DbRuntime: Logger: Network](config: DbSrvConf) e
       }
       for {
         healthServiceMetrics <- Prometheus
-          .metricsOps[F](CollectorRegistry.defaultRegistry, "health")
+          .metricsOps[F](CollectorRegistry.defaultRegistry, "data")
       } yield Metrics[F](healthServiceMetrics)(withErrorLogging(healthService))
     }
 

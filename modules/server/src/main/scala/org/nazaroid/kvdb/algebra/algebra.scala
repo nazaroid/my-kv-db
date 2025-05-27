@@ -11,8 +11,9 @@ final case class DbSrvConf(
   maxConnections: Int = 1024,
   idleTimeout:    FiniteDuration = 60.seconds)
 
-trait DbServerFactory[F[_]] {
-  def create(conf: DbSrvConf): F[DbServer[F]]
+trait DbServerFactory[F[_]: DbRuntime] {
+  def startSync(conf: DbSrvConf): Unit
+  def startAsync(conf: DbSrvConf): Unit
 }
 
 trait DbRuntime[F[_]] {
@@ -20,11 +21,7 @@ trait DbRuntime[F[_]] {
 }
 
 trait DbServer[F[_]] {
-  def run(): F[DbServerHandle]
-}
-
-trait DbServerHandle {
-  def stop(): Unit
+  def run(): F[Unit]
 }
 
 trait DbEngine[F[_]] {

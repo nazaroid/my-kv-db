@@ -7,9 +7,11 @@ import org.http4s.Method.{GET, POST}
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.{EntityDecoder, Request, Uri}
 import org.nazaroid.kvdb.algebra.DbSrvConf
-import org.nazaroid.kvdb.srv.http.HttpDbServerFactory
+import org.nazaroid.kvdb.srv.http.{DbRuntimeIO, HttpDbServerFactory}
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+
+import scala.concurrent.duration.DurationInt
 
 // noinspection ScalaUnusedSymbol
 final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
@@ -21,9 +23,10 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
     import config.*
     {
       for {
-        logger   <- Slf4jLogger.create[IO]
-        instance <- new HttpDbServerFactory[IO]().start(config)
-
+        logger <- Slf4jLogger.create[IO]
+        rt = new DbRuntimeIO()
+        _ <- Async[IO].blocking(new HttpDbServerFactory()(rt).startAsync(config))
+        _ <- Async[IO].sleep(100.millis)
         req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db"))
         _    <- logger.info(f"create db request: $req")
         resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
@@ -43,7 +46,7 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
         _    <- logger.info(f"get value request: $req")
         resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
         _    <- logger.info(f"get value response: $resp")
-        _    <- Async[IO].blocking(instance.stop())
+        _    <- Async[IO].blocking(rt.shutdown())
       } yield {
         assert(resp == "value")
       }
