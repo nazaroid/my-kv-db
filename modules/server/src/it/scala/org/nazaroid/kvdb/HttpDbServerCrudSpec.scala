@@ -6,7 +6,7 @@ import cats.effect.unsafe.IORuntime
 import org.http4s.Method.{GET, POST}
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.{EntityDecoder, Request, Uri}
-import org.nazaroid.kvdb.srv.{DbRuntime, DbServerFactory, DbSrvConf}
+import org.nazaroid.kvdb.srv.DbRuntime
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
@@ -18,13 +18,13 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
   it should "`set` and `get` the same value" in {
     val responseDecoder: EntityDecoder[IO, String] = EntityDecoder.text
 
-    val config = DbSrvConf()
+    val config = DbConf()
     import config.*
     {
       for {
         logger <- Slf4jLogger.create[IO]
         rt = new DbRuntime()
-        _ <- Async[IO].blocking(new DbServerFactory(rt).runAsync(config))
+        _ <- Async[IO].blocking(new Db(rt).runAsync(config))
         _ <- Async[IO].sleep(100.millis)
         req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db"))
         _    <- logger.info(f"create db request: $req")

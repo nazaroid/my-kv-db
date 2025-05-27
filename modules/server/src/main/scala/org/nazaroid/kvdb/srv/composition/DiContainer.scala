@@ -7,8 +7,9 @@ import cats.effect.kernel.Ref
 import cats.effect.std.Dispatcher
 import cats.implicits.*
 import fs2.io.net.Network
+import org.nazaroid.kvdb.DbConf
 import org.nazaroid.kvdb.algebra.DbServer
-import org.nazaroid.kvdb.srv.{DbSrvConf, DbSrvState}
+import org.nazaroid.kvdb.srv.DbSrvState
 import org.typelevel.log4cats.Logger
 
 class DiContainer[F[_]: Async: Logger: Parallel: Network] {
@@ -19,7 +20,7 @@ class DiContainer[F[_]: Async: Logger: Parallel: Network] {
     )
 
   def resolveDbServer(
-    conf: DbSrvConf
+    conf: DbConf
   )(implicit
     d: Dispatcher[F]
   ): F[DbServer[F]] = {
@@ -41,8 +42,8 @@ class DiContainer[F[_]: Async: Logger: Parallel: Network] {
   private def commonModuleK(
     implicit
     d: Dispatcher[F]
-  ): Kleisli[F, DbSrvConf, CommonModule[F]] =
-    Kleisli { (conf: DbSrvConf) =>
+  ): Kleisli[F, DbConf, CommonModule[F]] =
+    Kleisli { (conf: DbConf) =>
       {
         new CommonModule(conf, state, d).pure[F]
       }
