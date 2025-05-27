@@ -2,8 +2,7 @@ package org.nazaroid.kvdb.srv.composition
 
 import cats.effect.Async
 import cats.effect.std.Dispatcher
-import org.nazaroid.kvdb.algebra.DbSrvConf
-import org.nazaroid.kvdb.srv.DbSrvState
+import org.nazaroid.kvdb.srv.{DbSrvConf, DbSrvState}
 
 final class CommonModule[F[_]: Async](
   c: DbSrvConf,

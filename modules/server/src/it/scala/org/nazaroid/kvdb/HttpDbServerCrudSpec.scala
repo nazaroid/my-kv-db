@@ -6,8 +6,7 @@ import cats.effect.unsafe.IORuntime
 import org.http4s.Method.{GET, POST}
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.{EntityDecoder, Request, Uri}
-import org.nazaroid.kvdb.algebra.DbSrvConf
-import org.nazaroid.kvdb.srv.http.{DbRuntime, DbServerFactory}
+import org.nazaroid.kvdb.srv.{DbRuntime, DbServerFactory, DbSrvConf}
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 

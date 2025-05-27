@@ -1,4 +1,4 @@
-package org.nazaroid.kvdb.srv.http
+package org.nazaroid.kvdb.srv
 
 import cats.effect.unsafe.IORuntime
 import io.prometheus.client.CollectorRegistry

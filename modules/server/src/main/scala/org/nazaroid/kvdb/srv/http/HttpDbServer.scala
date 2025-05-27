@@ -13,7 +13,8 @@ import org.http4s.ember.server.*
 import org.http4s.metrics.prometheus.Prometheus
 import org.http4s.server.*
 import org.http4s.server.middleware.Metrics
-import org.nazaroid.kvdb.algebra.{DbServer, DbSrvConf}
+import org.nazaroid.kvdb.algebra.DbServer
+import org.nazaroid.kvdb.srv.DbSrvConf
 import org.nazaroid.kvdb.srv.http.middlewares.Err
 import org.typelevel.log4cats.Logger
 

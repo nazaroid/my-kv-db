@@ -6,7 +6,7 @@ import cats.effect.{Async, IO, IOApp}
 import cats.implicits.*
 import com.typesafe.config.ConfigFactory
 import fs2.io.net.Network
-import org.nazaroid.kvdb.srv.http.DbServerFactory
+import org.nazaroid.kvdb.srv.DbServerFactory
 import org.nazaroid.kvdb.utils.metrics.MetricExporter
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import pureconfig.ConfigSource

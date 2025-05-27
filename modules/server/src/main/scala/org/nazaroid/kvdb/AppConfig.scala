@@ -1,6 +1,6 @@
 package org.nazaroid.kvdb
 
-import org.nazaroid.kvdb.algebra.DbSrvConf
+import org.nazaroid.kvdb.srv.DbSrvConf
 import pureconfig.*
 import pureconfig.generic.derivation.default.*
 
