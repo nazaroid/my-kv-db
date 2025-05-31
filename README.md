@@ -46,8 +46,8 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
      Engine (BitCaskDbEngine)
 
   реализовать HttpDbServer
-   - POST http://$host:$port/data/db
-   - POST http://$host:$port/data/db/tbl
+   - POST 201 http://$host:$port/data/db
+   - POST 201 http://$host:$port/data/db/tbl
    - POST http://$host:$port/data/db/key
    - GET  http://$host:$port/data/db/key
   сделать Engine на Map[String, String]

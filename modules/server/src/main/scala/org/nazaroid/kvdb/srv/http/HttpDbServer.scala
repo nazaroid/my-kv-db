@@ -14,11 +14,13 @@ import org.http4s.metrics.prometheus.Prometheus
 import org.http4s.server.*
 import org.http4s.server.middleware.Metrics
 import org.nazaroid.kvdb.DbConf
-import org.nazaroid.kvdb.algebra.DbServer
+import org.nazaroid.kvdb.algebra.{DbEngine, DbServer}
 import org.nazaroid.kvdb.srv.http.middlewares.Err
 import org.typelevel.log4cats.Logger
 
-final class HttpDbServer[F[_]: Async: Logger: Network](config: DbConf) extends DbServer[F] with Err[F] {
+final class HttpDbServer[F[_]: Async: Logger: Network](config: DbConf, engine: DbEngine[F])
+    extends DbServer[F]
+    with Err[F] {
   import dsl.*
 
   override def run(): F[Unit] = {
@@ -47,25 +49,59 @@ final class HttpDbServer[F[_]: Async: Logger: Network](config: DbConf) extends D
 
   private def routes: Resource[F, HttpRoutes[F]] =
     for {
-      data   <- DataController()
+      data   <- DataController(engine)
       health <- HealthController()
     } yield Router(
       "/data"   -> data,
       "/health" -> health
     )
 
+  // noinspection ScalaStyle
   private object dsl extends Http4sDsl[F]
 
   private object DataController {
 
-    def apply(): Resource[F, HttpRoutes[F]] = {
-      val healthService: HttpRoutes[F] = HttpRoutes.of[F] { case GET -> Root =>
-        Ok("healthy")
+    def apply(engine: DbEngine[F]): Resource[F, HttpRoutes[F]] = {
+      val dataService: HttpRoutes[F] = HttpRoutes.of[F] {
+        // get value
+        case GET -> Root / dbName / tblName / key =>
+          {
+            for {
+              db  <- engine.getDatabase(dbName)
+              tbl <- db.getTable(tblName)
+              v   <- tbl.get(key)
+            } yield Ok(v)
+          }.flatten
+        // set value
+        case r @ POST -> Root / dbName / tblName / key =>
+          {
+            for {
+              db  <- engine.getDatabase(dbName)
+              tbl <- db.getTable(tblName)
+              v   <- r.bodyText.compile.fold("")(_ + _)
+              _   <- tbl.set(key, v)
+            } yield Ok("OK")
+          }.flatten
+        // create tbl
+        case POST -> Root / dbName / tblName =>
+          {
+            for {
+              db <- engine.getDatabase(dbName)
+              _  <- db.createTable(tblName)
+            } yield Ok("OK")
+          }.flatten
+        // create db
+        case POST -> Root / dbName =>
+          {
+            for {
+              _ <- engine.createDatabase(dbName)
+            } yield Ok("OK")
+          }.flatten
       }
       for {
-        healthServiceMetrics <- Prometheus
+        dataServiceMetrics <- Prometheus
           .metricsOps[F](CollectorRegistry.defaultRegistry, "data")
-      } yield Metrics[F](healthServiceMetrics)(withErrorLogging(healthService))
+      } yield Metrics[F](dataServiceMetrics)(withErrorLogging(dataService))
     }
 
   }

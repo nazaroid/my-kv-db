@@ -1,9 +1,9 @@
-package org.nazaroid.kvdb.algebra.itmo
+package org.nazaroid.kvdb.engine.bitcask
 
 import org.nazaroid.kvdb.algebra.DatabaseException
 
-import java.nio.file.Path
 import java.io.IOException
+import java.nio.file.Path
 
 
 @FunctionalInterface trait DatabaseFactory {
