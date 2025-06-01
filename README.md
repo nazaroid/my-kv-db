@@ -58,6 +58,7 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
      - описать файловую структуру (все файлы и папки)
        - TODO: остановился на индексах в my-kv-db.drawio
        -- обдумать какое содержимое индексов и описать каждый
+       -- см раздел Индексирвание в файле на GoogleDisk
   
 ???(обдумать) сделать в engine приемку команд при помощи fs2
 ** public CompletableFuture<DatabaseCommandResult> executeNextCommand(DatabaseCommand command)
