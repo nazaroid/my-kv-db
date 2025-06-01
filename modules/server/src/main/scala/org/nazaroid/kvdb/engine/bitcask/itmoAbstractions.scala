@@ -16,7 +16,7 @@ import java.nio.file.Path
    * @throws DatabaseException если база данных с данным именем уже существует или если произошла ошибка ввода-вывода
    */
   @throws[DatabaseException]
-  def createNonExistent(dbName: String, dbRoot: Path): Nothing
+  def createNonExistent(dbName: String, dbRoot: Path): Database
 }
 
 trait Database {

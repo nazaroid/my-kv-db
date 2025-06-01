@@ -51,14 +51,24 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
    - POST http://$host:$port/data/db/key
    - GET  http://$host:$port/data/db/key
      (+) сделать Engine на Map[String, String]
-     (!) не работают Логи
+
   потом начать делать BitCask
+   - Проектирование: 
+     - описать систему классов
+     - описать файловую структуру (все файлы и папки)
+       - TODO: остановился на индексах в my-kv-db.drawio
+       -- обдумать какое содержимое индексов и описать каждый
+  
+???(обдумать) сделать в engine приемку команд при помощи fs2
+** public CompletableFuture<DatabaseCommandResult> executeNextCommand(DatabaseCommand command)
+
   потом переделать на DSL + Free (можно только AppL и ServiceL)
      (AppL (run), 
      ServiceL (startEndpoint httpCfg | grpcCfg)
      DbSrvL (create, createDb))
 * реализовать сценарий с удалением значения
 * отделить базу данных в отдельный модуль: будут модули app и kvdb
+
 
 
 
