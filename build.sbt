@@ -10,15 +10,15 @@ lazy val root = (project in file("."))
   )
   .settings(
     commonSettings,
-    name := "kvdb",
-    version := GLOBAL_VERSION,
-    Compile / unmanagedSourceDirectories := Nil,
+    name                                   := "kvdb",
+    version                                := GLOBAL_VERSION,
+    Compile / unmanagedSourceDirectories   := Nil,
     Compile / unmanagedResourceDirectories := Nil,
-    Test / unmanagedSourceDirectories := Nil,
-    Test / unmanagedResourceDirectories := Nil,
-    sbt.Keys.`package` := target.value,
-    publish := {},
-    publishLocal := {}
+    Test / unmanagedSourceDirectories      := Nil,
+    Test / unmanagedResourceDirectories    := Nil,
+    sbt.Keys.`package`                     := target.value,
+    publish                                := {},
+    publishLocal                           := {}
   )
 
 lazy val `prometheus` = (project in file("modules/prometheus"))
@@ -27,7 +27,7 @@ lazy val `prometheus` = (project in file("modules/prometheus"))
   .configs(Integration)
   .settings(
     commonSettings,
-    name := "prometheus",
+    name    := "prometheus",
     version := GLOBAL_VERSION,
     excludeDependencies -= ExclusionRule("log4j", "log4j"),
     Test / testOptions += Tests
@@ -44,18 +44,18 @@ lazy val `server` = (project in file("modules/server"))
   .configs(Integration)
   .settings(
     commonSettings,
-    name := "server",
+    name    := "server",
     version := GLOBAL_VERSION,
-    libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Http4s.all ++ Prometheus.all ++ Testing.all,
+    libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Http4s.all ++ Logging.all ++ Prometheus.all ++ Testing.all,
     excludeDependencies -= ExclusionRule("log4j", "log4j"),
     Test / testOptions += Tests
       .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/server/unit-tests-html-report"),
     inConfig(Integration)(Defaults.testSettings),
     Integration / testOptions += Tests
       .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/server/integration-tests-html-report"),
-    dockerBaseImage := "openjdk:25-oraclelinux8",
+    dockerBaseImage      := "openjdk:25-oraclelinux8",
     Docker / packageName := "org/nazaroid/kvdb/server",
-    Docker / version := version.value,
+    Docker / version     := version.value,
     envVars += (sys.props.get("config") match {
       case Some(confName: String) => "config" -> confName
       case _                      => "config" -> "application.conf"

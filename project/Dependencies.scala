@@ -14,6 +14,15 @@ object Dependencies {
 
   }
 
+  object Logging {
+    val slf4j = "org.slf4j" % "slf4j-api" % "1.7.25"
+    val scalaLogging = ("com.typesafe.scala-logging" %% "scala-logging" % "3.9.5").cross(CrossVersion.for3Use2_13)
+    val logbackClassic = "ch.qos.logback" % "logback-classic" % "1.3.14"
+    val logstashLogbackEncoder = "net.logstash.logback" % "logstash-logback-encoder" % "5.0"
+
+    val all: Seq[ModuleID] = Seq(slf4j, scalaLogging, logbackClassic, logstashLogbackEncoder)
+  }
+
   object Prometheus {
     private val prometheusSimpleClientV = "0.16.0"
 
