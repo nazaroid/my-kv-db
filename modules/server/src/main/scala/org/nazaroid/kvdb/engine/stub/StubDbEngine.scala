@@ -1,11 +1,11 @@
-package org.nazaroid.kvdb.engine
+package org.nazaroid.kvdb.engine.stub
 
 import cats.effect.Async
 import cats.implicits.*
 import org.nazaroid.kvdb.algebra.{Database, DbEngine, Table}
-import org.nazaroid.kvdb.engine.BitcaskDbEngine.*
+import org.nazaroid.kvdb.engine.stub.StubDbEngine.*
 
-final class BitcaskDbEngine[F[_]: Async] extends DbEngine[F] {
+final class StubDbEngine[F[_]: Async] extends DbEngine[F] {
 
   private var dbs: Map[String, StubDatabase[F]] = Map.empty[String, StubDatabase[F]]
 
@@ -19,7 +19,7 @@ final class BitcaskDbEngine[F[_]: Async] extends DbEngine[F] {
   }
 }
 
-object BitcaskDbEngine {
+object StubDbEngine {
 
   private class StubDatabase[F[_]: Async] extends Database[F] {
     private var tbls: Map[String, Table[F]] = Map.empty[String, Table[F]]
