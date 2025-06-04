@@ -6,6 +6,12 @@ import org.nazaroid.kvdb.algebra.{Database, DbEngine, Table}
 final class BitcaskDbEngine[F[_]: Async] extends DbEngine[F] {
 
   override def createDbIfNotExists(name: String): F[Database[F]] = {
+    /* TODO:
+      создать общий конвейер для всех команд
+      * передаем команду в stream с pipe-ом для колбека и ждем ответ
+      * при createDbIfNotExists:
+       - создать папку для  бд
+     */
     ???
   }
 }
@@ -16,6 +22,13 @@ object BitcaskDbEngine {
 
     override def createTableIfNotExists(name: String): F[Table[F]] = {
       // TODO:
+      // таблицы и базы хранить в памяти, загружать при старте, потом в рилтайме модифицировать список
+      // для новой:
+      // - создать с таблицей внутри папки БД
+      // - инициализировать новый пустой сегмент
+      //   -- создать файлы индексов (таблицы + сегмента) и сегмента
+      // для существующей:
+      // - ничего не делать, вернуть объект
       ???
     }
   }
