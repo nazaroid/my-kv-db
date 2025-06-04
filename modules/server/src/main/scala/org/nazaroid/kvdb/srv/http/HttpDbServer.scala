@@ -67,8 +67,8 @@ final class HttpDbServer[F[_]: Async: Logger: Network](config: DbConf, engine: D
         case GET -> Root / dbName / tblName / key =>
           {
             for {
-              db  <- engine.getDatabase(dbName)
-              tbl <- db.getTable(tblName)
+              db  <- engine.createDbIfNotExists(dbName)
+              tbl <- db.createTableIfNotExists(tblName)
               v   <- tbl.get(key)
             } yield Ok(v)
           }.flatten
@@ -76,8 +76,8 @@ final class HttpDbServer[F[_]: Async: Logger: Network](config: DbConf, engine: D
         case r @ POST -> Root / dbName / tblName / key =>
           {
             for {
-              db  <- engine.getDatabase(dbName)
-              tbl <- db.getTable(tblName)
+              db  <- engine.createDbIfNotExists(dbName)
+              tbl <- db.createTableIfNotExists(tblName)
               v   <- r.bodyText.compile.fold("")(_ + _)
               _   <- tbl.set(key, v)
             } yield Ok("OK")
@@ -86,15 +86,15 @@ final class HttpDbServer[F[_]: Async: Logger: Network](config: DbConf, engine: D
         case POST -> Root / dbName / tblName =>
           {
             for {
-              db <- engine.getDatabase(dbName)
-              _  <- db.createTable(tblName)
+              db <- engine.createDbIfNotExists(dbName)
+              _  <- db.createTableIfNotExists(tblName)
             } yield Ok("OK")
           }.flatten
         // create db
         case POST -> Root / dbName =>
           {
             for {
-              _ <- engine.createDatabase(dbName)
+              _ <- engine.createDbIfNotExists(dbName)
             } yield Ok("OK")
           }.flatten
       }

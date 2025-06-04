@@ -7,13 +7,11 @@ trait DbServer[F[_]] {
 }
 
 trait DbEngine[F[_]] {
-  def createDatabase(name: String): F[Unit]
-  def getDatabase(name: String):    F[Database[F]]
+  def createDbIfNotExists(name: String): F[Database[F]]
 }
 
 trait Database[F[_]] {
-  def createTable(name: String): F[Unit]
-  def getTable(name: String):    F[Table[F]]
+  def createTableIfNotExists(name: String): F[Table[F]]
 }
 
 trait Table[F[_]] {

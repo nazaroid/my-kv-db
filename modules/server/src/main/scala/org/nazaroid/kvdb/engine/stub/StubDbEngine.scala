@@ -9,12 +9,8 @@ final class StubDbEngine[F[_]: Async] extends DbEngine[F] {
 
   private var dbs: Map[String, StubDatabase[F]] = Map.empty[String, StubDatabase[F]]
 
-  override def createDatabase(name: String): F[Unit] = {
+  override def createDbIfNotExists(name: String): F[Database[F]] = {
     dbs = dbs.updated(name, dbs.getOrElse(name, new StubDatabase[F]()))
-    ().pure[F]
-  }
-
-  override def getDatabase(name: String): F[Database[F]] = {
     dbs(name).pure[F]
   }
 }
@@ -24,12 +20,8 @@ object StubDbEngine {
   private class StubDatabase[F[_]: Async] extends Database[F] {
     private var tbls: Map[String, Table[F]] = Map.empty[String, Table[F]]
 
-    override def createTable(name: String): F[Unit] = {
+    override def createTableIfNotExists(name: String): F[Table[F]] = {
       tbls = tbls.updated(name, tbls.getOrElse(name, new StubTable[F]()))
-      ().pure[F]
-    }
-
-    override def getTable(name: String): F[Table[F]] = {
       tbls(name).pure[F]
     }
   }
