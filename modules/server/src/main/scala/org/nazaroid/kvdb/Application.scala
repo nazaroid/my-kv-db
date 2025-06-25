@@ -22,7 +22,7 @@ final class Application[F[_]: Async: Parallel: Network](implicit d: Dispatcher[F
           .fromConfig(ConfigFactory.load(confName).getConfig(AppConfig.appName))
           .loadF[F, AppConfig]()
         _ <- if (appConfig.metricsEnabled) new MetricExporter(appConfig.metricsPort).start() else ().pure[F]
-        _ <- Async[F].blocking(new Db().runSync(appConfig.dbSrvConf))
+        _ <- Async[F].blocking(new Db().runSync(appConfig.dbConf))
       } yield ()
     }
 }

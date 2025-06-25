@@ -14,7 +14,7 @@ final class DbServerModule[F[_]: Async: Logger: Parallel: Network](commonModule:
 
   def resolve: F[DbServer[F]] = {
     val engine: DbEngine[F] = new StubDbEngine[F]()
-    new HttpDbServer[F](config, engine).pure[F]
+    new HttpDbServer[F](config.server.http, engine).pure[F]
   }
 
 }

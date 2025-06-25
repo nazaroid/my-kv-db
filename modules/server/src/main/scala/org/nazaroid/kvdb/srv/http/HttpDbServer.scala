@@ -13,23 +13,23 @@ import org.http4s.ember.server.*
 import org.http4s.metrics.prometheus.Prometheus
 import org.http4s.server.*
 import org.http4s.server.middleware.Metrics
-import org.nazaroid.kvdb.DbConf
+import org.nazaroid.kvdb.HttpSrvConf
 import org.nazaroid.kvdb.algebra.{DbEngine, DbServer}
 import org.nazaroid.kvdb.srv.http.middlewares.Err
 import org.typelevel.log4cats.Logger
 
-final class HttpDbServer[F[_]: Async: Logger: Network](config: DbConf, engine: DbEngine[F])
+final class HttpDbServer[F[_]: Async: Logger: Network](conf: HttpSrvConf, engine: DbEngine[F])
     extends DbServer[F]
     with Err[F] {
   import dsl.*
 
   override def run(): F[Unit] = {
     val host = Ipv4Address
-      .fromString(config.host)
-      .getOrElse(throw new IllegalArgumentException(config.host))
+      .fromString(conf.host)
+      .getOrElse(throw new IllegalArgumentException(conf.host))
     val port = Port
-      .fromInt(config.port)
-      .getOrElse(throw new IllegalArgumentException(config.port.toString))
+      .fromInt(conf.port)
+      .getOrElse(throw new IllegalArgumentException(conf.port.toString))
 
     routes
       .flatMap(r =>
@@ -38,8 +38,8 @@ final class HttpDbServer[F[_]: Async: Logger: Network](config: DbConf, engine: D
           .withHost(host)
           .withPort(port)
           .withHttpApp(r.orNotFound)
-          .withIdleTimeout(config.idleTimeout)
-          .withMaxConnections(config.maxConnections)
+          .withIdleTimeout(conf.idleTimeout)
+          .withMaxConnections(conf.maxConnections)
           .build
       )
       .useForever
