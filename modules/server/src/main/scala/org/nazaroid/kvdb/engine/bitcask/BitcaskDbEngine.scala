@@ -67,20 +67,56 @@ object BitcaskDbEngine {
   object algebra {
     type Offset = Long
     type Key = String
-    type DbName = String
+    type BaseName = String
     type TblName = String
+    type TblIxName = String
+    type SegmentNum = Int
     type SegmentIxData = Map[Key, Offset]
     type TblIxData = Map[Key, Segment]
-    type BaseRegistry = Map[DbName, Base]
-    type DbTables = Map[TblName, Tbl]
+    type BaseRegistry = Map[BaseName, Base]
+    type BaseTables = Map[TblName, Tbl]
+
+    trait CacheService[F[_]] {
+      def get(): F[State[F]]
+    }
+
+    trait FileService[F[_]] {}
+
+    trait Env[F[_]] {
+      def files: FileService[F]
+      def cache: CacheService[F]
+    }
+
+    trait BaseService[F[_]] {
+      def createIfNotExists(env: Env[F])(rootDir: String, name: BaseName): F[Base]
+    }
+
+    trait TblService[F[_]] {
+      def createIfNotExists(env: Env[F])(base: Base, name: TblName): F[TblIx]
+    }
+
+    trait TblSegmentService[F[_]] {
+      def create(env: Env[F])(tbl: Tbl, num: SegmentNum): F[Segment]
+      def write(env: Env[F])(s: Segment):                 F[Segment]
+    }
+
+    trait TblIxService[F[_]] {
+      def create(env: Env[F])(tbl: Tbl): F[TblIx]
+      def write(env: Env[F])(ix: TblIx): F[TblIx]
+    }
+
+    trait SegmentIxService[F[_]] {
+      def create(env: Env[F])(tbl: Tbl, num: SegmentNum): F[SegmentIx]
+      def write(env: Env[F])(ix: SegmentIx):              F[SegmentIx]
+    }
 
     final case class Base(
-      name:   String,
+      name:   BaseName,
       path:   Path,
-      tables: DbTables)
+      tables: BaseTables)
 
     final case class TblIx(
-      name: String,
+      name: TblIxName,
       path: Path,
       data: TblIxData)
 
@@ -90,12 +126,13 @@ object BitcaskDbEngine {
       data: SegmentIxData)
 
     final case class Tbl(
-      name:        String,
+      name:        TblName,
       path:        Path,
       lastSegment: Segment,
       ix:          TblIx)
 
     final case class Segment(
+      num:        SegmentNum,
       name:       String,
       path:       Path,
       isReadOnly: Boolean,
@@ -105,8 +142,6 @@ object BitcaskDbEngine {
   }
 
 }
-
-
 
 trait BitcaskHelper[F[_]: Async] {
   def createDbDir(dbRoot: String, dbName: String): F[Path] = Paths.get(f"$dbRoot/$dbName").pure[F]
