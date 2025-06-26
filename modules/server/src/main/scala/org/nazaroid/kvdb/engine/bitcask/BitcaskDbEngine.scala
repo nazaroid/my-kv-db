@@ -1,5 +1,6 @@
 package org.nazaroid.kvdb.engine.bitcask
 
+import cats.data.Kleisli
 import cats.effect.{Async, Ref}
 import cats.implicits.*
 import org.nazaroid.kvdb.BitcaskConf
@@ -67,6 +68,7 @@ object BitcaskDbEngine {
   object algebra {
     type Offset = Long
     type Key = String
+    type Value = String
     type BaseName = String
     type TblName = String
     type TblIxName = String
@@ -75,9 +77,27 @@ object BitcaskDbEngine {
     type TblIxData = Map[Key, Segment]
     type BaseRegistry = Map[BaseName, Base]
     type BaseTables = Map[TblName, Tbl]
+    type DbScript[F[_], O] = Kleisli[F, Env[F], O]
 
     trait CacheService[F[_]] {
-      def get(): F[State[F]]
+
+      def findSegment(
+        baseName: BaseName,
+        tblName: TblName,
+        k: Key
+      ):                                             DbScript[F, Option[Segment]]
+      def getOffsetInSegment(sx: SegmentIx, k: Key): DbScript[F, Offset]
+
+      def addBase(base: Base):          DbScript[F, BaseRegistry]
+      def addTbl(base: Base, tbl: Tbl): DbScript[F, Base]
+
+      def addSegment(
+        env: Env[F]
+      )(
+        base: Base,
+        tbl: Tbl,
+        s: Segment
+      ): DbScript[F, Base]
     }
 
     trait FileService[F[_]] {}
@@ -85,29 +105,35 @@ object BitcaskDbEngine {
     trait Env[F[_]] {
       def files: FileService[F]
       def cache: CacheService[F]
+      def state: State[F]
     }
 
     trait BaseService[F[_]] {
-      def createIfNotExists(env: Env[F])(rootDir: String, name: BaseName): F[Base]
+      def createIfNotExists(rootDir: String, name: BaseName): DbScript[F, Base]
+      def list(rootDir: String):                              DbScript[F, Seq[Base]]
     }
 
     trait TblService[F[_]] {
-      def createIfNotExists(env: Env[F])(base: Base, name: TblName): F[TblIx]
+      def createIfNotExists(base: Base, name: TblName): DbScript[F, TblIx]
+      def list(base: Base):                             DbScript[F, Seq[TblIx]]
     }
 
     trait TblSegmentService[F[_]] {
-      def create(env: Env[F])(tbl: Tbl, num: SegmentNum): F[Segment]
-      def write(env: Env[F])(s: Segment):                 F[Segment]
+      def create(tbl: Tbl, num: SegmentNum):            DbScript[F, Segment]
+      def append(s: Segment, batch: Seq[(Key, Value)]): DbScript[F, Segment]
+      def readValue(s: Segment, offset: Offset):        DbScript[F, Value]
     }
 
     trait TblIxService[F[_]] {
-      def create(env: Env[F])(tbl: Tbl): F[TblIx]
-      def write(env: Env[F])(ix: TblIx): F[TblIx]
+      def create(tbl: Tbl): DbScript[F, TblIx]
+      def read(tbl: Tbl):   DbScript[F, TblIx]
+      def write(ix: TblIx): DbScript[F, TblIx]
     }
 
     trait SegmentIxService[F[_]] {
-      def create(env: Env[F])(tbl: Tbl, num: SegmentNum): F[SegmentIx]
-      def write(env: Env[F])(ix: SegmentIx):              F[SegmentIx]
+      def create(s: Segment):              DbScript[F, SegmentIx]
+      def read(tbl: Tbl, num: SegmentNum): DbScript[F, SegmentIx]
+      def write(ix: SegmentIx):            DbScript[F, SegmentIx]
     }
 
     final case class Base(
@@ -136,6 +162,7 @@ object BitcaskDbEngine {
       name:       String,
       path:       Path,
       isReadOnly: Boolean,
+      offset:     Offset,
       ix:         SegmentIx)
 
     final case class State[F[_]](registryRef: Ref[F, BaseRegistry])
