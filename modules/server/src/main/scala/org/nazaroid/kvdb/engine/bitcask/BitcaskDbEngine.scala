@@ -186,12 +186,12 @@ object BitcaskDbEngine {
 
 trait BitcaskScenarios[F[_]: Async] {
 
-  def createBaseIfNotExists(baseName: String): DbScript[F, Unit] = {
+  def createBaseIfNotExists(baseName: String): DbScript[F, BaseRegistry] = {
     DbScript { (env: Env[F]) =>
       for {
         base     <- env.base.createIfNotExists(env.conf.rootDir, baseName)
         registry <- env.cache.addBase(base)
-      } yield ()
+      } yield registry
     }
   }
 
