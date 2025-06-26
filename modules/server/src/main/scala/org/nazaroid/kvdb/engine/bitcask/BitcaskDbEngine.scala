@@ -102,11 +102,15 @@ object BitcaskDbEngine {
     trait FileService[F[_]] {}
 
     trait Env[F[_]] {
-      def conf:  BitcaskConf
-      def files: FileService[F]
-      def cache: CacheService[F]
-      def base:  BaseService[F]
-      def state: State[F]
+      def conf:      BitcaskConf
+      def files:     FileService[F]
+      def base:      BaseService[F]
+      def tbl:       TblService[F]
+      def segment:   TblSegmentService[F]
+      def tblIx:     TblIxService[F]
+      def segmentIx: SegmentIxService[F]
+      def cache:     CacheService[F]
+      def state:     State[F]
     }
 
     trait BaseService[F[_]] {
