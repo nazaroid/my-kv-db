@@ -78,6 +78,26 @@ object BitcaskDbEngine {
     type BaseTables = Map[TblName, Tbl]
     type DbScript[F[_], O] = Kleisli[F, Env[F], O]
 
+    trait Env[F[_]] {
+      def conf: BitcaskConf
+
+      def files: FileService[F]
+
+      def base: BaseService[F]
+
+      def tbl: TblService[F]
+
+      def segment: TblSegmentService[F]
+
+      def tblIx: TblIxService[F]
+
+      def segmentIx: SegmentIxService[F]
+
+      def cache: CacheService[F]
+
+      def state: State[F]
+    }
+
     trait CacheService[F[_]] {
 
       def findSegment(
@@ -100,18 +120,6 @@ object BitcaskDbEngine {
     }
 
     trait FileService[F[_]] {}
-
-    trait Env[F[_]] {
-      def conf:      BitcaskConf
-      def files:     FileService[F]
-      def base:      BaseService[F]
-      def tbl:       TblService[F]
-      def segment:   TblSegmentService[F]
-      def tblIx:     TblIxService[F]
-      def segmentIx: SegmentIxService[F]
-      def cache:     CacheService[F]
-      def state:     State[F]
-    }
 
     trait BaseService[F[_]] {
       def createIfNotExists(rootDir: String, name: BaseName): DbScript[F, Base]
