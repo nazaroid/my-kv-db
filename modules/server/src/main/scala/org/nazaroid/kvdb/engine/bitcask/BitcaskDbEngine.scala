@@ -6,6 +6,7 @@ import cats.implicits.*
 import org.nazaroid.kvdb.BitcaskConf
 import org.nazaroid.kvdb.algebra.{Database, DbEngine, Table}
 import org.nazaroid.kvdb.engine.bitcask.BitcaskDbEngine.*
+import org.nazaroid.kvdb.engine.bitcask.BitcaskDbEngine.algebra.*
 
 import java.nio.file.{Files, Path, Paths}
 // TODO: переделать дизайн, чтобы методы были отделены от данных
@@ -63,8 +64,6 @@ object BitcaskDbEngine {
     }
   }
 
-  private class BitcaskSegment[F[_]: Async](conf: BitcaskConf)() {}
-
   object algebra {
     type Offset = Long
     type Key = String
@@ -103,8 +102,10 @@ object BitcaskDbEngine {
     trait FileService[F[_]] {}
 
     trait Env[F[_]] {
+      def conf:  BitcaskConf
       def files: FileService[F]
       def cache: CacheService[F]
+      def base:  BaseService[F]
       def state: State[F]
     }
 
@@ -166,11 +167,28 @@ object BitcaskDbEngine {
       ix:         SegmentIx)
 
     final case class State[F[_]](registryRef: Ref[F, BaseRegistry])
+
+    object DbScript {
+
+      def apply[F[_], O](inner: Env[F] => DbScript[F, O]): DbScript[F, O] =
+        Kleisli { (env: Env[F]) =>
+          inner(env).run(env)
+        }
+    }
+
   }
 
 }
 
-trait BitcaskHelper[F[_]: Async] {
-  def createDbDir(dbRoot: String, dbName: String): F[Path] = Paths.get(f"$dbRoot/$dbName").pure[F]
+trait BitcaskScenarios[F[_]: Async] {
+
+  def createBaseIfNotExists(baseName: String): DbScript[F, Unit] = {
+    DbScript { (env: Env[F]) =>
+      for {
+        base     <- env.base.createIfNotExists(env.conf.rootDir, baseName)
+        registry <- env.cache.addBase(base)
+      } yield ()
+    }
+  }
 
 }
