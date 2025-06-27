@@ -7,8 +7,6 @@ import org.nazaroid.kvdb.algebra.{Database, DbEngine, Table}
 import org.nazaroid.kvdb.engine.bitcask.BitcaskDbEngine.*
 
 final class BitcaskDbEngine[F[_]: Async](conf: BitcaskConf) extends DbEngine[F] {
-  private given lib: BitcaskLib.Scenarios[F] = BitcaskLib(conf)
-
   override def createDbIfNotExists(name: String): F[Database[F]] = {
     /* TODO:
       создать общий конвейер для всех команд
@@ -16,13 +14,15 @@ final class BitcaskDbEngine[F[_]: Async](conf: BitcaskConf) extends DbEngine[F] 
      * при createDbIfNotExists:
        - создать папку для  бд
      */
-    lib.createBaseIfNotExists(name).map(BitcaskDatabase[F](_))
+    lib.createBaseIfNotExists(name).map(BitcaskDatabase[F])
   }
+
+  private given lib: BitcaskLib.Scenarios[F] = BitcaskLib(conf)
 }
 
 object BitcaskDbEngine {
 
-  private class BitcaskDatabase[F[_]: Async](base: BitcaskLib.algebra.Base)(using lib: BitcaskLib.Scenarios[F])
+  case class BitcaskDatabase[F[_]: Async](base: BitcaskLib.algebra.Base)(using lib: BitcaskLib.Scenarios[F])
       extends Database[F] {
 
     override def createTableIfNotExists(name: String): F[Table[F]] = {
@@ -35,11 +35,12 @@ object BitcaskDbEngine {
       // для существующей:
       // - ничего не делать, вернуть объект
 
-      lib.createTableIfNotExists(base, name).map(BitcaskTable[F](_))
+      lib.createTableIfNotExists(base, name).map(BitcaskTable[F])
     }
   }
 
-  private class BitcaskTable[F[_]: Async](tbl: BitcaskLib.algebra.Tbl)(using lib: BitcaskLib.Scenarios[F]) extends Table[F] {
+  case class BitcaskTable[F[_]: Async](tbl: BitcaskLib.algebra.Tbl)(using lib: BitcaskLib.Scenarios[F])
+      extends Table[F] {
 
     override def get(key: String): F[String] = ???
 
