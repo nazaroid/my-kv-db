@@ -15,28 +15,6 @@ object BitcaskLib {
 
   def apply[F[_]: Async](c: BitcaskConf): Scenarios[F] = new ScenariosImpl(c)
 
-  trait Scenarios[F[_]: Async] {
-    given env: Env[F]
-
-    def createBaseIfNotExists(baseName: String): F[Base] =
-      RunDbScript {
-        for {
-          env  <- ask[F, Env[F]]
-          base <- env.base.createIfNotExists(env.conf.rootDir, baseName)
-          _    <- env.cache.addBase(base)
-        } yield base
-      }
-
-    def createTableIfNotExists(base: Base, tblName: String): F[Tbl] =
-      RunDbScript {
-        for {
-          env <- ask[F, Env[F]]
-          tbl <- env.tbl.createIfNotExists(base, tblName)
-          _   <- env.cache.addTbl(base, tbl)
-        } yield tbl
-      }
-  }
-
   object instances {
 
     final class Dsl[F[_]: Async]
@@ -193,6 +171,28 @@ object BitcaskLib {
       def write(ix: SegmentIx): DbScript[F, SegmentIx] = ???
     }
 
+    trait Scenarios[F[_]: Async] {
+      given env: Env[F]
+
+      def createBaseIfNotExists(baseName: String): F[Base] =
+        RunDbScript {
+          for {
+            env  <- ask[F, Env[F]]
+            base <- env.base.createIfNotExists(env.conf.rootDir, baseName)
+            _    <- env.cache.addBase(base)
+          } yield base
+        }
+
+      def createTableIfNotExists(base: Base, tblName: String): F[Tbl] =
+        RunDbScript {
+          for {
+            env <- ask[F, Env[F]]
+            tbl <- env.tbl.createIfNotExists(base, tblName)
+            _   <- env.cache.addTbl(base, tbl)
+          } yield tbl
+        }
+    }
+
     final case class Base(
       name:   BaseName,
       path:   Path,
@@ -230,5 +230,6 @@ object BitcaskLib {
         s.run(env)
       }
     }
+
   }
 }
