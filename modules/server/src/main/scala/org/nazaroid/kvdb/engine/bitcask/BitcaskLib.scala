@@ -13,7 +13,7 @@ object BitcaskLib {
   import algebra.*
   import instances.*
 
-  def apply[F[_]: Async](c: BitcaskConf): Scenarios[F] = new ScenariosImpl(c)
+  def apply[F[_]: Async](c: BitcaskConf): LibScenarios[F] = new LibScenariosImpl(c)
 
   object instances {
 
@@ -26,7 +26,7 @@ object BitcaskLib {
         with TblIxService[F]
         with SegmentIxService[F] {}
 
-    final class ScenariosImpl[F[_]: Async](c: BitcaskConf) extends Scenarios[F]:
+    final class LibScenariosImpl[F[_]: Async](c: BitcaskConf) extends LibScenarios[F]:
       override def env: Env[F] = EnvImpl(c)
 
     final class EnvImpl[F[_]: Async](c: BitcaskConf) extends Env[F]:
@@ -171,7 +171,7 @@ object BitcaskLib {
       def write(ix: SegmentIx): DbScript[F, SegmentIx] = ???
     }
 
-    trait Scenarios[F[_]: Async] {
+    trait LibScenarios[F[_]: Async] {
       given env: Env[F]
 
       def createBaseIfNotExists(baseName: String): F[Base] =
