@@ -41,7 +41,7 @@ object BitcaskDbEngine {
     }
   }
 
-  case class BitcaskTable[F[_]: Async](tbl: BitcaskLib.algebra.Tbl)(using lib: LibScenarios[F])
+  case class BitcaskTable[F[_]: Async](tbl: Tbl)(using lib: LibScenarios[F])
       extends Table[F] {
 
     override def get(key: String): F[String] = ???
