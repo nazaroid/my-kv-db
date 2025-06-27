@@ -1,6 +1,7 @@
 package org.nazaroid.kvdb.engine.bitcask
 
 import cats.data.Kleisli
+import cats.data.Kleisli.ask
 import cats.effect.{Async, Ref}
 import cats.implicits.*
 import org.nazaroid.kvdb.BitcaskConf
@@ -180,14 +181,6 @@ object BitcaskDbEngine {
 
     final case class State[F[_]](registryRef: Ref[F, BaseRegistry])
 
-    object DbScript {
-
-      def apply[F[_], O](inner: Env[F] => DbScript[F, O]): DbScript[F, O] =
-        Kleisli { (env: Env[F]) =>
-          inner(env).run(env)
-        }
-    }
-
   }
 
 }
@@ -195,12 +188,11 @@ object BitcaskDbEngine {
 trait BitcaskScenarios[F[_]: Async] {
 
   def createBaseIfNotExists(baseName: String): DbScript[F, BaseRegistry] = {
-    DbScript { (env: Env[F]) =>
       for {
-        base     <- env.base.createIfNotExists(env.conf.rootDir, baseName)
+        env <- ask[F, Env[F]]
+        base <- env.base.createIfNotExists(env.conf.rootDir, baseName)
         registry <- env.cache.addBase(base)
       } yield registry
-    }
   }
 
 }
