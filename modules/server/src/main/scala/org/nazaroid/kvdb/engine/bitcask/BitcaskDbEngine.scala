@@ -24,8 +24,7 @@ final class BitcaskDbEngine[F[_]: Async](conf: BitcaskConf) extends DbEngine[F] 
 
 object BitcaskDbEngine {
 
-  case class BitcaskDatabase[F[_]: Async](base: Base)(using lib: LibScenarios[F])
-      extends Database[F] {
+  case class BitcaskDatabase[F[_]: Async](base: Base[F])(using lib: LibScenarios[F]) extends Database[F] {
 
     override def createTableIfNotExists(name: String): F[Table[F]] = {
       // TODO:
@@ -41,8 +40,7 @@ object BitcaskDbEngine {
     }
   }
 
-  case class BitcaskTable[F[_]: Async](tbl: Tbl)(using lib: LibScenarios[F])
-      extends Table[F] {
+  case class BitcaskTable[F[_]: Async](tbl: Tbl[F])(using lib: LibScenarios[F]) extends Table[F] {
 
     override def get(key: String): F[String] = ???
 
