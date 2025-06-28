@@ -145,13 +145,13 @@ object BitcaskLib {
       def createIfNotExists(base: Base[F], name: TblName): DbScript[F, Tbl[F]] = {
         for {
           env <- ask[F, Env[F]]
-          // TODO: create segment and ix's
           tblPath = Paths.get(f"${base.path.toAbsolutePath}/$name")
           _   <- env.files.createDirIfNotExists(tblPath)
           tbl <- DbScript.lift(Tbl.create(base, name))
           _   <- env.cache.addTbl(base, tbl)
           s   <- env.segment.create(tbl, 1)
           _   <- env.segmentIx.create(s)
+          _   <- env.tblIx.create(tbl)
         } yield tbl
       }
 
@@ -159,6 +159,7 @@ object BitcaskLib {
     }
 
     trait TblSegmentService[F[_]] {
+      // TODO: create segment and ix's
       def create(tbl: Tbl[F], num: SegmentNum): DbScript[F, Segment[F]] = ???
 
       def append(s: Segment[F], batch: Seq[(Key, Value)]): DbScript[F, Segment[F]] = ???
@@ -167,6 +168,7 @@ object BitcaskLib {
     }
 
     trait TblIxService[F[_]: Async] {
+      // TODO: create segment and ix's
       def create(tbl: Tbl[F]): DbScript[F, TblIx[F]] = ???
 
       def read(tbl: Tbl[F]): DbScript[F, TblIx[F]] = ???
@@ -175,6 +177,7 @@ object BitcaskLib {
     }
 
     trait SegmentIxService[F[_]: Async] {
+      // TODO: create segment and ix's
       def create(s: Segment[F]): DbScript[F, SegmentIx[F]] = ???
 
       def read(tbl: Tbl[F], num: SegmentNum): DbScript[F, SegmentIx[F]] = ???
