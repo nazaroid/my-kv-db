@@ -261,11 +261,18 @@ object BitcaskLib {
 
     object DbScript {
 
-      def run[F[_]: Async, O](s: DbScript[F, O])(using env: Env[F]): F[O] = {
-        s.run(env)
-      }
+      extension [F[_]: Async, O](s: DbScript[F, O])
 
-      def lift[F[_]: Async, O](f: F[O]): DbScript[F, O] = ???
+        def run(using env: Env[F]): F[O] = {
+          s.run(env)
+        }
+
+      extension [F[_]: Async, O](f: F[O])
+
+        def lift: DbScript[F, O] = {
+          Kleisli.liftK(f)
+        }
+
     }
 
   }
