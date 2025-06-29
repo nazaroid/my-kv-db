@@ -265,7 +265,7 @@ object BitcaskLib {
     final case class SegmentIx[F[_]: Async](
       name: SegmentIxName,
       path: Path,
-      data: F[Ref[F, SegmentIxData]])
+      data: Ref[F, SegmentIxData])
 
     final case class Tbl[F[_]: Async](
       name:        TblName,
@@ -318,13 +318,13 @@ object BitcaskLib {
     object Segment {
 
       def create[F[_]: Async](
-        tbl:    Tbl[F],
-        num:    SegmentNum = 1
+        tbl: Tbl[F],
+        num: SegmentNum = 1
       ): F[Segment[F]] = {
         val name = f"segment_$num.seg"
         val path = Paths.get(f"${tbl.path.toAbsolutePath}/$name")
         for {
-          ix <- Async[F].ref(Map.empty[Key, Offset])
+          ix <- Async[F].ref(Option.empty[SegmentIx[F]])
         } yield Segment(num, name, path, ix)
       }
     }
