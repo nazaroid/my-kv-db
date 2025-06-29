@@ -5,7 +5,6 @@ import cats.data.Kleisli.ask
 import cats.effect.{Async, Ref}
 import cats.implicits.given
 import org.nazaroid.kvdb.BitcaskConf
-import org.nazaroid.kvdb.engine.bitcask.BitcaskLib.algebra.DbScript
 
 import java.nio.file.{Files, Path, Paths}
 
