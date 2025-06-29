@@ -5,6 +5,7 @@ import cats.data.Kleisli.ask
 import cats.effect.{Async, Ref}
 import cats.implicits.given
 import org.nazaroid.kvdb.BitcaskConf
+import org.nazaroid.kvdb.engine.bitcask.BitcaskLib.algebra.DbScript
 
 import java.nio.file.{Files, Path, Paths}
 
@@ -92,39 +93,55 @@ object BitcaskLib {
 
     trait CacheService[F[_]: Async] {
 
-      def findSegment(
-        baseName: BaseName,
-        tblName:  TblName,
-        k:        Key
-      ): DbScript[F, Option[Segment[F]]] = ???
-
-      def getOffsetInSegment(sx: SegmentIx[F], k: Key): DbScript[F, Offset] = ???
-
       def addBase(base: Base[F]): DbScript[F, BaseRegistry[F]] = {
         for {
           env <- ask[F, Env[F]]
-          s   <- Kleisli.liftK(env.state)
-          reg <- Kleisli.liftK(s.registryRef.updateAndGet(_.updated(base.name, base)))
+          s   <- DbScript.lift(env.state)
+          reg <- DbScript.lift(s.registryRef.updateAndGet(_.updated(base.name, base)))
         } yield reg
       }
 
-      def addTbl(base: Base[F], tbl: Tbl[F]): DbScript[F, Base[F]] = ???
+      def addTbl(base: Base[F], tbl: Tbl[F]): DbScript[F, Base[F]] = {
+        for {
+          _ <- DbScript.lift(base.tables.update(_.updated(tbl.name, tbl)))
+        } yield base
+      }
 
-      def addTblIx(tbl: Tbl[F], ix: TblIx[F]): DbScript[F, TblIx[F]] = ???
+      def addTblIx(tbl: Tbl[F], ix: TblIx[F]): DbScript[F, Tbl[F]] = {
+        for {
+          _ <- DbScript.lift(tbl.ix.update(ix.some))
+        } yield tbl
+      }
 
       def addSegment(
         env: Env[F]
       )(
         tbl: Tbl[F],
         s:   Segment[F]
-      ): DbScript[F, Base[F]] = ???
+      ): DbScript[F, Tbl[F]] = {
+        for {
+          _ <- DbScript.lift(tbl.lastSegment.update(s.some))
+        } yield tbl
+      }
 
       def addSegmentIx(
         env: Env[F]
       )(
         s:  Segment[F],
         ix: SegmentIx[F]
-      ): DbScript[F, Base[F]] = ???
+      ): DbScript[F, Base[F]] = {
+        for {
+          _ <- DbScript.lift(s.ix.update(ix.some))
+        } yield s
+      }
+
+      def findSegment(
+                       baseName: BaseName,
+                       tblName: TblName,
+                       k: Key
+                     ): DbScript[F, Option[Segment[F]]] = ???
+
+      def getOffsetInSegment(sx: SegmentIx[F], k: Key): DbScript[F, Offset] = ???
     }
 
     trait FileService[F[_]: Async] {
