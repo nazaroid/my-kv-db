@@ -114,8 +114,6 @@ object BitcaskLib {
       }
 
       def addSegment(
-        env: Env[F]
-      )(
         tbl: Tbl[F],
         s:   Segment[F]
       ): DbScript[F, Tbl[F]] = {
@@ -125,8 +123,6 @@ object BitcaskLib {
       }
 
       def addSegmentIx(
-        env: Env[F]
-      )(
         s:  Segment[F],
         ix: SegmentIx[F]
       ): DbScript[F, Segment[F]] = {
@@ -323,13 +319,12 @@ object BitcaskLib {
 
       def create[F[_]: Async](
         tbl:    Tbl[F],
-        num:    SegmentNum = 1,
-        offset: Offset = 0
+        num:    SegmentNum = 1
       ): F[Segment[F]] = {
         val name = f"segment_$num.seg"
         val path = Paths.get(f"${tbl.path.toAbsolutePath}/$name")
         for {
-          ix <- Async[F].ref(Option.empty[Key, Offset])
+          ix <- Async[F].ref(Map.empty[Key, Offset])
         } yield Segment(num, name, path, ix)
       }
     }
