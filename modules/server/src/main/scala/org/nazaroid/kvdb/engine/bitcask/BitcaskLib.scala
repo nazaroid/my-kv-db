@@ -109,7 +109,7 @@ object BitcaskLib {
 
       def addTblIx(tbl: Tbl[F], ix: TblIx[F]): DbScript[F, Tbl[F]] = {
         for {
-          _ <- DbScript.lift(tbl.ix.update(ix.some))
+          _ <- DbScript.lift(tbl.ix.set(ix.some))
         } yield tbl
       }
 
@@ -120,7 +120,7 @@ object BitcaskLib {
         s:   Segment[F]
       ): DbScript[F, Tbl[F]] = {
         for {
-          _ <- DbScript.lift(tbl.lastSegment.update(s.some))
+          _ <- DbScript.lift(tbl.lastSegment.set(s.some))
         } yield tbl
       }
 
@@ -129,9 +129,9 @@ object BitcaskLib {
       )(
         s:  Segment[F],
         ix: SegmentIx[F]
-      ): DbScript[F, Base[F]] = {
+      ): DbScript[F, Segment[F]] = {
         for {
-          _ <- DbScript.lift(s.ix.update(ix.some))
+          _ <- DbScript.lift(s.ix.set(ix.some))
         } yield s
       }
 
@@ -186,7 +186,7 @@ object BitcaskLib {
       def list(base: Base[F]): DbScript[F, Seq[Tbl[F]]] = ???
     }
 
-    trait SegmentService[F[_]] {
+    trait SegmentService[F[_]: Async] {
 
       def create(tbl: Tbl[F], num: SegmentNum): DbScript[F, Segment[F]] = {
         for {
