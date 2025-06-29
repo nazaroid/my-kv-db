@@ -136,10 +136,10 @@ object BitcaskLib {
       }
 
       def findSegment(
-                       baseName: BaseName,
-                       tblName: TblName,
-                       k: Key
-                     ): DbScript[F, Option[Segment[F]]] = ???
+        baseName: BaseName,
+        tblName:  TblName,
+        k:        Key
+      ): DbScript[F, Option[Segment[F]]] = ???
 
       def getOffsetInSegment(sx: SegmentIx[F], k: Key): DbScript[F, Offset] = ???
     }
