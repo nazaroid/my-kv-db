@@ -22,7 +22,7 @@ object BitcaskLib {
         with CacheService[F]
         with BaseService[F]
         with TblService[F]
-        with TblSegmentService[F]
+        with SegmentService[F]
         with TblIxService[F]
         with SegmentIxService[F] {}
 
@@ -40,7 +40,7 @@ object BitcaskLib {
 
       override def tbl: TblService[F] = dsl
 
-      override def segment: TblSegmentService[F] = dsl
+      override def segment: SegmentService[F] = dsl
 
       override def tblIx: TblIxService[F] = dsl
 
@@ -79,7 +79,7 @@ object BitcaskLib {
 
       def tbl: TblService[F]
 
-      def segment: TblSegmentService[F]
+      def segment: SegmentService[F]
 
       def tblIx: TblIxService[F]
 
@@ -110,12 +110,20 @@ object BitcaskLib {
 
       def addTbl(base: Base[F], tbl: Tbl[F]): DbScript[F, Base[F]] = ???
 
+      def addTblIx(tbl: Tbl[F], ix: TblIx[F]): DbScript[F, TblIx[F]] = ???
+
       def addSegment(
         env: Env[F]
       )(
-        base: Base[F],
-        tbl:  Tbl[F],
-        s:    Segment[F]
+        tbl: Tbl[F],
+        s:   Segment[F]
+      ): DbScript[F, Base[F]] = ???
+
+      def addSegmentIx(
+        env: Env[F]
+      )(
+        s:  Segment[F],
+        ix: SegmentIx[F]
       ): DbScript[F, Base[F]] = ???
     }
 
@@ -123,6 +131,10 @@ object BitcaskLib {
 
       def createDirIfNotExists(path: Path): DbScript[F, Path] = {
         Kleisli { env => Async[F].blocking(Files.createDirectories(path)) }
+      }
+
+      def createBinFile(path: Path): DbScript[F, Path] = {
+        Kleisli { env => Async[F].blocking(Files.createFile(path)) }
       }
     }
 
@@ -145,22 +157,28 @@ object BitcaskLib {
       def createIfNotExists(base: Base[F], name: TblName): DbScript[F, Tbl[F]] = {
         for {
           env <- ask[F, Env[F]]
-          tblPath = Paths.get(f"${base.path.toAbsolutePath}/$name")
-          _   <- env.files.createDirIfNotExists(tblPath)
           tbl <- DbScript.lift(Tbl.create(base, name))
+          _   <- env.files.createDirIfNotExists(tbl.path)
           _   <- env.cache.addTbl(base, tbl)
+          _   <- env.tblIx.create(tbl)
           s   <- env.segment.create(tbl, 1)
           _   <- env.segmentIx.create(s)
-          _   <- env.tblIx.create(tbl)
         } yield tbl
       }
 
       def list(base: Base[F]): DbScript[F, Seq[Tbl[F]]] = ???
     }
 
-    trait TblSegmentService[F[_]] {
-      // TODO: create segment and ix's
-      def create(tbl: Tbl[F], num: SegmentNum): DbScript[F, Segment[F]] = ???
+    trait SegmentService[F[_]] {
+
+      def create(tbl: Tbl[F], num: SegmentNum): DbScript[F, Segment[F]] = {
+        for {
+          env <- ask[F, Env[F]]
+          s   <- DbScript.lift(Segment.create(tbl))
+          _   <- env.files.createBinFile(s.path)
+          _   <- env.cache.addSegment(tbl, s)
+        } yield s
+      }
 
       def append(s: Segment[F], batch: Seq[(Key, Value)]): DbScript[F, Segment[F]] = ???
 
@@ -168,8 +186,15 @@ object BitcaskLib {
     }
 
     trait TblIxService[F[_]: Async] {
-      // TODO: create segment and ix's
-      def create(tbl: Tbl[F]): DbScript[F, TblIx[F]] = ???
+
+      def create(tbl: Tbl[F]): DbScript[F, TblIx[F]] = {
+        for {
+          env <- ask[F, Env[F]]
+          ix  <- DbScript.lift(TblIx.create(tbl))
+          _   <- env.files.createBinFile(ix.path)
+          _   <- env.cache.addTblIx(tbl, ix)
+        } yield ix
+      }
 
       def read(tbl: Tbl[F]): DbScript[F, TblIx[F]] = ???
 
@@ -177,8 +202,15 @@ object BitcaskLib {
     }
 
     trait SegmentIxService[F[_]: Async] {
-      // TODO: create segment and ix's
-      def create(s: Segment[F]): DbScript[F, SegmentIx[F]] = ???
+
+      def create(s: Segment[F]): DbScript[F, SegmentIx[F]] = {
+        for {
+          env <- ask[F, Env[F]]
+          ix  <- DbScript.lift(SegmentIx.create(s))
+          _   <- env.files.createBinFile(ix.path)
+          _   <- env.cache.addSegmentIx(s, ix)
+        } yield ix
+      }
 
       def read(tbl: Tbl[F], num: SegmentNum): DbScript[F, SegmentIx[F]] = ???
 
@@ -232,9 +264,9 @@ object BitcaskLib {
       num:        SegmentNum,
       name:       SegmentName,
       path:       Path,
-      isReadOnly: Boolean,
-      offset:     Offset,
-      ix:         Ref[F, Option[SegmentIx[F]]])
+      ix:         Ref[F, Option[SegmentIx[F]]],
+      isReadOnly: Boolean = false,
+      offset:     Offset = 0)
 
     final case class State[F[_]: Async](registryRef: Ref[F, BaseRegistry[F]])
 
@@ -256,6 +288,43 @@ object BitcaskLib {
         for {
           tables <- Async[F].ref(Map.empty[TblName, Tbl[F]])
         } yield Base(name, path, tables)
+      }
+    }
+
+    object TblIx {
+
+      def create[F[_]: Async](tbl: Tbl[F]): F[TblIx[F]] = {
+        val name = "table.ix"
+        val path = Paths.get(f"${tbl.path.toAbsolutePath}/$name")
+        for {
+          data <- Async[F].ref(Map.empty[Key, Segment[F]])
+        } yield TblIx(name, path, data)
+      }
+    }
+
+    object Segment {
+
+      def create[F[_]: Async](
+        tbl:    Tbl[F],
+        num:    SegmentNum = 1,
+        offset: Offset = 0
+      ): F[Segment[F]] = {
+        val name = f"segment_$num.seg"
+        val path = Paths.get(f"${tbl.path.toAbsolutePath}/$name")
+        for {
+          ix <- Async[F].ref(Option.empty[Key, Offset])
+        } yield Segment(num, name, path, ix)
+      }
+    }
+
+    object SegmentIx {
+
+      def create[F[_]: Async](s: Segment[F]): F[SegmentIx[F]] = {
+        val name = f"${s.name}.ix"
+        val path = Paths.get(f"${s.path.toAbsolutePath}/$name")
+        for {
+          data <- Async[F].ref(Map.empty[Key, Offset])
+        } yield SegmentIx(name, path, data)
       }
     }
 
