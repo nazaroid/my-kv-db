@@ -177,8 +177,8 @@ object BitcaskLib {
 
       def writeToFile(
         path:   Path,
-        data:   Array[Byte],
-        offset: Long
+        offset: Long,
+        data:   Array[Byte]
       ): DbScript[F, Unit] = ??? // TODO
     }
 
@@ -309,9 +309,9 @@ object BitcaskLib {
         for {
           env    <- ask[F, Env[F]]
           offset <- env.cache.getOffset(s)
-          data   <- DbScript.lift(SegmentRecord.create(key, value))
-          _      <- env.files.writeToFile(s.path, data, offset)
-          newOffset = offset + data.size
+          record   <- DbScript.lift(SegmentRecord.create(key, value))
+          _      <- env.files.writeToFile(s.path, offset, record)
+          newOffset = offset + record.size
           _ <- env.cache.updateOffset(s, newOffset)
         } yield newOffset
       }
