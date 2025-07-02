@@ -126,6 +126,8 @@ object BitcaskLib {
         } yield tbl
       }
 
+      def getTblIx(tbl: Tbl[F]): DbScript[F, Option[TblIx[F]]] = DbScript.lift(tbl.ix.get)
+
       def addSegmentIx(
         s:  Segment[F],
         ix: SegmentIx[F]
@@ -134,6 +136,8 @@ object BitcaskLib {
           _ <- DbScript.lift(s.ix.set(ix.some))
         } yield s
       }
+
+      def getSegmentIx(s: Segment[F]): DbScript[F, Option[SegmentIx[F]]] = DbScript.lift(s.ix.get)
 
       def addSegment(
         tbl: Tbl[F],
@@ -144,24 +148,38 @@ object BitcaskLib {
         } yield tbl
       }
 
+      def getLastSegment(tbl: Tbl[F]): DbScript[F, Option[Segment[F]]] = DbScript.lift(tbl.lastSegment.get)
+
       def findSegment(
         baseName: BaseName,
         tblName:  TblName,
         k:        Key
       ): DbScript[F, Option[Segment[F]]] = ???
 
-      def getOffsetInSegment(sx: SegmentIx[F], k: Key): DbScript[F, Offset] = ???
+      def updateOffset(s: Segment[F], newOffset: Offset): DbScript[F, Segment[F]] = {
+        DbScript.lift(s.offset.set(newOffset)) >> s.pure
+      }
+
+      def getOffset(s: Segment[F]): DbScript[F, Offset] = DbScript.lift(s.offset.get)
+
+      def getSegmentOffset(sIx: SegmentIx[F], k: Key): DbScript[F, Offset] = ???
     }
 
     trait FileService[F[_]: Async] {
 
       def createDirIfNotExists(path: Path): DbScript[F, Path] = {
-        Kleisli { env => Async[F].blocking(Files.createDirectories(path)) }
+        DbScript.lift { Async[F].blocking(Files.createDirectories(path)) }
       }
 
       def createBinFile(path: Path): DbScript[F, Path] = {
-        Kleisli { env => Async[F].blocking(Files.createFile(path)) }
+        DbScript.lift { Async[F].blocking(Files.createFile(path)) }
       }
+
+      def writeToFile(
+        path:   Path,
+        data:   Array[Byte],
+        offset: Long
+      ): DbScript[F, Unit] = ??? // TODO
     }
 
     trait BaseService[F[_]: Async] {
@@ -206,10 +224,41 @@ object BitcaskLib {
         } yield tbl
       }
 
+      def appendToLastSegment(
+        tbl:   Tbl[F],
+        key:   Key,
+        value: Value
+      ): DbScript[F, Segment[F]] = {
+        for {
+          env    <- ask[F, Env[F]]
+          s      <- env.tbl.getOrAddLastSegment(tbl)
+          sIx    <- env.segment.getOrAddSegmentIx(s)
+          offset <- env.segment.appendValue(s, key, value) // TODO
+          _      <- env.segmentIx.update(sIx, key, offset) // TODO
+          tIx    <- env.tbl.getOrAddTblIx(tbl)
+          _      <- env.tblIx.update(tIx, key, s)          // TODO
+        } yield s
+      }
+
+      private def getOrAddTblIx(tbl: Tbl[F]): DbScript[F, TblIx[F]] = {
+        for {
+          env   <- ask[F, Env[F]]
+          ixOpt <- env.cache.getTblIx(tbl)
+          ix <- ixOpt match {
+            case Some(ix) => DbScript.lift(ix.pure[F])
+            case None =>
+              for {
+                ix <- DbScript.lift(TblIx.create(tbl))
+                _  <- env.cache.addTblIx(tbl, ix)
+              } yield ix
+          }
+        } yield ix
+      }
+
       private def getOrAddLastSegment(tbl: Tbl[F]): DbScript[F, Segment[F]] = {
         for {
           env  <- ask[F, Env[F]]
-          sOpt <- DbScript.lift(tbl.lastSegment.get)
+          sOpt <- env.cache.getLastSegment(tbl)
           s <- sOpt match {
             case Some(s) => DbScript.lift(s.pure[F])
             case None =>
@@ -218,23 +267,6 @@ object BitcaskLib {
                 _ <- env.cache.addSegment(tbl, s)
               } yield s
           }
-        } yield s
-      }
-
-      def appendToLastSegment(tbl: Tbl[F], key: Key, value: Value): DbScript[F, Segment[F]] = {
-        for {
-          env <- ask[F, Env[F]]
-          s <- env.tbl.getOrAddLastSegment(tbl)
-          sIx <- env.segment.getOrAddSegmentIx(s)
-          // TODO: continue 
-          offset <- env.segment.appendValue(s, key, value)
-          // write to file and upd cache key -> offset
-          _ <- env.segmentIx.update(sIx, key, offset)
-          // write to file and upd cache key -> segment
-          _ <- env.tblIx.update(sIx, key, s)
-
-          offset <- env.segmentIx.update()
-
         } yield s
       }
 
@@ -254,14 +286,14 @@ object BitcaskLib {
 
       def getOrAddSegmentIx(s: Segment[F]): DbScript[F, SegmentIx[F]] = {
         for {
-          env <- ask[F, Env[F]]
-          ixOpt <- DbScript.lift(s.ix.get)
+          env   <- ask[F, Env[F]]
+          ixOpt <- env.cache.getSegmentIx(s)
           ix <- ixOpt match {
             case Some(ix) => DbScript.lift(ix.pure[F])
             case None =>
               for {
                 ix <- DbScript.lift(SegmentIx.create(s))
-                _ <- env.cache.addSegmentIx(s, ix)
+                _  <- env.cache.addSegmentIx(s, ix)
               } yield ix
           }
         } yield ix
@@ -269,7 +301,20 @@ object BitcaskLib {
 
       def readValue(s: Segment[F], offset: Offset): DbScript[F, Value] = ???
 
-      def appendValue(s: Segment[F], key: Key, value: Value): DbScript[F, Offset]
+      def appendValue(
+        s:     Segment[F],
+        key:   Key,
+        value: Value
+      ): DbScript[F, Offset] = {
+        for {
+          env    <- ask[F, Env[F]]
+          offset <- env.cache.getOffset(s)
+          data   <- DbScript.lift(SegmentRecord.create(key, value))
+          _      <- env.files.writeToFile(s.path, data, offset)
+          newOffset = offset + data.size
+          _ <- env.cache.updateOffset(s, newOffset)
+        } yield newOffset
+      }
     }
 
     trait TblIxService[F[_]: Async] {
@@ -287,7 +332,11 @@ object BitcaskLib {
 
       def write(ix: TblIx[F]): DbScript[F, TblIx[F]] = ???
 
-      def append(key: Key, value: Value): DbScript[F, Segment[F]] = ???
+      def update(
+        ix:  TblIx[F],
+        key: Key,
+        s:   Segment[F]
+      ): DbScript[F, TblIx[F]] = ??? // TODO
 
     }
 
@@ -301,6 +350,12 @@ object BitcaskLib {
           _   <- env.cache.addSegmentIx(s, ix)
         } yield ix
       }
+
+      def update(
+        ix:     SegmentIx[F],
+        key:    Key,
+        offset: Offset
+      ): DbScript[F, SegmentIx[F]] = ??? // TODO
 
       def read(tbl: Tbl[F], num: SegmentNum): DbScript[F, SegmentIx[F]] = ???
 
@@ -371,7 +426,7 @@ object BitcaskLib {
             env  <- ask[F, Env[F]]
             base <- env.base.get(baseName)
             tbl  <- env.tbl.get(base, tblName)
-            _ <- env.tbl.appendToLastSegment(tbl, key, value)
+            _    <- env.tbl.appendToLastSegment(tbl, key, value)
           } yield ()
         }
       }
@@ -403,8 +458,8 @@ object BitcaskLib {
       name:       SegmentName,
       path:       Path,
       ix:         Ref[F, Option[SegmentIx[F]]],
-      isReadOnly: Boolean = false,
-      offset:     Offset = 0)
+      offset:     Ref[F, Offset],
+      isReadOnly: Boolean = false)
 
     final case class State[F[_]: Async](registryRef: Ref[F, BaseRegistry[F]])
 
@@ -440,6 +495,10 @@ object BitcaskLib {
       }
     }
 
+    object TblIxRecord {
+      def create[F[_]: Async](key: Key, s: Segment[F]): F[Array[Byte]] = ???
+    }
+
     object Segment {
 
       def create[F[_]: Async](
@@ -449,9 +508,14 @@ object BitcaskLib {
         val name = f"segment_$num.seg"
         val path = Paths.get(f"${tbl.path.toAbsolutePath}/$name")
         for {
-          ix <- Async[F].ref(Option.empty[SegmentIx[F]])
-        } yield Segment(num, name, path, ix)
+          ix     <- Async[F].ref(Option.empty[SegmentIx[F]])
+          offset <- Async[F].ref(0L)
+        } yield Segment(num, name, path, ix, offset)
       }
+    }
+
+    object SegmentRecord {
+      def create[F[_]: Async](key: Key, value: Value): F[Array[Byte]] = ??? // TODO
     }
 
     object SegmentIx {
@@ -463,6 +527,10 @@ object BitcaskLib {
           data <- Async[F].ref(Map.empty[Key, Offset])
         } yield SegmentIx(name, path, data)
       }
+    }
+
+    object SegmentIxRecord {
+      def create[F[_]: Async](key: Key, offset: Offset): F[Array[Byte]] = ???
     }
 
     object DbScript {

@@ -79,7 +79,7 @@
         <mxCell id="1" parent="0" />
         <UserObject label="./db root path/&#xa;   DB1/&#xa;    ...&#xa;   DB2/&#xa;       TBL1/&#xa;         table.ix&#xa;         segment_1.ix&#xa;         segment_1.seg&#xa;         segment_2.ix&#xa;         segment_2.seg&#xa;        ...&#xa;       TBL2/&#xa;       ...&#xa;&#xa;table.ix&#xa;[ключ] [имя номер сегмента]&#xa;k1 segment_1&#xa;k2 segment_2&#xa;&#xa;&#xa;segment_1.ix&#xa;k1 offset&#xa;k2 offset&#xa;&#xa;segment_1.seg&#xa;    [длина ключа 4b][ключ][длина значения 4b][значение]&#xa;    [4b]            [123] [8kb]              [{..json..}]" link="./db root path/&#xa;   DB1/&#xa;    ...&#xa;   DB2/&#xa;       tables.ix&#xa;       TBL1/&#xa;         segment_1.ix&#xa;         segment_1.smt&#xa;         segment_2.smt&#xa;         segment_2.smt&#xa;        ...&#xa;       TBL2/&#xa;       ...&#xa;&#xa;&#xa;&#xa;&#xa;tables.ix&#xa;&#xa;&#xa;TODO&#xa;&#xa;&#xa;segment_1.ix&#xa;&#xa;&#xa;TODO&#xa;&#xa;&#xa;segment_1.seg&#xa;    [длина ключа 4b][ключ][длина значения 4b][значение]&#xa;    [4b]            [123] [8kb]              [{..json..}]" id="WwZy5p1NHr276Xbs5h3A-1">
           <mxCell style="text;whiteSpace=wrap;fontSize=15;fontStyle=1" parent="1" vertex="1">
-            <mxGeometry x="80" y="70" width="350" height="480" as="geometry" />
+            <mxGeometry x="80" y="70" width="470" height="480" as="geometry" />
           </mxCell>
         </UserObject>
       </root>
