@@ -67,27 +67,27 @@ final class HttpDbServer[F[_]: Async: Logger: Network](conf: HttpSrvConf, engine
         case GET -> Root / dbName / tblName / key =>
           {
             for {
-              db  <- engine.createDbIfNotExists(dbName)
-              tbl <- db.createTableIfNotExists(tblName)
-              v   <- tbl.get(key)
-            } yield Ok(v)
+              vOpt <- engine.get(dbName, tblName, key)
+            } yield {
+              vOpt match {
+                case Some(v) => Status.Ok(v)
+                case None    => Status.NotFound()
+              }
+            }
           }.flatten
         // set value
         case r @ POST -> Root / dbName / tblName / key =>
           {
             for {
-              db  <- engine.createDbIfNotExists(dbName)
-              tbl <- db.createTableIfNotExists(tblName)
-              v   <- r.bodyText.compile.fold("")(_ + _)
-              _   <- tbl.set(key, v)
+              v <- r.bodyText.compile.fold("")(_ + _)
+              _ <- engine.set(dbName, tblName, key, v)
             } yield Ok("OK")
           }.flatten
         // create tbl
         case POST -> Root / dbName / tblName =>
           {
             for {
-              db <- engine.createDbIfNotExists(dbName)
-              _  <- db.createTableIfNotExists(tblName)
+              _ <- engine.createTableIfNotExists(dbName, tblName)
             } yield Ok("OK")
           }.flatten
         // create db

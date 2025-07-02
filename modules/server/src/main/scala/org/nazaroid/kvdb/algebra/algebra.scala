@@ -7,14 +7,20 @@ trait DbServer[F[_]] {
 }
 
 trait DbEngine[F[_]] {
-  def createDbIfNotExists(name: String): F[Database[F]]
-}
+  def createDbIfNotExists(name: String): F[Unit]
 
-trait Database[F[_]] {
-  def createTableIfNotExists(name: String): F[Table[F]]
-}
+  def createTableIfNotExists(baseName: String, tblName: String): F[Unit]
 
-trait Table[F[_]] {
-  def get(key: String):                F[String]
-  def set(key: String, value: String): F[Unit]
+  def get(
+    baseName: String,
+    tblName: String,
+    key: String
+  ): F[Option[String]]
+
+  def set(
+    baseName: String,
+    tblName: String,
+    key: String,
+    value: String
+  ): F[Unit]
 }

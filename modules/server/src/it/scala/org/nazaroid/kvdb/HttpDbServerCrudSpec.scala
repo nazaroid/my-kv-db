@@ -19,7 +19,7 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
     val responseDecoder: EntityDecoder[IO, String] = EntityDecoder.text
 
     val config = DbConf()
-    import config.*
+    import config.server.http.*
     {
       for {
         logger <- Slf4jLogger.create[IO]

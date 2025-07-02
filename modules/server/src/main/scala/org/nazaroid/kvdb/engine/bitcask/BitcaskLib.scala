@@ -106,6 +106,22 @@ object BitcaskLib {
         } yield base
       }
 
+      def getTbl(baseName: BaseName, tblName: TblName): DbScript[F, Tbl[F]] = {
+        for {
+          env  <- ask[F, Env[F]]
+          base <- getBase(baseName)
+          tbl  <- DbScript.lift(base.tables.get).map(_(tblName))
+        } yield tbl
+      }
+
+      def getBase(baseName: BaseName): DbScript[F, Base[F]] = {
+        for {
+          env  <- ask[F, Env[F]]
+          s    <- DbScript.lift(env.state)
+          base <- DbScript.lift(s.registryRef.get).map(_(baseName))
+        } yield base
+      }
+
       def addTblIx(tbl: Tbl[F], ix: TblIx[F]): DbScript[F, Tbl[F]] = {
         for {
           _ <- DbScript.lift(tbl.ix.set(ix.some))
@@ -161,6 +177,15 @@ object BitcaskLib {
         } yield base
       }
 
+      def get(name: BaseName): DbScript[F, Base[F]] = {
+        for {
+          env  <- ask[F, Env[F]]
+          base <- DbScript.lift(Base.create(env.conf.rootDir, name))
+          _    <- env.files.createDirIfNotExists(base.path)
+          _    <- env.cache.addBase(base)
+        } yield base
+      }
+
       def list(rootDir: String): DbScript[F, Seq[Base[F]]] = ???
     }
 
@@ -177,6 +202,8 @@ object BitcaskLib {
           _   <- env.segmentIx.create(s)
         } yield tbl
       }
+
+      def get(baseName: BaseName, tblName: TblName): DbScript[F, Tbl[F]] = ???
 
       def list(base: Base[F]): DbScript[F, Seq[Tbl[F]]] = ???
     }
@@ -241,14 +268,57 @@ object BitcaskLib {
           } yield base
         }
 
-      def createTableIfNotExists(base: Base[F], tblName: String): F[Tbl[F]] =
+      def createTableIfNotExists(baseName: String, tblName: String): F[Tbl[F]] =
         DbScript.run {
           for {
-            env <- ask[F, Env[F]]
-            tbl <- env.tbl.createIfNotExists(base, tblName)
-            _   <- env.cache.addTbl(base, tbl)
+            env  <- ask[F, Env[F]]
+            base <- env.base.get(baseName)
+            tbl  <- env.tbl.createIfNotExists(base, tblName)
+            _    <- env.cache.addTbl(base, tbl)
           } yield tbl
         }
+
+      /*
+       read
+       * по индексу key -> segment находим сегмент
+       * по индексу value -> offset находим место записи (см file structure)
+       * парсим запись согласно схеме записи
+
+
+      исключение "в индексе отсутствует"
+      • возвращаем None
+       */
+      def get(
+        baseName: String,
+        tblName:  String,
+        key:      String
+      ): F[Option[String]] = ???
+
+      /*
+       write
+      запись в segment и обновление индексов
+      • подбираем сегмент для ключа
+      +t (транзакция)
+       * добавляем запись в конец сегмента
+       * обновляем индекс key -> segment
+      • обновляем индекс value -> offset
+      -t
+
+
+      шаг "подбор сегмента"
+      нужен последний сегмент, в который можно писать
+       * если еще нет сегмента, то создаем новый
+       * если последний сегмент is_read_only, то создаем новый
+      • иначе пишем в последний сегмент
+       */
+      def set(
+        baseName: String,
+        tblName:  String,
+        key:      String,
+        value:    String
+      ): F[Unit] = {
+        ???
+      }
     }
 
     final case class Base[F[_]: Async](

@@ -45,20 +45,22 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
      Server (Http / Grpc) 
      Engine (BitCaskDbEngine)
 
-  реализовать HttpDbServer
+(+) реализовать HttpDbServer
    - POST 201 http://$host:$port/data/db
    - POST 201 http://$host:$port/data/db/tbl
    - POST http://$host:$port/data/db/key
    - GET  http://$host:$port/data/db/key
      (+) сделать Engine на Map[String, String]
 
-  потом начать делать BitCask
-   - Проектирование: 
+  потом начать делать BitCask [IN PROGRESS]
+   - (+) Проектирование: 
      - описать систему классов
      - описать файловую структуру (все файлы и папки)
        - TODO: остановился на индексах в my-kv-db.drawio
        -- обдумать какое содержимое индексов и описать каждый
        -- см раздел Индексирвание в файле на GoogleDisk
+   - (!) реализация
+     continue from: BitcaskTable get set
   
 ???(обдумать) сделать в engine приемку команд при помощи fs2
 ** public CompletableFuture<DatabaseCommandResult> executeNextCommand(DatabaseCommand command)
