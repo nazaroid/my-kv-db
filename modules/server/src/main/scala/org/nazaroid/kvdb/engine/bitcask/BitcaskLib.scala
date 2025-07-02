@@ -106,11 +106,9 @@ object BitcaskLib {
         } yield base
       }
 
-      def getTbl(baseName: BaseName, tblName: TblName): DbScript[F, Tbl[F]] = {
+      def getTbl(base: Base[F], tblName: TblName): DbScript[F, Tbl[F]] = {
         for {
-          env  <- ask[F, Env[F]]
-          base <- getBase(baseName)
-          tbl  <- DbScript.lift(base.tables.get).map(_(tblName))
+          tbl <- DbScript.lift(base.tables.get).map(_(tblName))
         } yield tbl
       }
 
@@ -168,21 +166,19 @@ object BitcaskLib {
 
     trait BaseService[F[_]: Async] {
 
-      def createIfNotExists(rootDir: String, name: BaseName): DbScript[F, Base[F]] = {
+      def createIfNotExists(rootDir: String, baseName: BaseName): DbScript[F, Base[F]] = {
         for {
           env  <- ask[F, Env[F]]
-          base <- DbScript.lift(Base.create(env.conf.rootDir, name))
+          base <- DbScript.lift(Base.create(env.conf.rootDir, baseName))
           _    <- env.files.createDirIfNotExists(base.path)
           _    <- env.cache.addBase(base)
         } yield base
       }
 
-      def get(name: BaseName): DbScript[F, Base[F]] = {
+      def get(baseName: BaseName): DbScript[F, Base[F]] = {
         for {
           env  <- ask[F, Env[F]]
-          base <- DbScript.lift(Base.create(env.conf.rootDir, name))
-          _    <- env.files.createDirIfNotExists(base.path)
-          _    <- env.cache.addBase(base)
+          base <- env.cache.getBase(baseName)
         } yield base
       }
 
@@ -191,10 +187,10 @@ object BitcaskLib {
 
     trait TblService[F[_]: Async] {
 
-      def createIfNotExists(base: Base[F], name: TblName): DbScript[F, Tbl[F]] = {
+      def createIfNotExists(base: Base[F], tblName: TblName): DbScript[F, Tbl[F]] = {
         for {
           env <- ask[F, Env[F]]
-          tbl <- DbScript.lift(Tbl.create(base, name))
+          tbl <- DbScript.lift(Tbl.create(base, tblName))
           _   <- env.files.createDirIfNotExists(tbl.path)
           _   <- env.cache.addTbl(base, tbl)
           _   <- env.tblIx.create(tbl)
@@ -203,7 +199,12 @@ object BitcaskLib {
         } yield tbl
       }
 
-      def get(baseName: BaseName, tblName: TblName): DbScript[F, Tbl[F]] = ???
+      def get(base: Base[F], tblName: TblName): DbScript[F, Tbl[F]] = {
+        for {
+          env <- ask[F, Env[F]]
+          tbl <- env.cache.getTbl(base, tblName)
+        } yield tbl
+      }
 
       def list(base: Base[F]): DbScript[F, Seq[Tbl[F]]] = ???
     }
