@@ -249,10 +249,10 @@ object BitcaskLib {
           env    <- ask[F, Env[F]]
           s      <- env.tbl.getOrAddLastSegment(tbl)
           sIx    <- env.segment.getOrAddSegmentIx(s)
-          offset <- env.segment.appendValue(s, key, value) // TODO
-          _      <- env.segmentIx.update(sIx, key, offset) // TODO
+          offset <- env.segment.appendValue(s, key, value)
+          _      <- env.segmentIx.update(sIx, key, offset)
           tIx    <- env.tbl.getOrAddTblIx(tbl)
-          _      <- env.tblIx.update(tIx, key, s)          // TODO
+          _      <- env.tblIx.update(tIx, key, s)
         } yield s
       }
 
