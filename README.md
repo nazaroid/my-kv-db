@@ -61,6 +61,7 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
        -- см раздел Индексирвание в файле на GoogleDisk
    - (!) реализация
      continue from: BitcaskTable get set
+   - восстановление кеша при старте
   
 ???(обдумать) сделать в engine приемку команд при помощи fs2
 ** public CompletableFuture<DatabaseCommandResult> executeNextCommand(DatabaseCommand command)
