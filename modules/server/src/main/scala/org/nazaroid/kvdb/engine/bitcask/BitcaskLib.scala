@@ -6,7 +6,8 @@ import cats.effect.{Async, Ref}
 import cats.implicits.given
 import org.nazaroid.kvdb.BitcaskConf
 
-import java.nio.file.{Files, Path, Paths}
+import java.nio.ByteBuffer
+import java.nio.file.{Files, Paths, StandardOpenOption}
 
 object BitcaskLib {
 
@@ -194,7 +195,11 @@ object BitcaskLib {
       def appendToFile(
         path: Path,
         data: Array[Byte]
-      ): DbScript[F, Unit] = ??? // TODO
+      ): DbScript[F, Unit] = {
+        DbScript.lift {
+          Async[F].blocking(Files.write(path, data, StandardOpenOption.CREATE, StandardOpenOption.APPEND))
+        }
+      }
 
     }
 
@@ -524,7 +529,17 @@ object BitcaskLib {
     }
 
     object TblIxRecord {
-      def create[F[_]: Async](key: Key, s: Segment[F]): F[Array[Byte]] = ???
+
+      def create[F[_]: Async](key: Key, s: Segment[F]): F[Array[Byte]] = {
+        val keyBytes = key.getBytes("UTF-8")
+        val keySize = keyBytes.length
+        val sNameBytes = s.name.getBytes
+        val sNameSize = sNameBytes.length
+        ByteBuffer.allocate(4).putInt(keySize).array()
+          ++ keyBytes
+          ++ ByteBuffer.allocate(4).putInt(sNameSize).array()
+          ++ sNameBytes
+      }
     }
 
     object Segment {
@@ -543,7 +558,17 @@ object BitcaskLib {
     }
 
     object SegmentRecord {
-      def create[F[_]: Async](key: Key, value: Value): F[Array[Byte]] = ??? // TODO
+
+      def create[F[_]: Async](key: Key, value: Value): F[Array[Byte]] = {
+        val keyBytes = key.getBytes("UTF-8")
+        val keySize = keyBytes.length
+        val valueBytes = value.getBytes("UTF-8")
+        val valueSize = valueBytes.length
+        ByteBuffer.allocate(4).putInt(keySize).array()
+          ++ keyBytes
+          ++ ByteBuffer.allocate(4).putInt(valueSize).array()
+          ++ valueBytes
+      }
     }
 
     object SegmentIx {
@@ -558,7 +583,16 @@ object BitcaskLib {
     }
 
     object SegmentIxRecord {
-      def create[F[_]: Async](key: Key, offset: Offset): F[Array[Byte]] = ??? // TODO
+
+      def create[F[_]: Async](key: Key, offset: Offset): F[Array[Byte]] = {
+        val keyBytes = key.getBytes("UTF-8")
+        val keySize = keyBytes.length
+        val valueBytes = value.getBytes("UTF-8")
+        val valueSize = valueBytes.length
+        ByteBuffer.allocate(4).putInt(keySize).array()
+          ++ keyBytes
+          ++ ByteBuffer.allocate(8).putInt(offset).array()
+      }
     }
 
     object DbScript {
