@@ -7,7 +7,7 @@ import cats.implicits.given
 import org.nazaroid.kvdb.BitcaskConf
 
 import java.nio.ByteBuffer
-import java.nio.file.{Files, Paths, StandardOpenOption}
+import java.nio.file.{Files, Paths, StandardOpenOption, Path}
 
 object BitcaskLib {
 
@@ -535,10 +535,10 @@ object BitcaskLib {
         val keySize = keyBytes.length
         val sNameBytes = s.name.getBytes
         val sNameSize = sNameBytes.length
-        ByteBuffer.allocate(4).putInt(keySize).array()
+        (ByteBuffer.allocate(4).putInt(keySize).array()
           ++ keyBytes
           ++ ByteBuffer.allocate(4).putInt(sNameSize).array()
-          ++ sNameBytes
+          ++ sNameBytes).pure[F]
       }
     }
 
@@ -564,10 +564,10 @@ object BitcaskLib {
         val keySize = keyBytes.length
         val valueBytes = value.getBytes("UTF-8")
         val valueSize = valueBytes.length
-        ByteBuffer.allocate(4).putInt(keySize).array()
+        (ByteBuffer.allocate(4).putInt(keySize).array()
           ++ keyBytes
           ++ ByteBuffer.allocate(4).putInt(valueSize).array()
-          ++ valueBytes
+          ++ valueBytes).pure[F]
       }
     }
 
@@ -587,11 +587,9 @@ object BitcaskLib {
       def create[F[_]: Async](key: Key, offset: Offset): F[Array[Byte]] = {
         val keyBytes = key.getBytes("UTF-8")
         val keySize = keyBytes.length
-        val valueBytes = value.getBytes("UTF-8")
-        val valueSize = valueBytes.length
-        ByteBuffer.allocate(4).putInt(keySize).array()
+        (ByteBuffer.allocate(4).putInt(keySize).array()
           ++ keyBytes
-          ++ ByteBuffer.allocate(8).putInt(offset).array()
+          ++ ByteBuffer.allocate(8).putLong(offset).array()).pure[F]
       }
     }
 
