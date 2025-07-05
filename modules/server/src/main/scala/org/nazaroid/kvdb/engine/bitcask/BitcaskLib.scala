@@ -157,9 +157,19 @@ object BitcaskLib {
       def findSegment(
         tblIx: TblIx[F],
         k:     Key
-      ): DbScript[F, Option[Segment[F]]] = ??? // TODO
+      ): DbScript[F, Option[Segment[F]]] = {
+        for {
+          env  <- ask[F, Env[F]]
+          sOpt <- DbScript.lift(tblIx.data.get).map(_.get(k))
+        } yield sOpt
+      }
 
-      def getOffsetBySegmentIx(sIx: SegmentIx[F], k: Key): DbScript[F, Offset] = ??? // TODO
+      def getOffsetBySegmentIx(sIx: SegmentIx[F], k: Key): DbScript[F, Offset] = {
+        for {
+          env    <- ask[F, Env[F]]
+          offset <- DbScript.lift(sIx.data.get).map(_(k))
+        } yield offset
+      }
 
       def increaseSegmentOffset(s: Segment[F], delta: Offset): DbScript[F, Offset] = {
         DbScript.lift(s.offset.updateAndGet(_ + delta))
