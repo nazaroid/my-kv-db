@@ -63,9 +63,7 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
      
      - (+) set
      - рефакт: сериализация тупла (record) в бинарный вид (deser сделать абстрактной, чтобы можно было заменить на любой другой способ)
-     - continue from: BitcaskTable get 
-   - рефакт: сделать трансформер F -> DbScript[F, ...] 
-     - перевести где можно на F
+     - continue from: BitcaskTable get
    - восстановление кеша при старте
   
 ???(обдумать) сделать в engine приемку команд при помощи fs2
