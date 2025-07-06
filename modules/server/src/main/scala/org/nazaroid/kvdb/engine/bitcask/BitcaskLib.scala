@@ -232,6 +232,7 @@ object BitcaskLib {
         val bSize = ByteBuffer.allocate(recordSizeCapacity)
         ch.position(offset)
         ch.read(bSize)
+        bSize.rewind()
         val recordSize = bSize.getInt
         val bRecord = ByteBuffer.allocate(recordSize)
         ch.read(bRecord)
@@ -348,7 +349,7 @@ object BitcaskLib {
         for {
           env <- ask[F, Env[F]]
           s   <- DbScript.lift(Segment.create(tbl))
-//          _   <- env.files.createFile(s.path)
+          _   <- env.files.createFile(s.path)
           _ <- env.cache.addSegment(tbl, s)
         } yield s
       }
@@ -401,7 +402,7 @@ object BitcaskLib {
         for {
           env <- ask[F, Env[F]]
           ix  <- DbScript.lift(TblIx.create(tbl))
-//          _   <- env.files.createFile(ix.path)
+          _   <- env.files.createFile(ix.path)
           _ <- env.cache.addTblIx(tbl, ix)
         } yield ix
       }
@@ -431,7 +432,7 @@ object BitcaskLib {
         for {
           env <- ask[F, Env[F]]
           ix  <- DbScript.lift(SegmentIx.create(s))
-//          _   <- env.files.createFile(ix.path)
+          _   <- env.files.createFile(ix.path)
           _ <- env.cache.addSegmentIx(s, ix)
         } yield ix
       }
@@ -570,15 +571,27 @@ object BitcaskLib {
     }
 
     object TblIxRecord {
+      private val recordSizeCapacity: Int = 4
+      private val keySizeCapacity:    Int = 4
+      private val sNameSizeCapacity:  Int = 4
 
       def create[F[_]: Async](key: Key, s: Segment[F]): F[FileRecord] = {
         val keyBytes = key.getBytes("UTF-8")
         val keySize = keyBytes.length
+        val keySizeBytes = ByteBuffer.allocate(keySizeCapacity).putInt(keySize).array()
         val sNameBytes = s.name.getBytes
         val sNameSize = sNameBytes.length
-        (ByteBuffer.allocate(4).putInt(keySize).array()
+        val sNameSizeBytes = ByteBuffer.allocate(sNameSizeCapacity).putInt(sNameSize).array()
+        val recordSize = recordSizeCapacity + keySizeCapacity + keySize + sNameSize
+        val recordSizeBytes = ByteBuffer
+          .allocate(recordSizeCapacity)
+          .putInt(recordSize)
+          .array()
+
+        (recordSizeBytes
+          ++ keySizeBytes
           ++ keyBytes
-          ++ ByteBuffer.allocate(4).putInt(sNameSize).array()
+          ++ sNameSizeBytes
           ++ sNameBytes).pure[F]
       }
     }
@@ -605,9 +618,8 @@ object BitcaskLib {
         val valueBytes = value.getBytes("UTF-8")
         val valueSize = valueBytes.length
         val valueSizeBytes = ByteBuffer.allocate(recordSizeCapacity).putInt(valueSize).array()
-        val recordSize = recordSizeCapacity + valueSize
+        val recordSize = valueSize
         val recordSizeBytes = valueSizeBytes
-
         (recordSizeBytes ++ valueBytes).pure[F]
       }
 
