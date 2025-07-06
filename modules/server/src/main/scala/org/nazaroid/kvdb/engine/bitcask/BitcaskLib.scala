@@ -215,7 +215,25 @@ object BitcaskLib {
         }
       }
 
-      def readFileRecord(path: Path, offset: Offset): DbScript[F, FileRecord] = ??? // TODO
+      /*
+        binary record format:
+        [ record size | fld_1 size | fld_1 | fld_2 size | fld_2 | ... | fld_N size | fld_N ]
+       */
+      def readFileRecord(
+        path:               Path,
+        offset:             Offset,
+        recordSizeCapacity: Int = 4
+      ): DbScript[F, FileRecord] = {
+        val stream = new java.io.FileInputStream(path.toFile)
+        val ch = stream.getChannel
+        val bSize = ByteBuffer.allocate(recordSizeCapacity)
+        ch.position(offset)
+        ch.read(bSize)
+        val recordSize = bSize.getInt
+        val bRecord = ByteBuffer.allocate(recordSize)
+        ch.read(bRecord)
+        DbScript.lift(bRecord.array().pure[F])
+      }
 
     }
 
@@ -290,6 +308,20 @@ object BitcaskLib {
         } yield s
       }
 
+      def findInSegments(
+        tbl: Tbl[F],
+        k:   Key
+      ): DbScript[F, Option[Value]] = {
+        for {
+          env <- ask[F, Env[F]]
+          tIx <- env.tbl.getOrAddTblIx(tbl)
+          vOpt <- env.cache.findSegment(tIx, k) >>= {
+            case Some(s) => env.segment.getValue(s, k).map(Some(_))
+            case None    => DbScript.lift(None.pure[F])
+          }
+        } yield vOpt
+      }
+
       private def getOrAddTblIx(tbl: Tbl[F]): DbScript[F, TblIx[F]] = {
         for {
           env   <- ask[F, Env[F]]
@@ -303,20 +335,6 @@ object BitcaskLib {
               } yield ix
           }
         } yield ix
-      }
-
-      def findInSegments(
-        tbl: Tbl[F],
-        k:   Key
-      ): DbScript[F, Option[Value]] = {
-        for {
-          env <- ask[F, Env[F]]
-          tIx <- env.tbl.getOrAddTblIx(tbl)
-          vOpt <- env.cache.findSegment(tIx, k) >>= {
-            case Some(s) => env.segment.getValue(s, k).map(Some(_))
-            case None    => DbScript.lift(None.pure[F])
-          }
-        } yield vOpt
       }
 
     }
@@ -578,19 +596,38 @@ object BitcaskLib {
     }
 
     object SegmentRecord {
+      private val recordSizeCapacity = 4
+      private val keySizeCapacity    = 4
+      private val valueSizeCapacity  = 4
 
       def create[F[_]: Async](key: Key, value: Value): F[FileRecord] = {
         val keyBytes = key.getBytes("UTF-8")
         val keySize = keyBytes.length
+        val keySizeBytes = ByteBuffer.allocate(keySizeCapacity).putInt(keySize).array()
         val valueBytes = value.getBytes("UTF-8")
         val valueSize = valueBytes.length
-        (ByteBuffer.allocate(4).putInt(keySize).array()
+        val valueSizeBytes = ByteBuffer.allocate(valueSizeCapacity).putInt(keySize).array()
+        val recordSize = keySizeCapacity + keySize + valueSizeCapacity + valueSize
+        val recordSizeBytes = ByteBuffer.allocate(recordSizeCapacity).putInt(recordSize).array()
+
+        (recordSizeBytes
+          ++ keySizeBytes
           ++ keyBytes
-          ++ ByteBuffer.allocate(4).putInt(valueSize).array()
+          ++ valueSizeBytes
           ++ valueBytes).pure[F]
       }
 
-      def getValue[F[_]: Async](r: FileRecord): F[Value] = ??? // TODO
+      def getValue[F[_]: Async](r: FileRecord): F[Value] = {
+        val (keySizeBytes, tail) = r.splitAt(keySizeCapacity)
+        val keySize = ByteBuffer.wrap(keySizeBytes).getInt
+        val (keyBytes, tail2) = tail.splitAt(keySize)
+        val key = new String(keyBytes, "UTF-8")
+        val (valueSizeBytes, tail3) = tail2.splitAt(valueSizeCapacity)
+        val valueSize = ByteBuffer.wrap(valueSizeBytes).getInt
+        val (valueBytes, _) = tail3.splitAt(valueSize)
+        val value = new String(valueBytes, "UTF-8")
+        value.pure[F]
+      }
     }
 
     object SegmentIx {
@@ -605,13 +642,24 @@ object BitcaskLib {
     }
 
     object SegmentIxRecord {
+      private val keySizeCapacity:    Int = 4
+      private val recordSizeCapacity: Int = 4
+      private val offsetCapacity:     Int = 8
 
       def create[F[_]: Async](key: Key, offset: Offset): F[FileRecord] = {
         val keyBytes = key.getBytes("UTF-8")
         val keySize = keyBytes.length
-        (ByteBuffer.allocate(4).putInt(keySize).array()
+        val keySizeBytes = ByteBuffer.allocate(keySizeCapacity).putInt(keySize).array()
+        val offsetBytes = ByteBuffer.allocate(offsetCapacity).putLong(offset).array()
+        val recordSize = keySizeCapacity + keySize + offsetCapacity
+        val recordSizeBytes = ByteBuffer
+          .allocate(recordSizeCapacity)
+          .putInt(recordSize)
+          .array()
+        (recordSizeBytes
+          ++ keySizeBytes
           ++ keyBytes
-          ++ ByteBuffer.allocate(8).putLong(offset).array()).pure[F]
+          ++ offsetBytes).pure[F]
       }
     }
 
