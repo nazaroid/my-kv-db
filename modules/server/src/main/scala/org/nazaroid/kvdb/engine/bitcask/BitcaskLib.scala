@@ -14,7 +14,9 @@ object BitcaskLib {
   import algebra.*
   import instances.*
 
-  def apply[F[_]: Async](c: BitcaskConf): LibScenarios[F] = new LibScenariosImpl(c)
+  def apply[F[_]: Async](c: BitcaskConf, s: State[F]): LibScenarios[F] = new LibScenariosImpl(c, s)
+
+  def createState[F[_]: Async](): F[State[F]] = Async[F].ref(Map.empty[BaseName, Base[F]]) >>= { r => State(r).pure[F] }
 
   object instances {
 
@@ -27,10 +29,10 @@ object BitcaskLib {
         with TblIxService[F]
         with SegmentIxService[F] {}
 
-    final class LibScenariosImpl[F[_]: Async](c: BitcaskConf) extends LibScenarios[F]:
-      override def env: Env[F] = EnvImpl(c)
+    final class LibScenariosImpl[F[_]: Async](c: BitcaskConf, s: State[F]) extends LibScenarios[F]:
+      override def env: Env[F] = EnvImpl(c, s)
 
-    final class EnvImpl[F[_]: Async](c: BitcaskConf) extends Env[F]:
+    final class EnvImpl[F[_]: Async](c: BitcaskConf, s: State[F]) extends Env[F]:
       private val dsl = new Dsl()
 
       override def conf: BitcaskConf = c
@@ -49,10 +51,7 @@ object BitcaskLib {
 
       override def cache: CacheService[F] = dsl
 
-      override def state: F[State[F]] =
-        Async[F].ref(Map.empty[BaseName, Base[F]]) >>= { r =>
-          State(r).pure[F]
-        }
+      override def state: State[F] = s
   }
 
   object algebra {
@@ -89,7 +88,7 @@ object BitcaskLib {
 
       def cache: CacheService[F]
 
-      def state: F[State[F]]
+      def state: State[F]
     }
 
     trait CacheService[F[_]: Async] {
@@ -97,8 +96,7 @@ object BitcaskLib {
       def addBase(base: Base[F]): DbScript[F, BaseRegistry[F]] = {
         for {
           env <- ask[F, Env[F]]
-          s   <- DbScript.lift(env.state)
-          reg <- DbScript.lift(s.registryRef.updateAndGet(_.updated(base.name, base)))
+          reg <- DbScript.lift(env.state.registryRef.updateAndGet(_.updated(base.name, base)))
         } yield reg
       }
 
@@ -117,8 +115,7 @@ object BitcaskLib {
       def getBase(baseName: BaseName): DbScript[F, Base[F]] = {
         for {
           env  <- ask[F, Env[F]]
-          s    <- DbScript.lift(env.state)
-          base <- DbScript.lift(s.registryRef.get).map(_(baseName))
+          base <- DbScript.lift(env.state.registryRef.get).map(_(baseName))
         } yield base
       }
 
@@ -366,16 +363,6 @@ object BitcaskLib {
         } yield newOffset
       }
 
-      def getValue(s: Segment[F], k: Key): DbScript[F, Value] = {
-        for {
-          env    <- ask[F, Env[F]]
-          sIx    <- getOrAddSegmentIx(s)
-          offset <- env.cache.getOffsetBySegmentIx(sIx, k)
-          record <- env.files.readFileRecord(s.path, offset)
-          v      <- DbScript.lift(SegmentRecord.getValue(record))
-        } yield v
-      }
-
       def getOrAddSegmentIx(s: Segment[F]): DbScript[F, SegmentIx[F]] = {
         for {
           env   <- ask[F, Env[F]]
@@ -389,6 +376,16 @@ object BitcaskLib {
               } yield ix
           }
         } yield ix
+      }
+
+      def getValue(s: Segment[F], k: Key): DbScript[F, Value] = {
+        for {
+          env    <- ask[F, Env[F]]
+          sIx    <- getOrAddSegmentIx(s)
+          offset <- env.cache.getOffsetBySegmentIx(sIx, k)
+          record <- env.files.readFileRecord(s.path, offset)
+          v      <- DbScript.lift(SegmentRecord.getValue(record))
+        } yield v
       }
     }
 
