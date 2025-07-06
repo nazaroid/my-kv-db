@@ -357,7 +357,7 @@ object BitcaskLib {
       ): DbScript[F, Offset] = {
         for {
           env       <- ask[F, Env[F]]
-          record    <- DbScript.lift(SegmentRecord.create(key, value))
+          record    <- DbScript.lift(SegmentRecord.create(value))
           _         <- env.files.appendToFile(s.path, record)
           sIx       <- env.segment.getOrAddSegmentIx(s)
           offset    <- env.cache.getSegmentOffset(s)
@@ -597,35 +597,19 @@ object BitcaskLib {
 
     object SegmentRecord {
       private val recordSizeCapacity = 4
-      private val keySizeCapacity    = 4
-      private val valueSizeCapacity  = 4
 
-      def create[F[_]: Async](key: Key, value: Value): F[FileRecord] = {
-        val keyBytes = key.getBytes("UTF-8")
-        val keySize = keyBytes.length
-        val keySizeBytes = ByteBuffer.allocate(keySizeCapacity).putInt(keySize).array()
+      def create[F[_]: Async](value: Value): F[FileRecord] = {
         val valueBytes = value.getBytes("UTF-8")
         val valueSize = valueBytes.length
-        val valueSizeBytes = ByteBuffer.allocate(valueSizeCapacity).putInt(keySize).array()
-        val recordSize = keySizeCapacity + keySize + valueSizeCapacity + valueSize
-        val recordSizeBytes = ByteBuffer.allocate(recordSizeCapacity).putInt(recordSize).array()
+        val valueSizeBytes = ByteBuffer.allocate(recordSizeCapacity).putInt(valueSize).array()
+        val recordSize = recordSizeCapacity + valueSize
+        val recordSizeBytes = valueSizeBytes
 
-        (recordSizeBytes
-          ++ keySizeBytes
-          ++ keyBytes
-          ++ valueSizeBytes
-          ++ valueBytes).pure[F]
+        (recordSizeBytes ++ valueBytes).pure[F]
       }
 
       def getValue[F[_]: Async](r: FileRecord): F[Value] = {
-        val (keySizeBytes, tail) = r.splitAt(keySizeCapacity)
-        val keySize = ByteBuffer.wrap(keySizeBytes).getInt
-        val (keyBytes, tail2) = tail.splitAt(keySize)
-        val key = new String(keyBytes, "UTF-8")
-        val (valueSizeBytes, tail3) = tail2.splitAt(valueSizeCapacity)
-        val valueSize = ByteBuffer.wrap(valueSizeBytes).getInt
-        val (valueBytes, _) = tail3.splitAt(valueSize)
-        val value = new String(valueBytes, "UTF-8")
+        val value = new String(r, "UTF-8")
         value.pure[F]
       }
     }
