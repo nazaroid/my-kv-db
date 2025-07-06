@@ -200,7 +200,13 @@ object BitcaskLib {
       }
 
       def createFile(path: Path): DbScript[F, Path] = {
-        DbScript.lift { Async[F].blocking(Files.createFile(path)) }
+        DbScript.lift {
+          Async[F].blocking {
+            if (Files.notExists(path)) {
+              Files.createFile(path)
+            } else path
+          }
+        }
       }
 
       def appendToFile(
@@ -342,8 +348,8 @@ object BitcaskLib {
         for {
           env <- ask[F, Env[F]]
           s   <- DbScript.lift(Segment.create(tbl))
-          _   <- env.files.createFile(s.path)
-          _   <- env.cache.addSegment(tbl, s)
+//          _   <- env.files.createFile(s.path)
+          _ <- env.cache.addSegment(tbl, s)
         } yield s
       }
 
@@ -395,8 +401,8 @@ object BitcaskLib {
         for {
           env <- ask[F, Env[F]]
           ix  <- DbScript.lift(TblIx.create(tbl))
-          _   <- env.files.createFile(ix.path)
-          _   <- env.cache.addTblIx(tbl, ix)
+//          _   <- env.files.createFile(ix.path)
+          _ <- env.cache.addTblIx(tbl, ix)
         } yield ix
       }
 
@@ -425,8 +431,8 @@ object BitcaskLib {
         for {
           env <- ask[F, Env[F]]
           ix  <- DbScript.lift(SegmentIx.create(s))
-          _   <- env.files.createFile(ix.path)
-          _   <- env.cache.addSegmentIx(s, ix)
+//          _   <- env.files.createFile(ix.path)
+          _ <- env.cache.addSegmentIx(s, ix)
         } yield ix
       }
 
@@ -614,8 +620,9 @@ object BitcaskLib {
     object SegmentIx {
 
       def create[F[_]: Async](s: Segment[F]): F[SegmentIx[F]] = {
-        val name = f"${s.name}.ix"
-        val path = Paths.get(f"${s.path.toAbsolutePath}/$name")
+        val name = f"segment_${s.num}.ix"
+        s.path.getFileName
+        val path = Paths.get(f"${s.path.getParent.toAbsolutePath}/$name")
         for {
           data <- Async[F].ref(Map.empty[Key, Offset])
         } yield SegmentIx(name, path, data)

@@ -19,4 +19,4 @@ final case class HttpSrvConf(
   maxConnections: Int = 1024,
   idleTimeout:    FiniteDuration = 60.seconds)
 
-final case class BitcaskConf(rootDir: String = "./kvdb")
+final case class BitcaskConf(rootDir: String = "kvdb")
