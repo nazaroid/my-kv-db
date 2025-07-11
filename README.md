@@ -61,16 +61,37 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
    - (+) реализация get/set
 
 - (! TODO) рефакт: декомпозировть модуль server на части
-    - например:db, server, engine http,  bitcask,
-    - отдельно
+    - например:db, server, engine http,  bitcask
+      - app
+        
+      - db
+        - (opt) config
+          - возможно конфиги лучше в server
+        - server
+          - http
+          - grpc
+        - transact
+            - fs2 cmd interface
+        - engine
+          - ddl, dml
+        - bitcask
+          - BitcaskLib
+          - algebra
+            - ...
+          - instances
+            - ...
+          - state
+        - metrics
+    - отдельно fileformat (Persistence)
+    -
+- (! TODO) рефакт: выделить слой хранения в бинарном виде
+    - проектирование: посмотреть в Database Internals и других бд какие есть компоненты на уровне хранение
+    - выделить бинарный format файлов
+    - сериализация тупла (record) в бинарный вид (deser сделать абстрактной, чтобы можно было заменить на любой другой способ)
   
 - (! TODO) рефакт: декомпозировть BitcaskLib
     - (сейчас все в одном файле BitcaskLib)
-  
-- (! TODO) рефакт: выделить слой хранения в бинарном виде
-  - проектирование: посмотреть в Database Internals и других бд какие есть компоненты на уровне хранение
-  - выделить бинарный format файлов
-  - сериализация тупла (record) в бинарный вид (deser сделать абстрактной, чтобы можно было заменить на любой другой способ)
+
 
 - (! TODO)  восстановление кеша при старте
   - (читаем структуру и загружаем граф сущностей в кеше)
@@ -78,6 +99,7 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
 * (! TODO)  реализовать сценарий с удалением значения
 
 (! TODO) (проектирование/реализация) сделать в engine приемку команд при помощи fs2
+- модуль transact
 ** public CompletableFuture<DatabaseCommandResult> executeNextCommand(DatabaseCommand command)
 
 (! TODO) MVP: попробовать переделать на DSL + Free (можно только AppL и ServiceL)
