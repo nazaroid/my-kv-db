@@ -5,8 +5,7 @@ val GLOBAL_VERSION = "25.2.1.0"
 
 lazy val root = (project in file("."))
   .aggregate(
-    `server`,
-    `prometheus`
+    `service`
   )
   .settings(
     commonSettings,
@@ -21,7 +20,7 @@ lazy val root = (project in file("."))
     publishLocal                           := {}
   )
 
-lazy val `prometheus` = (project in file("modules/prometheus"))
+lazy val `prometheus` = (project in file("codebase/modules/utils/third_party/prometheus"))
   .enablePlugins(DockerPlugin, JavaAppPackaging)
   .disablePlugins(AssemblyPlugin)
   .configs(Integration)
@@ -37,8 +36,43 @@ lazy val `prometheus` = (project in file("modules/prometheus"))
       .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/prometheus/integration-tests-html-report")
   )
 
-lazy val `server` = (project in file("modules/server"))
+lazy val `metrics` = (project in file("codebase/modules/utils/metrics"))
   .dependsOn(`prometheus` % "compile->compile;test->test;it->it")
+  .enablePlugins(DockerPlugin, JavaAppPackaging)
+  .disablePlugins(AssemblyPlugin)
+  .configs(Integration)
+  .settings(
+    commonSettings,
+    name    := "prometheus",
+    version := GLOBAL_VERSION,
+    excludeDependencies -= ExclusionRule("log4j", "log4j"),
+    Test / testOptions += Tests
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/metrics/unit-tests-html-report"),
+    inConfig(Integration)(Defaults.testSettings),
+    Integration / testOptions += Tests
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/metrics/integration-tests-html-report")
+  )
+
+lazy val `bitcask` = (project in file("codebase/modules/bitcask"))
+  .enablePlugins(DockerPlugin, JavaAppPackaging)
+  .disablePlugins(AssemblyPlugin)
+  .configs(Integration)
+  .settings(
+    commonSettings,
+    name    := "server",
+    version := GLOBAL_VERSION,
+    libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Logging.all ++ Testing.all,
+    excludeDependencies -= ExclusionRule("log4j", "log4j"),
+    Test / testOptions += Tests
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/bitcask/unit-tests-html-report"),
+    inConfig(Integration)(Defaults.testSettings),
+    Integration / testOptions += Tests
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/bitcask/integration-tests-html-report"),
+  )
+
+lazy val `server` = (project in file("codebase/modules/server"))
+  .dependsOn(`metrics` % "compile->compile;test->test;it->it")
+  .dependsOn(`bitcask` % "compile->compile;test->test;it->it")
   .enablePlugins(DockerPlugin, JavaAppPackaging)
   .disablePlugins(AssemblyPlugin)
   .configs(Integration)
@@ -52,7 +86,26 @@ lazy val `server` = (project in file("modules/server"))
       .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/server/unit-tests-html-report"),
     inConfig(Integration)(Defaults.testSettings),
     Integration / testOptions += Tests
-      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/server/integration-tests-html-report"),
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/server/integration-tests-html-report")
+  )
+
+lazy val `service` = (project in file("codebase/service"))
+  .dependsOn(`metrics` % "compile->compile;test->test;it->it")
+  .dependsOn(`server` % "compile->compile;test->test;it->it")
+  .enablePlugins(DockerPlugin, JavaAppPackaging)
+  .disablePlugins(AssemblyPlugin)
+  .configs(Integration)
+  .settings(
+    commonSettings,
+    name    := "server",
+    version := GLOBAL_VERSION,
+    libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Http4s.all ++ Logging.all ++ Prometheus.all ++ Testing.all,
+    excludeDependencies -= ExclusionRule("log4j", "log4j"),
+    Test / testOptions += Tests
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/service/unit-tests-html-report"),
+    inConfig(Integration)(Defaults.testSettings),
+    Integration / testOptions += Tests
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/service/integration-tests-html-report"),
     dockerBaseImage      := "openjdk:25-oraclelinux8",
     Docker / packageName := "org/nazaroid/kvdb/server",
     Docker / version     := version.value,
@@ -61,3 +114,6 @@ lazy val `server` = (project in file("modules/server"))
       case _                      => "config" -> "application.conf"
     })
   )
+
+
+
