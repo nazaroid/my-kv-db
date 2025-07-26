@@ -52,7 +52,7 @@ trait SegmentService[F[_]: Async] {
       env    <- ask[F, Env[F]]
       sIx    <- getOrAddSegmentIx(s)
       offset <- env.cache.getOffsetBySegmentIx(sIx, k)
-      record <- env.files.readFileRecord(s.path, offset)
+      record <- BinRecord.read(s.path, offset)
       v      <- DbScript.lift(SegmentRecord.getValue(record))
     } yield v
   }

@@ -107,6 +107,29 @@ package object algebra {
     }
   }
 
+  object BinRecord {
+    /*
+        binary record format:
+        [ record size | fld_1 size | fld_1 | fld_2 size | fld_2 | ... | fld_N size | fld_N ]
+       */
+    def read[F[_]: Async](
+                        path: Path,
+                        offset: Offset,
+                        recordSizeCapacity: Int = 4
+                      ): DbScript[F, FileRecord] = {
+      val stream = new java.io.FileInputStream(path.toFile)
+      val ch = stream.getChannel
+      val bSize = ByteBuffer.allocate(recordSizeCapacity)
+      ch.position(offset)
+      ch.read(bSize)
+      bSize.rewind()
+      val recordSize = bSize.getInt
+      val bRecord = ByteBuffer.allocate(recordSize)
+      ch.read(bRecord)
+      DbScript.lift(bRecord.array().pure[F])
+    }
+  }
+  
   object TblIxRecord {
     private val recordSizeCapacity: Int = 4
     private val keySizeCapacity:    Int = 4
