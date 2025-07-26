@@ -5,7 +5,6 @@ import cats.implicits.given
 import org.nazaroid.kvdb.bitcask.lib.algebra.*
 import org.nazaroid.kvdb.bitcask.lib.instances.*
 
-
 object BitcaskLib {
 
   def apply[F[_]: Async](c: BitcaskConf, s: State[F]): LibScenarios[F] = new LibScenariosImpl(c, s)
