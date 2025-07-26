@@ -3,6 +3,7 @@ package org.nazaroid.kvdb.bitcask.lib.algebra
 import cats.data.Kleisli
 import cats.data.Kleisli.ask
 import cats.effect.Async
+import org.nazaroid.kvdb.bitcask.lib.bindata.*
 
 trait TblIxService[F[_]: Async] {
 

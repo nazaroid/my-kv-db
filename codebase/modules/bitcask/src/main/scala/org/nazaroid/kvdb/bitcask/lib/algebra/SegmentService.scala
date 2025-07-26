@@ -4,6 +4,7 @@ import cats.data.Kleisli
 import cats.data.Kleisli.ask
 import cats.effect.Async
 import cats.implicits.given
+import org.nazaroid.kvdb.bitcask.lib.bindata.*
 
 trait SegmentService[F[_]: Async] {
 
