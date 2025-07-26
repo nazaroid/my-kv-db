@@ -5,7 +5,8 @@ val GLOBAL_VERSION = "25.2.1.0"
 
 lazy val root = (project in file("."))
   .aggregate(
-    `service`
+    `service`,
+    `server`
   )
   .settings(
     commonSettings,
