@@ -3,7 +3,8 @@ package org.nazaroid.kvdb.engine.bitcask
 import cats.effect.Async
 import cats.implicits.*
 import org.nazaroid.kvdb.algebra.DbEngine
-import org.nazaroid.kvdb.engine.bitcask.algebra.*
+import org.nazaroid.kvdb.bitcask.lib.BitcaskConf
+import org.nazaroid.kvdb.bitcask.lib.algebra.*
 
 final class BitcaskDbEngine[F[_]: Async](conf: BitcaskConf, lib: LibScenarios[F]) extends DbEngine[F] {
 

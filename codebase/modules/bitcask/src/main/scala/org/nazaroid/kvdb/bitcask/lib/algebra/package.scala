@@ -1,4 +1,4 @@
-package org.nazaroid.kvdb.engine.bitcask
+package org.nazaroid.kvdb.bitcask.lib
 
 import cats.data.Kleisli
 import cats.data.Kleisli.ask

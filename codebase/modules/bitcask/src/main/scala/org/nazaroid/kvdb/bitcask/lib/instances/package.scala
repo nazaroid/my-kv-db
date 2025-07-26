@@ -1,7 +1,7 @@
-package org.nazaroid.kvdb.engine.bitcask
+package org.nazaroid.kvdb.bitcask.lib
 
 import cats.effect.Async
-import org.nazaroid.kvdb.engine.bitcask.algebra.*
+import org.nazaroid.kvdb.bitcask.lib.algebra.*
 
 package object instances {
 
