@@ -148,5 +148,4 @@ package object algebra {
       }
 
   }
-
 }
