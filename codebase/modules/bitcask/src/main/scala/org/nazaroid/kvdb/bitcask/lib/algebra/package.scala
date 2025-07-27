@@ -4,7 +4,6 @@ import cats.data.Kleisli
 import cats.effect.{Async, Ref}
 import cats.implicits.given
 
-import java.nio.ByteBuffer
 import java.nio.file.{Path, Paths}
 
 package object algebra {
