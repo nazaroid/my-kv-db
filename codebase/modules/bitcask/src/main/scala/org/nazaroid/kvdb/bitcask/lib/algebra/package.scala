@@ -106,8 +106,6 @@ package object algebra {
     }
   }
 
-  
-
   object Segment {
 
     def create[F[_]: Async](
@@ -123,8 +121,6 @@ package object algebra {
     }
   }
 
-  
-
   object SegmentIx {
 
     def create[F[_]: Async](s: Segment[F]): F[SegmentIx[F]] = {
@@ -136,7 +132,6 @@ package object algebra {
       } yield SegmentIx(name, path, data)
     }
   }
-  
 
   object DbScript {
 
