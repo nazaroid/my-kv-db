@@ -52,6 +52,47 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
 
     }.unsafeRunSync()(IORuntime.builder().build())
   }
+
+  // TODO: IN PROGRESS
+  it should "can `get` value after db runtime restart" in {
+    val responseDecoder: EntityDecoder[IO, String] = EntityDecoder.text
+
+    val config = DbConf()
+    import config.server.http.*
+    {
+      for {
+        logger <- Slf4jLogger.create[IO]
+        rt = new DbRuntime()
+        _ <- Async[IO].blocking(new Db(rt).runAsync(config))
+        _ <- Async[IO].sleep(100.millis)
+        req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db"))
+        _    <- logger.info(f"create db request: $req")
+        resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
+        _    <- logger.info(f"create db response: $resp")
+
+        req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl"))
+        _    <- logger.info(f"create tbl request: $req")
+        resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
+        _    <- logger.info(f"create tbl response: $resp")
+
+        req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key")).withEntity("value")
+        _    <- logger.info(f"set value request: $req")
+        resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
+        _    <- logger.info(f"set value response: $resp")
+        _    <- Async[IO].blocking(rt.shutdown())
+        rt = new DbRuntime()
+        req = Request[IO](GET, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key"))
+        _    <- logger.info(f"get value request: $req")
+        resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
+        _    <- logger.info(f"get value response: $resp")
+      } yield {
+        assert(resp == "value")
+      }
+
+    }.unsafeRunSync()(IORuntime.builder().build())
+  }
+
+
 }
 
 object Test {}

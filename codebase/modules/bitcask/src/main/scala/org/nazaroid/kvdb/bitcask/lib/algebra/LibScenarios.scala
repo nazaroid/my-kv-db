@@ -7,6 +7,12 @@ import cats.effect.Async
 trait LibScenarios[F[_]: Async] {
   given env: Env[F]
 
+  def readDbCatalog(): F[DbCatalog] = ???
+
+  def init(dbCatalog: DbCatalog): F[Unit] = {
+    ???
+  }
+
   def createBaseIfNotExists(baseName: String): F[Base[F]] =
     DbScript.run {
       for {

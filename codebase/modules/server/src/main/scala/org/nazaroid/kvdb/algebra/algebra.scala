@@ -7,6 +7,8 @@ trait DbServer[F[_]] {
 }
 
 trait DbEngine[F[_]] {
+  def init(): F[Unit]
+
   def createDbIfNotExists(name: String): F[Unit]
 
   def createTableIfNotExists(baseName: String, tblName: String): F[Unit]

@@ -43,6 +43,8 @@ package object algebra {
     def state: State[F]
   }
 
+  final case class DbCatalog()
+
   final case class Base[F[_]: Async](
     name:   BaseName,
     path:   Path,

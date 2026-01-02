@@ -31,20 +31,21 @@ final class HttpDbServer[F[_]: Async: Logger: Network](conf: HttpSrvConf, engine
       .fromInt(conf.port)
       .getOrElse(throw new IllegalArgumentException(conf.port.toString))
 
-    routes
-      .flatMap(r =>
-        EmberServerBuilder
-          .default[F]
-          .withHost(host)
-          .withPort(port)
-          .withHttpApp(r.orNotFound)
-          .withIdleTimeout(conf.idleTimeout)
-          .withMaxConnections(conf.maxConnections)
-          .build
-      )
-      .useForever
-      .as(ExitCode.Success)
-      .map(_ => ())
+    engine.init() >>
+      routes
+        .flatMap(r =>
+          EmberServerBuilder
+            .default[F]
+            .withHost(host)
+            .withPort(port)
+            .withHttpApp(r.orNotFound)
+            .withIdleTimeout(conf.idleTimeout)
+            .withMaxConnections(conf.maxConnections)
+            .build
+        )
+        .useForever
+        .as(ExitCode.Success)
+        .map(_ => ())
   }
 
   private def routes: Resource[F, HttpRoutes[F]] =

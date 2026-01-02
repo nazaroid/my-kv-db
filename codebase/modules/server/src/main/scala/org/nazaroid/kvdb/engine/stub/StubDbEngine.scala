@@ -9,6 +9,8 @@ final class StubDbEngine[F[_]: Async] extends DbEngine[F] {
 
   private var dbs: Map[String, StubDatabase[F]] = Map.empty[String, StubDatabase[F]]
 
+  override def init(): F[Unit] = Async[F].unit
+
   override def createDbIfNotExists(name: String): F[Unit] = {
     dbs = dbs.updated(name, dbs.getOrElse(name, new StubDatabase[F]()))
     ().pure[F]
@@ -34,6 +36,7 @@ final class StubDbEngine[F[_]: Async] extends DbEngine[F] {
   ): F[Unit] = {
     dbs(baseName).getTable(tblName).set(key, value)
   }
+
 }
 
 object StubDbEngine {
