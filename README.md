@@ -101,6 +101,7 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
   - наполнить кеш сервис: 
     - создать сущности, из файлов (индексы + сегменты) 
     - наполнить свойства data (см src/main/scala/org/nazaroid/kvdb/bitcask/lib/algebra/package.scala)
+- (! TODO) логирование
 
 * (! TODO)  реализовать сценарий с удалением значения
 

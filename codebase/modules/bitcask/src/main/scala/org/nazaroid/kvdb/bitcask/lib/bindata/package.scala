@@ -38,11 +38,11 @@ package object bindata {
     private val keySizeCapacity:    Int = 4
     private val sNameSizeCapacity:  Int = 4
 
-    def create[F[_]: Async](key: Key, s: Segment[F]): F[FileRecord] = {
+    def create[F[_]: Async](key: Key, segmentName: SegmentName): F[FileRecord] = {
       val keyBytes = key.getBytes("UTF-8")
       val keySize = keyBytes.length
       val keySizeBytes = ByteBuffer.allocate(keySizeCapacity).putInt(keySize).array()
-      val sNameBytes = s.name.getBytes
+      val sNameBytes = segmentName.getBytes
       val sNameSize = sNameBytes.length
       val sNameSizeBytes = ByteBuffer.allocate(sNameSizeCapacity).putInt(sNameSize).array()
       val recordSize = recordSizeCapacity + keySizeCapacity + keySize + sNameSize

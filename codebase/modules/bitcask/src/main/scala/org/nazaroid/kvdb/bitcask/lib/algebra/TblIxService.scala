@@ -16,10 +16,6 @@ trait TblIxService[F[_]: Async] {
     } yield ix
   }
 
-  def read(tbl: Tbl[F]): DbScript[F, TblIx[F]] = ???
-
-  def write(ix: TblIx[F]): DbScript[F, TblIx[F]] = ???
-
   def update(
     ix:  TblIx[F],
     key: Key,
@@ -27,10 +23,9 @@ trait TblIxService[F[_]: Async] {
   ): DbScript[F, TblIx[F]] = {
     for {
       env    <- ask[F, Env[F]]
-      record <- DbScript.lift(TblIxRecord.create(key, s))
+      record <- DbScript.lift(TblIxRecord.create(key, s.name))
       _      <- env.files.appendToFile(ix.path, record)
       _      <- env.cache.updateTblIx(ix, key, s)
     } yield ix
   }
-
 }
