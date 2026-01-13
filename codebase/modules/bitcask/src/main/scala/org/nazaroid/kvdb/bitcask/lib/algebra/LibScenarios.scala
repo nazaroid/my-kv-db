@@ -3,6 +3,7 @@ package org.nazaroid.kvdb.bitcask.lib.algebra
 import cats.data.Kleisli
 import cats.data.Kleisli.ask
 import cats.effect.Async
+import cats.implicits.given
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.Paths
@@ -10,7 +11,9 @@ import java.nio.file.Paths
 trait LibScenarios[F[_]: Async] {
   given env: Env[F]
 
-  def readDbCatalog(): F[DbCatalog] = ???
+  def readDbCatalog(): F[DbCatalog] = {
+    DbCatalog().pure[F]
+  }
 
   def init(dbCatalog: DbCatalog): F[Unit] = {
     val rootDir = "/Users/artem.nazarenko/IdeaProjects/my/my-kv-db/codebase/modules/server/kvdb/"
@@ -40,13 +43,28 @@ trait LibScenarios[F[_]: Async] {
 
       val dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))
       val records = ListBuffer[(Key, SegmentName)]()
+
+      val recordSizeBuffer = new Array[Byte](4)
+      val keySizeBuffer = new Array[Byte](4)
+      val segmentNameSizeBuffer = new Array[Byte](4)
+
       try {
         while (true) {
-          val recordSize = ByteBuffer.wrap(dis.readNBytes(4)).getInt()
-          val keySize = ByteBuffer.wrap(dis.readNBytes(4)).getInt()
-          val keyBytes = dis.readNBytes(keySize)
-          val segmentNameSize = ByteBuffer.wrap(dis.readNBytes(4)).getInt()
-          val segmentNameBytes = dis.readNBytes(segmentNameSize)
+          dis.readFully(recordSizeBuffer)
+          val recordSize = ByteBuffer.wrap(recordSizeBuffer).getInt()
+
+          dis.readFully(keySizeBuffer)
+          val keySize = ByteBuffer.wrap(keySizeBuffer).getInt()
+
+          val keyBytes = new Array[Byte](keySize)
+          dis.readFully(keyBytes)
+
+          dis.readFully(segmentNameSizeBuffer)
+          val segmentNameSize = ByteBuffer.wrap(segmentNameSizeBuffer).getInt()
+
+          val segmentNameBytes = new Array[Byte](segmentNameSize)
+          dis.readFully(segmentNameBytes)
+
           val key: Key = String(keyBytes, StandardCharsets.UTF_8)
           val segmentName: SegmentName = String(segmentNameBytes, StandardCharsets.UTF_8)
           val record: (Key, SegmentName) = (key, segmentName)
@@ -54,6 +72,8 @@ trait LibScenarios[F[_]: Async] {
         }
       } catch {
         case _: EOFException =>
+      } finally {
+        dis.close()
       }
       records.toList
     }
@@ -75,19 +95,33 @@ trait LibScenarios[F[_]: Async] {
 
       val dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))
       val records = ListBuffer[(Key, Offset)]()
+
+      val recordSizeBuffer = new Array[Byte](4)
+      val keySizeBuffer = new Array[Byte](4)
+      val offsetBytes = new Array[Byte](8)
+
       try {
         while (true) {
-          val recordSize = ByteBuffer.wrap(dis.readNBytes(4)).getInt()
-          val keySize = ByteBuffer.wrap(dis.readNBytes(4)).getInt()
-          val keyBytes = dis.readNBytes(keySize)
-          val offsetSize = 8
+          dis.readFully(recordSizeBuffer)
+          val recordSize = ByteBuffer.wrap(recordSizeBuffer).getInt()
+
+          dis.readFully(keySizeBuffer)
+          val keySize = ByteBuffer.wrap(keySizeBuffer).getInt()
+
+          val keyBytes = new Array[Byte](keySize)
+          dis.readFully(keyBytes)
+
+          dis.readFully(offsetBytes)
+
           val key: Key = String(keyBytes, StandardCharsets.UTF_8)
-          val offset = ByteBuffer.wrap(dis.readNBytes(offsetSize)).getLong()
+          val offset = ByteBuffer.wrap(offsetBytes).getLong()
           val record: (Key, Offset) = (key, offset)
           records += record
         }
       } catch {
         case _: EOFException =>
+      } finally {
+        dis.close()
       }
       records.toList
     }
@@ -104,7 +138,7 @@ trait LibScenarios[F[_]: Async] {
       val path = Paths.get(filePath)
       val segmentName: SegmentName = path.getFileName.toString
       val offset: Offset = path.toFile.length()
-      val segmentNum: SegmentNum = segmentName.substring(segmentName.indexOf("_"), segmentName.indexOf(".")).toInt
+      val segmentNum: SegmentNum = segmentName.substring(segmentName.indexOf("_") + 1, segmentName.indexOf(".")).toInt
       val emptyIx = None.asInstanceOf[Option[SegmentIx[F]]]
       val isReadOnly = false
       for {
