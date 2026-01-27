@@ -198,25 +198,57 @@ val tableSchema = List(
 
 
 
+
+import cats.effect.*
+import fs2.{Stream, Chunk}
+import fs2.io.file.{Files, Path, Flags}
+import scodec.bits.ByteVector
+import java.nio.charset.StandardCharsets
+
+/**
+ * Записывает список Row в файл согласно схеме.
+ */
+def writeGenericFile(filePath: String, schema: List[FieldDef], data: List[Row]): IO[Unit] = {
+
+  // Вспомогательная функция для превращения одной строки (Row) в ByteVector
+  def rowToBytes(row: Row): ByteVector = {
+    schema.foldLeft(ByteVector.empty) { (acc, field) =>
+      val value = row.getOrElse(field.name,
+        throw new Exception(s"Поле ${field.name} отсутствует в данных"))
+
+      val fieldBytes = field.fType match {
+        case FieldType.Int32 =>
+          ByteVector.fromInt(value.asInstanceOf[Int])
+
+        case FieldType.Int64 =>
+          ByteVector.fromLong(value.asInstanceOf[Long])
+
+        case FieldType.StringUtf8(_) =>
+          val bytes = value.asInstanceOf[String].getBytes(StandardCharsets.UTF_8)
+          ByteVector.view(bytes)
+      }
+
+      acc ++ fieldBytes
+    }
+  }
+
+  // Создаем поток из данных
+  val byteStream: Stream[IO, Byte] = Stream.emits(data)
+    .map(rowToBytes)
+    .flatMap(bv => Stream.chunk(Chunk.byteVector(bv)))
+
+  // Записываем в файл
+    byteStream
+      .through(
+        Files[IO].writeAll(
+          Path(filePath),
+          Flags(WriteFlags.Append) // Указываем флаг добавления
+        )
+      )
+      .compile
+      .drain
+}
+
 имена
 
-1. Описательные и современные (в духе Scala 3)
-Эти названия подчеркивают, что библиотека работает со структурами данных и схемами.
-SchemaIO — подчеркивает связь между описанием схемы и вводом-выводом.
-BinSchema — коротко и ясно: «бинарные схемы».
-MorphBin (от Morphology) — акцент на том, что данные принимают форму вашей схемы.
-Stuctura (или StructuraIO) — латинское название, подчеркивающее работу со структурами.
-2. Функциональные и «стримовые»
-Если вы планируете развивать её в экосистеме Cats Effect и FS2.
-Fs2-Binary-Specs — техническое название, указывающее на стек.
-FluxBin — от Flux (поток), подчеркивает потоковый парсинг.
-PureBin — подчеркивает «чистоту» (Purity) и функциональный стиль.
-StreamShape — данные, которые «принимают форму» прямо в потоке.
-3. Метафоричные (креативные)
-Decipher (Дешифровщик) — звучит солидно для парсера.
-Blueprint — схема как «чертеж», по которому строится объект.
-Scribe (Писец) — тот, кто читает и записывает данные.
-Genome — как будто вы описываете ДНК бинарного файла.
-4. Игра слов
-Cats-Eye — метафора «взгляда» сквозь бинарные данные (с отсылкой к библиотеке Cats).
-BinReader (или B-Read) — просто и функционально.
+BinCodec

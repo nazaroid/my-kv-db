@@ -86,8 +86,10 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
 - (+) рефакт: декомпозировть BitcaskLib
     - (сейчас все в одном файле BitcaskLib)
     - 
-- (! TODO) рефакт: выделить слой хранения в бинарном виде BinReader
-    - см файл BinReader
+- (! TODO) рефакт: выделить слой хранения в бинарном виде
+    - см файл BinFileIO
+    - названия: BinStore, BinEngine, BinLayout, BinSchema, BinFileIO, BinStorage, BinCodec
+    - фавориты BinStorage или BinFileIO.
 
 - (! TODO) (IN PROGRESS)  восстановление кеша при старте
   - (читаем структуру и загружаем граф сущностей в кеше)
