@@ -158,6 +158,7 @@ trait LibScenarios[F[_]: Async] {
         // + add to cache
         // refact: move paths to DbCatalog (bases *> tables[: tbl ix) *> segments[: seg_ix]
         // - impl load DataCatalog
+        // func style
 
         // plan:
         // create segmentIx

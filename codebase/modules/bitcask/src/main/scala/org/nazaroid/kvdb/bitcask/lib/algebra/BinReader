@@ -1,0 +1,222 @@
+/*
+    import cats.effect.*
+    import fs2.{Stream, Pull}
+    import fs2.io.file.{Files, Path}
+    import scodec.bits.ByteVector
+    import java.nio.charset.StandardCharsets
+
+    type Key = String
+    type SegmentName = String
+
+    def readTblIxFile(filePath: String): IO[List[(Key, SegmentName)]] = {
+
+      def decode(s: Stream[IO, Byte]): Pull[IO, (Key, SegmentName), Unit] = {
+        // 1. Читаем recordSize (4 байта)
+        s.pull.unconsN(4).flatMap {
+          case Some((chunk, rest)) =>
+            // 2. Читаем keySize (4 байта)
+            rest.pull.unconsN(4).flatMap {
+              case Some((kSizeChunk, afterKSize)) =>
+                val keySize = kSizeChunk.toByteVector.toInt()
+
+                // 3. Читаем Key
+                afterKSize.pull.unconsN(keySize).flatMap {
+                  case Some((kBytes, afterKey)) =>
+                    val key = new String(kBytes.toArray, StandardCharsets.UTF_8)
+
+                    // 4. Читаем segmentNameSize (4 байта)
+                    afterKey.pull.unconsN(4).flatMap {
+                      case Some((sSizeChunk, afterSSize)) =>
+                        val segSize = sSizeChunk.toByteVector.toInt()
+
+                        // 5. Читаем SegmentName
+                        afterSSize.pull.unconsN(segSize).flatMap {
+                          case Some((sBytes, nextRecord)) =>
+                            val segmentName = new String(sBytes.toArray, StandardCharsets.UTF_8)
+
+                            // Выдаем результат и рекурсивно идем дальше
+                            Pull.output1((key, segmentName)) >> decode(nextRecord)
+
+                          case None => Pull.done
+                        }
+                      case None => Pull.done
+                    }
+                  case None => Pull.done
+                }
+              case None => Pull.done
+            }
+          case None => Pull.done // Конец файла
+        }
+      }
+
+      Files[IO].readAll(Path(filePath))
+        .through(s => decode(s).stream)
+        .compile
+        .toList
+    }
+*/
+
+/*
+    import cats.effect.*
+    import fs2.{Stream, io}
+    import fs2.io.file.{Files, Path}
+    import scodec.bits.ByteVector
+    import java.nio.charset.StandardCharsets
+
+    type Key = String
+    type Offset = Long
+    def readSegmentIxFile(filePath: String): IO[List[(Key, Offset)]] = {
+      val path = Path(filePath)
+
+      // Вспомогательная функция для чтения точного количества байт
+      def readExact(s: Stream[IO, Byte], n: Int): Stream[IO, ByteVector] =
+        s.take(n).chunks.map(_.toByteVector).reduce(_ ++ _)
+
+      def decodeRecords(s: Stream[IO, Byte]): Stream[IO, (Key, Offset)] =
+        Stream.eval(s.pull.unconsN(4).flatMap {
+          case Some((chunks, rest)) =>
+            val recordSize = chunks.toByteVector.toInt()
+
+            // Читаем keySize (4 байта)
+            rest.pull.unconsN(4).flatMap {
+              case Some((keySizeChunks, afterKeySize)) =>
+                val keySize = keySizeChunks.toByteVector.toInt()
+
+                // Читаем сам ключ и затем offset (8 байт)
+                afterKeySize.pull.unconsN(keySize + 8).flatMap {
+                  case Some((data, tail)) =>
+                    val bv = data.toByteVector
+                    val key = bv.take(keySize).decodeUtf8.getOrElse("")
+                    val offset = bv.takeRight(8).toLong()
+
+                    Pull.output1((key, offset)) >> decodeRecords(tail).pull.echo
+                  case None => Pull.done
+                }
+              case None => Pull.done
+            }
+          case None => Pull.done
+        }.stream)
+
+      Files[IO].readAll(path)
+        .through(decodeRecords)
+        .compile
+        .toList
+    }
+*/
+
+
+import cats.effect.*
+import fs2.{Stream, Pull, Chunk}
+import fs2.io.file.{Files, Path}
+import scodec.bits.ByteVector
+import java.nio.charset.StandardCharsets
+
+// 1. Определение типов данных
+enum FieldType {
+  case Int32
+  case Int64
+  case StringUtf8(sizeFromField: String)
+}
+
+case class FieldDef(name: String, fType: FieldType)
+type Row = Map[String, Any]
+
+// 2. Основная функция
+def readGenericFile(filePath: String, schema: List[FieldDef]): IO[List[Row]] = {
+
+  // Рекурсивный разбор потока байтов
+  def decodeStream(s: Stream[IO, Byte]): Pull[IO, Row, Unit] = {
+
+    // Внутренняя функция для последовательного чтения полей одной записи
+    def readFields(currentStream: Stream[IO, Byte],
+                   remainingSchema: List[FieldDef],
+                   acc: Row): Pull[IO, Row, Unit] = {
+      remainingSchema match {
+        case Nil =>
+          // Запись полностью прочитана, выдаем её и рекурсивно парсим следующую
+          Pull.output1(acc) >> decodeStream(currentStream)
+
+        case FieldDef(name, fType) :: tail =>
+          val bytesToRead = fType match {
+            case FieldType.Int32 => Some(4)
+            case FieldType.Int64 => Some(8)
+            case FieldType.StringUtf8(ref) => acc.get(ref).map(_.toString.toInt)
+          }
+
+          bytesToRead match {
+            case Some(n) =>
+              currentStream.pull.unconsN(n).flatMap {
+                case Some((chunk, nextStream)) =>
+                  val bv = chunk.toByteVector
+                  val value = fType match {
+                    case FieldType.Int32 => bv.toInt()
+                    case FieldType.Int64 => bv.toLong()
+                    case FieldType.StringUtf8(_) => new String(bv.toArray, StandardCharsets.UTF_8)
+                  }
+                  readFields(nextStream, tail, acc + (name -> value))
+                case None => Pull.done // Неожиданный конец файла внутри записи
+              }
+            case None =>
+              Pull.raiseError[IO](new Exception(s"Не найдено поле размера для $name"))
+          }
+      }
+    }
+
+    // Проверяем, есть ли в стриме хотя бы 1 байт, прежде чем начинать чтение полей
+    s.pull.peek1.flatMap {
+      case Some(_) => readFields(s, schema, Map.empty)
+      case None    => Pull.done // Естественный конец файла
+    }
+  }
+
+  Files[IO].readAll(Path(filePath))
+    .through(s => decodeStream(s).stream)
+    .compile
+    .toList
+}
+
+
+val segmentSchema = List(
+  FieldDef("keySize", FieldType.Int32),
+  FieldDef("key",     FieldType.StringUtf8(sizeFromField = "keySize")),
+  FieldDef("offset",  FieldType.Int64)
+)
+
+// Вызов:
+// val result: IO[List[Row]] = readGenericFile("path/to/seg.ix", segmentSchema
+
+
+val tableSchema = List(
+  FieldDef("keySize",     FieldType.Int32),
+  FieldDef("key",         FieldType.StringUtf8(sizeFromField = "keySize")),
+  FieldDef("segNameSize", FieldType.Int32),
+  FieldDef("segmentName", FieldType.StringUtf8(sizeFromField = "segNameSize"))
+)
+
+// Вызов:
+// val result: IO[List[Row]] = readGenericFile("path/to/tbl.ix", tableSchema)
+
+
+
+имена
+
+1. Описательные и современные (в духе Scala 3)
+Эти названия подчеркивают, что библиотека работает со структурами данных и схемами.
+SchemaIO — подчеркивает связь между описанием схемы и вводом-выводом.
+BinSchema — коротко и ясно: «бинарные схемы».
+MorphBin (от Morphology) — акцент на том, что данные принимают форму вашей схемы.
+Stuctura (или StructuraIO) — латинское название, подчеркивающее работу со структурами.
+2. Функциональные и «стримовые»
+Если вы планируете развивать её в экосистеме Cats Effect и FS2.
+Fs2-Binary-Specs — техническое название, указывающее на стек.
+FluxBin — от Flux (поток), подчеркивает потоковый парсинг.
+PureBin — подчеркивает «чистоту» (Purity) и функциональный стиль.
+StreamShape — данные, которые «принимают форму» прямо в потоке.
+3. Метафоричные (креативные)
+Decipher (Дешифровщик) — звучит солидно для парсера.
+Blueprint — схема как «чертеж», по которому строится объект.
+Scribe (Писец) — тот, кто читает и записывает данные.
+Genome — как будто вы описываете ДНК бинарного файла.
+4. Игра слов
+Cats-Eye — метафора «взгляда» сквозь бинарные данные (с отсылкой к библиотеке Cats).
+BinReader (или B-Read) — просто и функционально.
