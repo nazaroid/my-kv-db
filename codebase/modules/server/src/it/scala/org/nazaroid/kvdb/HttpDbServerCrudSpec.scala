@@ -15,7 +15,7 @@ import scala.concurrent.duration.DurationInt
 // noinspection ScalaUnusedSymbol
 final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
 
-  ignore should "`set` and `get` the same value" in {
+  it should "`set` and `get` the same value" in {
     val responseDecoder: EntityDecoder[IO, String] = EntityDecoder.text
 
     val config = DbConf()
@@ -53,7 +53,6 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
     }.unsafeRunSync()(IORuntime.builder().build())
   }
 
-  // TODO: IN PROGRESS
   it should "can `get` value after db runtime restart" in {
     val responseDecoder: EntityDecoder[IO, String] = EntityDecoder.text
 
