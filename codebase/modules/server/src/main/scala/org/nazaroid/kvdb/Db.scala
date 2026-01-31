@@ -1,11 +1,11 @@
 package org.nazaroid.kvdb
 
-import cats.effect.IO
 import cats.effect.implicits.given
 import cats.effect.std.Dispatcher
+import cats.effect.{Deferred, IO}
 import fs2.io.net.Network
-import org.nazaroid.kvdb.srv.composition.DiContainer
 import org.nazaroid.kvdb.srv.DbRuntime
+import org.nazaroid.kvdb.srv.composition.DiContainer
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
@@ -22,7 +22,15 @@ final class Db(val rt: DbRuntime = new DbRuntime()) {
     Dispatcher.parallel[IO] use { implicit d: Dispatcher[IO] =>
       di
         .resolveDbServer(conf)
-        .flatMap(_.run())
+        .flatMap { srv =>
+          for {
+            stopSignal <- Deferred[IO, Unit]
+            _ = rt
+              .stopRef
+              .set(() => stopSignal.complete(()).map(_ => ()).unsafeRunSync()(rt.io))
+            _ <- srv.run(stopSignal)
+          } yield ()
+        }
     }
   }
 

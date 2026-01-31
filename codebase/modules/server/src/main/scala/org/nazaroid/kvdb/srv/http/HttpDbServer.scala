@@ -23,7 +23,7 @@ final class HttpDbServer[F[_]: Async: Logger: Network](conf: HttpSrvConf, engine
     with Err[F] {
   import dsl.*
 
-  override def run(): F[Unit] = {
+  override def run(stopSignal: Deferred[F, Unit]): F[Unit] = {
     val host = Ipv4Address
       .fromString(conf.host)
       .getOrElse(throw new IllegalArgumentException(conf.host))
@@ -31,9 +31,10 @@ final class HttpDbServer[F[_]: Async: Logger: Network](conf: HttpSrvConf, engine
       .fromInt(conf.port)
       .getOrElse(throw new IllegalArgumentException(conf.port.toString))
 
-    engine.init() >>
-      routes
-        .flatMap(r =>
+    for {
+      _ <- engine.init()
+      _ <- Logger[F].info("server starting...") >> routes
+        .flatMap { r =>
           EmberServerBuilder
             .default[F]
             .withHost(host)
@@ -42,10 +43,9 @@ final class HttpDbServer[F[_]: Async: Logger: Network](conf: HttpSrvConf, engine
             .withIdleTimeout(conf.idleTimeout)
             .withMaxConnections(conf.maxConnections)
             .build
-        )
-        .useForever
-        .as(ExitCode.Success)
-        .map(_ => ())
+        }
+        .use(_ => stopSignal.get >> Logger[F].warn("server shutting down..."))
+    } yield ()
   }
 
   private def routes: Resource[F, HttpRoutes[F]] =

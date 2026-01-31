@@ -1,9 +1,11 @@
 package org.nazaroid.kvdb.algebra
 
+import cats.effect.*
+
 class DatabaseException extends Exception
 
 trait DbServer[F[_]] {
-  def run(): F[Unit]
+  def run(stopSignal: Deferred[F, Unit]): F[Unit]
 }
 
 trait DbEngine[F[_]] {

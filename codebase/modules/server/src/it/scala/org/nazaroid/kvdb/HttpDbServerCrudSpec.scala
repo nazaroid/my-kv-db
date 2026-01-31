@@ -23,8 +23,8 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
     {
       for {
         logger <- Slf4jLogger.create[IO]
-        rt = new DbRuntime()
-        _ <- Async[IO].blocking(new Db(rt).runAsync(config))
+        rt = DbRuntime()
+        _ <- Async[IO].blocking(Db(rt).runAsync(config))
         _ <- Async[IO].sleep(100.millis)
         req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db"))
         _    <- logger.info(f"create db request: $req")
@@ -62,9 +62,14 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
     {
       for {
         logger <- Slf4jLogger.create[IO]
-        rt = new DbRuntime()
-        _ <- Async[IO].blocking(new Db(rt).runAsync(config))
+
+        _    <- logger.info(f"=== first db session ===")
+
+        rt = DbRuntime()
+        _ <- Async[IO].blocking(Db(rt).runAsync(config))
         _ <- Async[IO].sleep(100.millis)
+
+
         req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db"))
         _    <- logger.info(f"create db request: $req")
         resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
@@ -79,11 +84,16 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
         _    <- logger.info(f"set value request: $req")
         resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
         _    <- logger.info(f"set value response: $resp")
+
         _    <- Async[IO].blocking(rt.shutdown())
-        _ <- Async[IO].sleep(10000.millis)
-        rt = new DbRuntime()
-        _ <- Async[IO].blocking(new Db(rt).runAsync(config))
+        _    <- Async[IO].sleep(100.millis)
+
+        _    <- logger.info(f"=== second db session ===")
+
+        rt = DbRuntime()
+        _ <- Async[IO].blocking(Db(rt).runAsync(config))
         _ <- Async[IO].sleep(100.millis)
+
         req = Request[IO](GET, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key"))
         _    <- logger.info(f"get value request: $req")
         resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
@@ -94,7 +104,6 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
 
     }.unsafeRunSync()(IORuntime.builder().build())
   }
-
 
 }
 
