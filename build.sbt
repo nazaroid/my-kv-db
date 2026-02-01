@@ -44,7 +44,7 @@ lazy val `metrics` = (project in file("codebase/modules/utils/metrics"))
   .configs(Integration)
   .settings(
     commonSettings,
-    name    := "prometheus",
+    name    := "metrics",
     version := GLOBAL_VERSION,
     excludeDependencies -= ExclusionRule("log4j", "log4j"),
     Test / testOptions += Tests
@@ -54,26 +54,44 @@ lazy val `metrics` = (project in file("codebase/modules/utils/metrics"))
       .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/metrics/integration-tests-html-report")
   )
 
-lazy val `bitcask` = (project in file("codebase/modules/bitcask"))
+lazy val `bin-file-io` = (project in file("codebase/modules/bin-file-io"))
   .enablePlugins(DockerPlugin, JavaAppPackaging)
   .disablePlugins(AssemblyPlugin)
   .configs(Integration)
   .settings(
     commonSettings,
-    name    := "server",
+    name    := "bin-file-io",
     version := GLOBAL_VERSION,
     libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Logging.all ++ Testing.all,
     excludeDependencies -= ExclusionRule("log4j", "log4j"),
     Test / testOptions += Tests
-      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/bitcask/unit-tests-html-report"),
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/bin-file-io/unit-tests-html-report"),
     inConfig(Integration)(Defaults.testSettings),
     Integration / testOptions += Tests
-      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/bitcask/integration-tests-html-report"),
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/bin-file-io/integration-tests-html-report"),
+  )
+
+lazy val `bitcask-lib` = (project in file("codebase/modules/bitcask-lib"))
+  .dependsOn(`bin-file-io` % "compile->compile;test->test;it->it")
+  .enablePlugins(DockerPlugin, JavaAppPackaging)
+  .disablePlugins(AssemblyPlugin)
+  .configs(Integration)
+  .settings(
+    commonSettings,
+    name    := "bitcask-lib",
+    version := GLOBAL_VERSION,
+    libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Logging.all ++ Testing.all,
+    excludeDependencies -= ExclusionRule("log4j", "log4j"),
+    Test / testOptions += Tests
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/bitcask-lib/unit-tests-html-report"),
+    inConfig(Integration)(Defaults.testSettings),
+    Integration / testOptions += Tests
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/bitcask-lib/integration-tests-html-report"),
   )
 
 lazy val `server` = (project in file("codebase/modules/server"))
   .dependsOn(`metrics` % "compile->compile;test->test;it->it")
-  .dependsOn(`bitcask` % "compile->compile;test->test;it->it")
+  .dependsOn(`bitcask-lib` % "compile->compile;test->test;it->it")
   .enablePlugins(DockerPlugin, JavaAppPackaging)
   .disablePlugins(AssemblyPlugin)
   .configs(Integration)
@@ -98,7 +116,7 @@ lazy val `service` = (project in file("codebase/service"))
   .configs(Integration)
   .settings(
     commonSettings,
-    name    := "server",
+    name    := "service",
     version := GLOBAL_VERSION,
     libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Http4s.all ++ Logging.all ++ Prometheus.all ++ Testing.all,
     excludeDependencies -= ExclusionRule("log4j", "log4j"),
