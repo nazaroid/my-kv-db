@@ -42,7 +42,7 @@ def writeBinary(
     .through(
       Files[IO].writeAll(
         Path(filePath),
-        Flags(fs2.io.file.Flag.Append)
+        Flags(fs2.io.file.Flag.CreateNew, fs2.io.file.Flag.Append)
       )
     )
     .compile

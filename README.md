@@ -27,71 +27,74 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
   https://gitlab.com/VictorWinbringer/ddd_scala/-/blob/main/src/main/scala/vw/ddd_scala/core/domain/services/UuidsRepository.scala?ref_type=heads
 -- гексагональная арх-ра
 
-## TODO
-
-(cv CrudSpec)
+## DONE
 
 * реализовать сценарий create_db, create_tb, write, read
-  * база данных и таблица - это папки
-  * segment - это append only - file
-  * table index - получить сегмент по ключу (Key -> Segment)
-  * segment index - получить offset в segment по ключу ( (Segment, Key) -> SegmentOffsetInfo)
-  * Замечание: в bitcast вместо этих двух индексов есть индкекс keydir: giving the file, offset, and size of the most recently
-    written entry for that key
+    * база данных и таблица - это папки
+    * segment - это append only - file
+    * table index - получить сегмент по ключу (Key -> Segment)
+    * segment index - получить offset в segment по ключу ( (Segment, Key) -> SegmentOffsetInfo)
+    * Замечание: в bitcast вместо этих двух индексов есть индкекс keydir: giving the file, offset, and size of the most recently
+      written entry for that key
 
 
-  (+) выделить слои (Config, Env, Di)
-     App  
-     Server (Http / Grpc) 
-     Engine (BitCaskDbEngine)
+(+) выделить слои (Config, Env, Di)
+App  
+Server (Http / Grpc)
+Engine (BitCaskDbEngine)
 
 (+) реализовать HttpDbServer
-   - POST 201 http://$host:$port/data/db
-   - POST 201 http://$host:$port/data/db/tbl
-   - POST http://$host:$port/data/db/key
-   - GET  http://$host:$port/data/db/key
-     (+) сделать Engine на Map[String, String]
+- POST 201 http://$host:$port/data/db
+- POST 201 http://$host:$port/data/db/tbl
+- POST http://$host:$port/data/db/key
+- GET  http://$host:$port/data/db/key
+  (+) сделать Engine на Map[String, String]
 
-  потом начать делать BitCask
-   - (+) Проектирование: 
-     - описать систему классов
-     - описать файловую структуру (все файлы и папки)
-       -- обдумать какое содержимое индексов и описать каждый
-       -- см раздел Индексирвание в файле на GoogleDisk
-   - (+) реализация get/set
+потом начать делать BitCask
+- (+) Проектирование:
+    - описать систему классов
+    - описать файловую структуру (все файлы и папки)
+      -- обдумать какое содержимое индексов и описать каждый
+      -- см раздел Индексирвание в файле на GoogleDisk
+- (+) реализация get/set
 
 - (+) рефакт: декомпозировть модуль server на части
     - например:db, server, engine http,  bitcask
-      - app
-        
-      - db
-        - (opt) config
-          - возможно конфиги лучше в server
-        - server
-          - http
-          - grpc
-        - transact
-            - fs2 cmd interface
-        - engine
-          - ddl, dml
-        - bitcask
-          - BitcaskLib
-          - algebra
-            - ...
-          - instances
-            - ...
-        - metrics
+        - app
+
+        - db
+            - (opt) config
+                - возможно конфиги лучше в server
+            - server
+                - http
+                - grpc
+            - transact
+                - fs2 cmd interface
+            - engine
+                - ddl, dml
+            - bitcask
+                - BitcaskLib
+                - algebra
+                    - ...
+                - instances
+                    - ...
+            - metrics
     - отдельно fileformat (Persistence)
 
 - (+) рефакт: декомпозировть BitcaskLib
     - (сейчас все в одном файле BitcaskLib)
-    - 
-- (! TODO) рефакт: выделить слой хранения в бинарном виде
+  
+  
+## TODO
+
+(cv CrudSpec)
+
+- (IN PROGRESS) рефакт: выделить слой хранения в бинарном виде
     - см файл BinFileIO
     - названия: BinStore, BinEngine, BinLayout, BinSchema, BinFileIO, BinStorage, BinCodec
     - фавориты BinStorage или BinFileIO.
 
-- (! TODO) (IN PROGRESS)  восстановление кеша при старте
+- (IN PROGRESS) восстановление кеша при старте
   - (читаем структуру и загружаем граф сущностей в кеше)
   - план:
   - прочитать файловую струткуру (придумать название.):
@@ -99,26 +102,26 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
   - наполнить кеш сервис: 
     - создать сущности, из файлов (индексы + сегменты) 
     - наполнить свойства data (см src/main/scala/org/nazaroid/kvdb/bitcask/lib/algebra/package.scala)
-- (! TODO) логирование
 
-* (! TODO)  реализовать сценарий с удалением значения
+- (TODO) Небольшие доработки
+* логирование
+* переписать тесты на munit.CatsEffectSuite
+* удалять bin-файлы после теста в teardown
 
-(! TODO) (проектирование/реализация) сделать в engine приемку команд при помощи fs2
+- (TODO) реализовать сценарий с удалением значения
+
+- (TODO) (проектирование/реализация) сделать в engine приемку команд при помощи fs2
 - модуль transact
 ** public CompletableFuture<DatabaseCommandResult> executeNextCommand(DatabaseCommand command)
 
-(! TODO) MVP: попробовать переделать на DSL + Free (можно только AppL и ServiceL)
+- (TODO) MVP: попробовать переделать на DSL + Free (можно только AppL и ServiceL)
      (AppL (run), 
      ServiceL (startEndpoint httpCfg | grpcCfg)
      DbSrvL (create, createDb))
 
-* (! TODO)  (проектирование/реализация) добавить bloom filter
+* (TODO) (проектирование/реализация) добавить bloom filter
   * спроектировать сценарии использования
   * реализовать
-
-
-
-
 
 grafana + prometheus
 https://github.com/gvolpe/trading/blob/main/docker-compose.yml
