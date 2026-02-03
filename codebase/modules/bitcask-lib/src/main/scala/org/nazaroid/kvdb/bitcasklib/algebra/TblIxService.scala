@@ -31,7 +31,7 @@ trait TblIxService[F[_]: Async: Files] {
     } yield ix
   }
 
-  def readTblIxData(filePath: String, segments: Map[SegmentName, Segment[F]]): DbScript[F, TblIxData[F]] = {
+  def readData(filePath: String, segments: Map[SegmentName, Segment[F]]): DbScript[F, TblIxData[F]] = {
     def readTblIxFile(filePath: String): fs2.Stream[F, (Key, SegmentName)] = {
       val schema = List(
         FieldDef("recordSize", FieldType.Int32),

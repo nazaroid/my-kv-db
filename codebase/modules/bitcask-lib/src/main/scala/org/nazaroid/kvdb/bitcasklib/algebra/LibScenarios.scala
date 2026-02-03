@@ -56,14 +56,14 @@ trait LibScenarios[F[_]: Async: Files] {
         // create base
 
         // segments
-        segmentIxData    <- env.segmentIx.readSegmentIxData(segmentIxPath)
+        segmentIxData    <- env.segmentIx.readData(segmentIxPath)
         segmentIxDataRef <- DbScript.lift(Async[F].ref(segmentIxData))
         segmentIx = SegmentIx(segmentIxName, Paths.get(segmentIxPath), segmentIxDataRef)
-        segment <- env.segment.readSegment(segmentPath)
+        segment <- env.segment.read(segmentPath)
         tblSegments = Map(segment.name -> segment)
         _ <- DbScript.lift(segment.ix.set(Some(segmentIx)))
         // tables
-        tblIxData    <- env.tblIx.readTblIxData(tblIxPath, tblSegments)
+        tblIxData    <- env.tblIx.readData(tblIxPath, tblSegments)
         tblIxDataRef <- DbScript.lift(Async[F].ref(tblIxData))
         tblIx = TblIx[F](tblIxName, Paths.get(tblIxPath), tblIxDataRef)
         tblIxRef       <- DbScript.lift(Async[F].ref(Option(tblIx)))

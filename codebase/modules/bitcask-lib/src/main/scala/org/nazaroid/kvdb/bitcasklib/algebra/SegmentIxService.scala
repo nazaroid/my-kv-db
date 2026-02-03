@@ -32,7 +32,7 @@ trait SegmentIxService[F[_]: Async: Files] {
   }
 
 
-  def readSegmentIxData(filePath: String): DbScript[F, SegmentIxData] = {
+  def readData(filePath: String): DbScript[F, SegmentIxData] = {
     def readSegmentIxFile(filePath: String): fs2.Stream[F, (Key, Offset)] = {
       val schema = List(
         FieldDef("recordSize", FieldType.Int32),

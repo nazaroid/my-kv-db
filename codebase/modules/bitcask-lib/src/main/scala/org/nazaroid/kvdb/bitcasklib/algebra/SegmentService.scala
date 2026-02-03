@@ -62,7 +62,7 @@ trait SegmentService[F[_]: Async: Files] {
     } yield v
   }
 
-  def readSegment(filePath: String): DbScript[F, Segment[F]] = {
+  def read(filePath: String): DbScript[F, Segment[F]] = {
     val path = Paths.get(filePath)
     val segmentName: SegmentName = path.getFileName.toString
     val offset: Offset = path.toFile.length()
