@@ -2,10 +2,12 @@ package org.nazaroid.kvdb.bitcasklib.algebra
 
 import cats.data.Kleisli
 import cats.data.Kleisli.ask
-import cats.effect.Async
+import cats.effect.*
+import fs2.io.file.Files
+import org.nazaroid.kvdb.binfileio.*
 import org.nazaroid.kvdb.bitcasklib.bindata.*
 
-trait SegmentIxService[F[_]: Async] {
+trait SegmentIxService[F[_]: Async: Files] {
 
   def create(s: Segment[F]): DbScript[F, SegmentIx[F]] = {
     for {
@@ -29,7 +31,24 @@ trait SegmentIxService[F[_]: Async] {
     } yield ix
   }
 
-  def read(tbl: Tbl[F], num: SegmentNum): DbScript[F, SegmentIx[F]] = ???
 
-  def write(ix: SegmentIx[F]): DbScript[F, SegmentIx[F]] = ???
+  def readSegmentIxData(filePath: String): DbScript[F, SegmentIxData] = {
+    def readSegmentIxFile(filePath: String): fs2.Stream[F, (Key, Offset)] = {
+      val schema = List(
+        FieldDef("recordSize", FieldType.Int32),
+        FieldDef("keySize", FieldType.Int32),
+        FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
+        FieldDef("offset", FieldType.Int64)
+      )
+
+      BinFileIO
+        .read[F](filePath, schema)
+        .map(r => (r("key").asInstanceOf[Key], r("offset").asInstanceOf[Offset]))
+    }
+
+    DbScript.lift(readSegmentIxFile(filePath).compile.fold(Map.empty[Key, Offset]) { case (acc, (k, s)) =>
+      acc + (k -> s)
+    })
+  }
+
 }

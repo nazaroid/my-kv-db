@@ -4,9 +4,7 @@ import cats.data.Kleisli
 import cats.data.Kleisli.ask
 import cats.effect.*
 import cats.implicits.given
-import cats.syntax.all.*
 import fs2.io.file.Files
-import org.nazaroid.kvdb.binfileio.*
 
 import java.nio.file.Paths
 
@@ -36,62 +34,6 @@ trait LibScenarios[F[_]: Async: Files] {
     val segmentIxPath =
       "/Users/artem.nazarenko/IdeaProjects/my/my-kv-db/codebase/modules/server/kvdb/db/tbl/segment_1.ix"
 
-    def loadTblIxData(filePath: String, segments: Map[SegmentName, Segment[F]]): DbScript[F, TblIxData[F]] = {
-      def readTblIxFile(filePath: String): fs2.Stream[F, (Key, SegmentName)] = {
-        val schema = List(
-          FieldDef("recordSize", FieldType.Int32),
-          FieldDef("keySize", FieldType.Int32),
-          FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
-          FieldDef("segmentNameSize", FieldType.Int32),
-          FieldDef("segmentName", FieldType.StringUtf8(sizeFromField = "segmentNameSize"))
-        )
-
-        BinFileIO
-          .read[F](filePath, schema)
-          .map(r => (r("key").asInstanceOf[Key], r("segmentName").asInstanceOf[SegmentName]))
-      }
-
-      val stream = for {
-        (key, segmentName) <- readTblIxFile(filePath)
-      } yield (key, segments(segmentName))
-
-      DbScript.lift(stream.compile.fold(Map.empty[Key, Segment[F]]) { case (acc, (k, s)) =>
-        acc + (k -> s)
-      })
-    }
-
-    def loadSegmentIxData(filePath: String): DbScript[F, SegmentIxData] = {
-      def readSegmentIxFile(filePath: String): fs2.Stream[F, (Key, Offset)] = {
-        val schema = List(
-          FieldDef("recordSize", FieldType.Int32),
-          FieldDef("keySize", FieldType.Int32),
-          FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
-          FieldDef("offset", FieldType.Int64)
-        )
-
-        BinFileIO
-          .read[F](filePath, schema)
-          .map(r => (r("key").asInstanceOf[Key], r("offset").asInstanceOf[Offset]))
-      }
-
-      DbScript.lift(readSegmentIxFile(filePath).compile.fold(Map.empty[Key, Offset]) { case (acc, (k, s)) =>
-        acc + (k -> s)
-      })
-    }
-
-    def loadSegment(filePath: String): DbScript[F, Segment[F]] = {
-      val path = Paths.get(filePath)
-      val segmentName: SegmentName = path.getFileName.toString
-      val offset: Offset = path.toFile.length()
-      val segmentNum: SegmentNum = segmentName.substring(segmentName.indexOf("_") + 1, segmentName.indexOf(".")).toInt
-      val emptyIx = None.asInstanceOf[Option[SegmentIx[F]]]
-      val isReadOnly = false
-      for {
-        offsetRef  <- DbScript.lift(Async[F].ref(offset))
-        emptyIxRef <- DbScript.lift(Async[F].ref(emptyIx))
-      } yield Segment(segmentNum, segmentName, path, emptyIxRef, offsetRef, isReadOnly)
-    }
-
     DbScript.run {
       for {
         env <- ask[F, Env[F]]
@@ -104,6 +46,7 @@ trait LibScenarios[F[_]: Async: Files] {
         // refact: move paths to DbCatalog (bases *> tables[: tbl ix) *> segments[: seg_ix]
         // - impl load DataCatalog
         // func style
+        // move от bindata
 
         // plan:
         // create segmentIx
@@ -113,14 +56,14 @@ trait LibScenarios[F[_]: Async: Files] {
         // create base
 
         // segments
-        segmentIxData    <- loadSegmentIxData(segmentIxPath)
+        segmentIxData    <- env.segmentIx.readSegmentIxData(segmentIxPath)
         segmentIxDataRef <- DbScript.lift(Async[F].ref(segmentIxData))
         segmentIx = SegmentIx(segmentIxName, Paths.get(segmentIxPath), segmentIxDataRef)
-        segment <- loadSegment(segmentPath)
+        segment <- env.segment.readSegment(segmentPath)
         tblSegments = Map(segment.name -> segment)
         _ <- DbScript.lift(segment.ix.set(Some(segmentIx)))
         // tables
-        tblIxData    <- loadTblIxData(tblIxPath, tblSegments)
+        tblIxData    <- env.tblIx.readTblIxData(tblIxPath, tblSegments)
         tblIxDataRef <- DbScript.lift(Async[F].ref(tblIxData))
         tblIx = TblIx[F](tblIxName, Paths.get(tblIxPath), tblIxDataRef)
         tblIxRef       <- DbScript.lift(Async[F].ref(Option(tblIx)))

@@ -7,6 +7,7 @@ import org.nazaroid.kvdb.bitcasklib.algebra.*
 import java.nio.ByteBuffer
 import java.nio.file.Path
 
+// TODO: refact to org.nazaroid.kvdb.bitcasklib.bindata
 package object bindata {
 
   object BinRecord {

@@ -6,7 +6,7 @@ import org.nazaroid.kvdb.bitcasklib.algebra.*
 
 package object instances {
 
-  final class Dsl[F[_]: Async]
+  final class Dsl[F[_]: Async: Files]
       extends FileService[F]
       with CacheService[F]
       with BaseService[F]
@@ -18,7 +18,7 @@ package object instances {
   final class LibScenariosImpl[F[_]: Async: Files](c: BitcaskConf, s: State[F]) extends LibScenarios[F]:
     override def env: Env[F] = EnvImpl(c, s)
 
-  final class EnvImpl[F[_]: Async](c: BitcaskConf, s: State[F]) extends Env[F]:
+  final class EnvImpl[F[_]: Async: Files](c: BitcaskConf, s: State[F]) extends Env[F]:
     private val dsl = new Dsl()
 
     override def conf: BitcaskConf = c

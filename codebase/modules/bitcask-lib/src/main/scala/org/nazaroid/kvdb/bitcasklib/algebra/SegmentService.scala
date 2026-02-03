@@ -2,11 +2,15 @@ package org.nazaroid.kvdb.bitcasklib.algebra
 
 import cats.data.Kleisli
 import cats.data.Kleisli.ask
-import cats.effect.Async
 import cats.implicits.given
 import org.nazaroid.kvdb.bitcasklib.bindata.*
+import cats.effect.*
+import cats.syntax.all.*
+import fs2.io.file.Files
 
-trait SegmentService[F[_]: Async] {
+import java.nio.file.Paths
+
+trait SegmentService[F[_]: Async: Files] {
 
   def create(tbl: Tbl[F], num: SegmentNum): DbScript[F, Segment[F]] = {
     for {
@@ -56,5 +60,18 @@ trait SegmentService[F[_]: Async] {
       record <- BinRecord.read(s.path, offset)
       v      <- DbScript.lift(SegmentRecord.getValue(record))
     } yield v
+  }
+
+  def readSegment(filePath: String): DbScript[F, Segment[F]] = {
+    val path = Paths.get(filePath)
+    val segmentName: SegmentName = path.getFileName.toString
+    val offset: Offset = path.toFile.length()
+    val segmentNum: SegmentNum = segmentName.substring(segmentName.indexOf("_") + 1, segmentName.indexOf(".")).toInt
+    val emptyIx = None.asInstanceOf[Option[SegmentIx[F]]]
+    val isReadOnly = false
+    for {
+      offsetRef <- DbScript.lift(Async[F].ref(offset))
+      emptyIxRef <- DbScript.lift(Async[F].ref(emptyIx))
+    } yield Segment(segmentNum, segmentName, path, emptyIxRef, offsetRef, isReadOnly)
   }
 }
