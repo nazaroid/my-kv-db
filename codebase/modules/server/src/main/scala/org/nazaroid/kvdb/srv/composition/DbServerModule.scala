@@ -9,8 +9,9 @@ import org.nazaroid.kvdb.bitcasklib.BitcaskLib
 import org.nazaroid.kvdb.engine.bitcask.BitcaskDbEngine
 import org.nazaroid.kvdb.srv.http.HttpDbServer
 import org.typelevel.log4cats.Logger
+import fs2.io.file.Files
 
-final class DbServerModule[F[_]: Async: Logger: Parallel: Network](commonModule: CommonModule[F]) {
+final class DbServerModule[F[_]: Async: Files: Logger: Parallel: Network](commonModule: CommonModule[F]) {
   import commonModule.*
 
   def resolve: F[DbServer[F]] = {

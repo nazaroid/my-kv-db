@@ -62,12 +62,11 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
       for {
         logger <- Slf4jLogger.create[IO]
 
-        _    <- logger.info(f"=== first db session ===")
+        _ <- logger.info(f"=== first db session ===")
 
         rt = DbRuntime()
         _ <- Async[IO].blocking(Db(rt).runAsync(config))
         _ <- Async[IO].sleep(100.millis)
-
 
         req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db"))
         _    <- logger.info(f"create db request: $req")
@@ -84,10 +83,10 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
         resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
         _    <- logger.info(f"set value response: $resp")
 
-        _    <- Async[IO].blocking(rt.shutdown())
-        _    <- Async[IO].sleep(100.millis)
+        _ <- Async[IO].blocking(rt.shutdown())
+        _ <- Async[IO].sleep(100.millis)
 
-        _    <- logger.info(f"=== second db session ===")
+        _ <- logger.info(f"=== second db session ===")
 
         rt = DbRuntime()
         _ <- Async[IO].blocking(Db(rt).runAsync(config))
@@ -105,5 +104,3 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
   }
 
 }
-
-object Test {}

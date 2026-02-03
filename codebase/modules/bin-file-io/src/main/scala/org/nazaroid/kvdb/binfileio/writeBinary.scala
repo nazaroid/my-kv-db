@@ -7,11 +7,11 @@ import scodec.bits.ByteVector
 
 import java.nio.charset.StandardCharsets
 
-def writeBinary(
+def writeBinary[F[_]: Async: Files](
   filePath: String,
   schema:   List[FieldDef],
-  data:     List[Row]
-): IO[Unit] = {
+  data:     Stream[F, Row]
+): Stream[F, Unit] = {
 
   def rowToBytes(row: Row): ByteVector = {
     schema.foldLeft(ByteVector.empty) { (acc, field) =>
@@ -33,18 +33,15 @@ def writeBinary(
     }
   }
 
-  val byteStream: Stream[IO, Byte] = Stream
-    .emits(data)
+  val byteStream: Stream[F, Byte] = data
     .map(rowToBytes)
     .flatMap(bv => Stream.chunk(Chunk.byteVector(bv)))
 
   byteStream
     .through(
-      Files[IO].writeAll(
+      Files[F].writeAll(
         Path(filePath),
         Flags(fs2.io.file.Flag.CreateNew, fs2.io.file.Flag.Append)
       )
     )
-    .compile
-    .drain
 }

@@ -6,13 +6,14 @@ import cats.effect.Async
 import cats.effect.kernel.Ref
 import cats.effect.std.Dispatcher
 import cats.implicits.*
+import fs2.io.file.Files
 import fs2.io.net.Network
 import org.nazaroid.kvdb.DbConf
 import org.nazaroid.kvdb.algebra.DbServer
 import org.nazaroid.kvdb.srv.DbSrvState
 import org.typelevel.log4cats.Logger
 
-class DiContainer[F[_]: Async: Logger: Parallel: Network] {
+class DiContainer[F[_]: Async: Files: Logger: Parallel: Network] {
 
   private val state =
     DbSrvState(

@@ -91,8 +91,7 @@ Engine (BitCaskDbEngine)
 
 - (IN PROGRESS) рефакт: выделить слой хранения в бинарном виде
     - см файл BinFileIO
-    - названия: BinStore, BinEngine, BinLayout, BinSchema, BinFileIO, BinStorage, BinCodec
-    - фавориты BinStorage или BinFileIO.
+    - подключить к БД
 
 - (IN PROGRESS) восстановление кеша при старте
   - (читаем структуру и загружаем граф сущностей в кеше)
@@ -109,6 +108,8 @@ Engine (BitCaskDbEngine)
 * удалять bin-файлы после теста в teardown
 
 - (TODO) реализовать сценарий с удалением значения
+
+- (TODO) подготовить для OpenSource
 
 - (TODO) (проектирование/реализация) сделать в engine приемку команд при помощи fs2
 - модуль transact

@@ -6,17 +6,17 @@ import fs2.{Pull, Stream}
 
 import java.nio.charset.StandardCharsets
 
-def readBinary(
+def readBinary[F[_]: Async: Files](
   filePath: String,
   schema:   List[FieldDef]
-): IO[List[Row]] = {
-  def decodeStream(s: Stream[IO, Byte]): Pull[IO, Row, Unit] = {
+): Stream[F, Row] = {
+  def decodeStream(s: Stream[F, Byte]): Pull[F, Row, Unit] = {
 
     def readFields(
-      currentStream:   Stream[IO, Byte],
+      currentStream:   Stream[F, Byte],
       remainingSchema: List[FieldDef],
       acc:             Row
-    ): Pull[IO, Row, Unit] = {
+    ): Pull[F, Row, Unit] = {
       remainingSchema match {
         case Nil =>
           // The record is completely read, we output it and recursively parse the next one
@@ -43,7 +43,7 @@ def readBinary(
                 case None => Pull.done // Unexpected end of file within record
               }
             case None =>
-              Pull.raiseError[IO](new Exception(s"Size field not found for$name"))
+              Pull.raiseError[F](new Exception(s"Size field not found for$name"))
           }
       }
     }
@@ -55,9 +55,7 @@ def readBinary(
     }
   }
 
-  Files[IO]
+  Files[F]
     .readAll(Path(filePath))
     .through(s => decodeStream(s).stream)
-    .compile
-    .toList
 }

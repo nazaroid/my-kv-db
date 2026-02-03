@@ -1,6 +1,7 @@
 package org.nazaroid.kvdb.bitcasklib
 
 import cats.effect.Async
+import fs2.io.file.Files
 import org.nazaroid.kvdb.bitcasklib.algebra.*
 
 package object instances {
@@ -14,7 +15,7 @@ package object instances {
       with TblIxService[F]
       with SegmentIxService[F] {}
 
-  final class LibScenariosImpl[F[_]: Async](c: BitcaskConf, s: State[F]) extends LibScenarios[F]:
+  final class LibScenariosImpl[F[_]: Async: Files](c: BitcaskConf, s: State[F]) extends LibScenarios[F]:
     override def env: Env[F] = EnvImpl(c, s)
 
   final class EnvImpl[F[_]: Async](c: BitcaskConf, s: State[F]) extends Env[F]:

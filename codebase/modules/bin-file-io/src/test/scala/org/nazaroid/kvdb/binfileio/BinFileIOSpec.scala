@@ -1,6 +1,8 @@
 package org.nazaroid.kvdb.binfileio
 
+import cats.effect.IO
 import cats.effect.unsafe.implicits.global
+import fs2.Stream
 import org.scalatest.flatspec.AnyFlatSpecLike
 
 final class BinFileIOSpec extends AnyFlatSpecLike {
@@ -17,8 +19,8 @@ final class BinFileIOSpec extends AnyFlatSpecLike {
     )
 
     (for {
-      _        <- BinFileIO.write("./segment_1.ix", schema, writtenRows)
-      readRows <- BinFileIO.read("./segment_1.ix", schema)
+      _        <- BinFileIO.write[IO]("./segment_1.ix", schema, Stream.emits(writtenRows)).compile.drain
+      readRows <- BinFileIO.read[IO]("./segment_1.ix", schema).compile.toList
 
     } yield assert(writtenRows == readRows)).unsafeRunSync()
   }

@@ -2,13 +2,15 @@ package org.nazaroid.kvdb.bitcasklib.algebra
 
 import cats.data.Kleisli
 import cats.data.Kleisli.ask
-import cats.effect.Async
+import cats.effect.*
 import cats.implicits.given
+import cats.syntax.all.*
+import fs2.io.file.Files
+import org.nazaroid.kvdb.binfileio.*
 
-import java.nio.charset.StandardCharsets
 import java.nio.file.Paths
 
-trait LibScenarios[F[_]: Async] {
+trait LibScenarios[F[_]: Async: Files] {
   given env: Env[F]
 
   def readDbCatalog(): F[DbCatalog] = {
@@ -34,104 +36,47 @@ trait LibScenarios[F[_]: Async] {
     val segmentIxPath =
       "/Users/artem.nazarenko/IdeaProjects/my/my-kv-db/codebase/modules/server/kvdb/db/tbl/segment_1.ix"
 
-    def readTblIxFile(filePath: String): List[(Key, SegmentName)] = {
-      import java.io.*
-      import java.nio.ByteBuffer
-      import scala.collection.mutable.ListBuffer
-
-      val file = new File(filePath)
-
-      val dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))
-      val records = ListBuffer[(Key, SegmentName)]()
-
-      val recordSizeBuffer = new Array[Byte](4)
-      val keySizeBuffer = new Array[Byte](4)
-      val segmentNameSizeBuffer = new Array[Byte](4)
-
-      try {
-        while (true) {
-          dis.readFully(recordSizeBuffer)
-          val recordSize = ByteBuffer.wrap(recordSizeBuffer).getInt()
-
-          dis.readFully(keySizeBuffer)
-          val keySize = ByteBuffer.wrap(keySizeBuffer).getInt()
-
-          val keyBytes = new Array[Byte](keySize)
-          dis.readFully(keyBytes)
-
-          dis.readFully(segmentNameSizeBuffer)
-          val segmentNameSize = ByteBuffer.wrap(segmentNameSizeBuffer).getInt()
-
-          val segmentNameBytes = new Array[Byte](segmentNameSize)
-          dis.readFully(segmentNameBytes)
-
-          val key: Key = String(keyBytes, StandardCharsets.UTF_8)
-          val segmentName: SegmentName = String(segmentNameBytes, StandardCharsets.UTF_8)
-          val record: (Key, SegmentName) = (key, segmentName)
-          records += record
-        }
-      } catch {
-        case _: EOFException =>
-      } finally {
-        dis.close()
-      }
-      records.toList
-    }
-
     def loadTblIxData(filePath: String, segments: Map[SegmentName, Segment[F]]): DbScript[F, TblIxData[F]] = {
-      for {
-        env <- ask[F, Env[F]]
-        fileData = readTblIxFile(filePath)
-        tblIxData = fileData.map((k, segName) => (k, segments(segName))).toMap
-      } yield tblIxData
-    }
+      def readTblIxFile(filePath: String): fs2.Stream[F, (Key, SegmentName)] = {
+        val schema = List(
+          FieldDef("recordSize", FieldType.Int32),
+          FieldDef("keySize", FieldType.Int32),
+          FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
+          FieldDef("segmentNameSize", FieldType.Int32),
+          FieldDef("segmentName", FieldType.StringUtf8(sizeFromField = "segmentNameSize"))
+        )
 
-    def readSegmentIxFile(filePath: String): List[(Key, Offset)] = {
-      import java.io.*
-      import java.nio.ByteBuffer
-      import scala.collection.mutable.ListBuffer
-
-      val file = new File(filePath)
-
-      val dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))
-      val records = ListBuffer[(Key, Offset)]()
-
-      val recordSizeBuffer = new Array[Byte](4)
-      val keySizeBuffer = new Array[Byte](4)
-      val offsetBytes = new Array[Byte](8)
-
-      try {
-        while (true) {
-          dis.readFully(recordSizeBuffer)
-          val recordSize = ByteBuffer.wrap(recordSizeBuffer).getInt()
-
-          dis.readFully(keySizeBuffer)
-          val keySize = ByteBuffer.wrap(keySizeBuffer).getInt()
-
-          val keyBytes = new Array[Byte](keySize)
-          dis.readFully(keyBytes)
-
-          dis.readFully(offsetBytes)
-
-          val key: Key = String(keyBytes, StandardCharsets.UTF_8)
-          val offset = ByteBuffer.wrap(offsetBytes).getLong()
-          val record: (Key, Offset) = (key, offset)
-          records += record
-        }
-      } catch {
-        case _: EOFException =>
-      } finally {
-        dis.close()
+        BinFileIO
+          .read[F](filePath, schema)
+          .map(r => (r("key").asInstanceOf[Key], r("segmentName").asInstanceOf[SegmentName]))
       }
-      records.toList
+
+      val stream = for {
+        (key, segmentName) <- readTblIxFile(filePath)
+      } yield (key, segments(segmentName))
+
+      DbScript.lift(stream.compile.fold(Map.empty[Key, Segment[F]]) { case (acc, (k, s)) =>
+        acc + (k -> s)
+      })
     }
 
     def loadSegmentIxData(filePath: String): DbScript[F, SegmentIxData] = {
-      for {
-        env <- ask[F, Env[F]]
-        fileData = readSegmentIxFile(filePath)
-        segmentIxData = fileData.toMap
-      } yield segmentIxData
+      def readSegmentIxFile(filePath: String): fs2.Stream[F, (Key, Offset)] = {
+        val schema = List(
+          FieldDef("recordSize", FieldType.Int32),
+          FieldDef("keySize", FieldType.Int32),
+          FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
+          FieldDef("offset", FieldType.Int64)
+        )
+
+        BinFileIO
+          .read[F](filePath, schema)
+          .map(r => (r("key").asInstanceOf[Key], r("offset").asInstanceOf[Offset]))
+      }
+
+      DbScript.lift(readSegmentIxFile(filePath).compile.fold(Map.empty[Key, Offset]) { case (acc, (k, s)) =>
+        acc + (k -> s)
+      })
     }
 
     def loadSegment(filePath: String): DbScript[F, Segment[F]] = {
