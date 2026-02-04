@@ -2,15 +2,23 @@ package org.nazaroid.kvdb.bitcasklib.algebra
 
 import cats.data.Kleisli
 import cats.data.Kleisli.ask
-import cats.implicits.given
-import org.nazaroid.kvdb.bitcasklib.bindata.*
 import cats.effect.*
+import cats.implicits.given
 import cats.syntax.all.*
 import fs2.io.file.Files
+import org.nazaroid.kvdb.binfileio.*
+import org.nazaroid.kvdb.bitcasklib.bindata.*
 
 import java.nio.file.Paths
 
 trait SegmentService[F[_]: Async: Files] {
+
+  private val schema = List(
+    FieldDef("keySize", FieldType.Int32),
+    FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
+    FieldDef("valueSize", FieldType.Int32),
+    FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize"))
+  )
 
   def create(tbl: Tbl[F], num: SegmentNum): DbScript[F, Segment[F]] = {
     for {
@@ -27,13 +35,16 @@ trait SegmentService[F[_]: Async: Files] {
     value: Value
   ): DbScript[F, Offset] = {
     for {
-      env       <- ask[F, Env[F]]
-      record    <- DbScript.lift(SegmentRecord.create(value))
-      _         <- env.files.appendToFile(s.path, record)
+      env <- ask[F, Env[F]]
+      keySize = key.length
+      valueSize = value.length
+      recordSize = keySize + valueSize
+      row: Row = Map("key" -> key, "value" -> value, "keySize" -> keySize, "valueSize" -> valueSize)
+      _         <- env.files.appendToFile(s.path, schema, row)
       sIx       <- env.segment.getOrAddSegmentIx(s)
       offset    <- env.cache.getSegmentOffset(s)
       _         <- env.segmentIx.update(sIx, key, offset)
-      newOffset <- env.cache.increaseSegmentOffset(s, record.size)
+      newOffset <- env.cache.increaseSegmentOffset(s, recordSize)
     } yield newOffset
   }
 
@@ -70,7 +81,7 @@ trait SegmentService[F[_]: Async: Files] {
     val emptyIx = None.asInstanceOf[Option[SegmentIx[F]]]
     val isReadOnly = false
     for {
-      offsetRef <- DbScript.lift(Async[F].ref(offset))
+      offsetRef  <- DbScript.lift(Async[F].ref(offset))
       emptyIxRef <- DbScript.lift(Async[F].ref(emptyIx))
     } yield Segment(segmentNum, segmentName, path, emptyIxRef, offsetRef, isReadOnly)
   }

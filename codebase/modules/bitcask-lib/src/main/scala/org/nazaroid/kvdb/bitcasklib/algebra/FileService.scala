@@ -1,10 +1,21 @@
 package org.nazaroid.kvdb.bitcasklib.algebra
 
+import cats.data.Kleisli.ask
 import cats.effect.Async
+import fs2.*
+import org.nazaroid.kvdb.binfileio.*
 
-import java.nio.file.{Files, Path, StandardOpenOption}
+import java.nio.file.{Files, Path}
 
-trait FileService[F[_]: Async] {
+trait FileService[F[_]: Async: fs2.io.file.Files] {
+
+  def initFileService(): DbScript[F, Unit] =
+    for {
+      env             <- ask[F, Env[F]]
+      fileWriteBuffer <- DbScript.lift(env.state.fileWriteBuffer.get)
+      taskStream = Stream.fromQueueUnterminated(fileWriteBuffer)
+      _ <- DbScript.lift(BinFileIO.write(input = taskStream, env.conf.fileWriteParallelism).compile.drain)
+    } yield ()
 
   def createDirIfNotExists(path: Path): DbScript[F, Path] = {
     DbScript.lift {
@@ -24,11 +35,13 @@ trait FileService[F[_]: Async] {
 
   def appendToFile(
     path:   Path,
-    record: FileRecord
+    schema: List[FieldDef],
+    row:    Row
   ): DbScript[F, Unit] = {
-    DbScript.lift {
-      Async[F].blocking(Files.write(path, record, StandardOpenOption.CREATE, StandardOpenOption.APPEND))
-    }
+    for {
+      env             <- ask[F, Env[F]]
+      fileWriteBuffer <- DbScript.lift(env.state.fileWriteBuffer.get)
+      _               <- DbScript.lift(fileWriteBuffer.offer(WriteTask(path.toString, schema, row)))
+    } yield ()
   }
-
 }

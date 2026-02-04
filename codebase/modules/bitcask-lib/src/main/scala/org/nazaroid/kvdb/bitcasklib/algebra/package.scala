@@ -1,8 +1,10 @@
 package org.nazaroid.kvdb.bitcasklib
 
 import cats.data.Kleisli
+import cats.effect.std.Queue
 import cats.effect.{Async, Ref}
 import cats.implicits.given
+import org.nazaroid.kvdb.binfileio.*
 
 import java.nio.file.{Path, Paths}
 
@@ -74,7 +76,9 @@ package object algebra {
     offset:     Ref[F, Offset],
     isReadOnly: Boolean = false)
 
-  final case class State[F[_]: Async](registryRef: Ref[F, BaseRegistry[F]])
+  final case class State[F[_]: Async](
+    registryRef:     Ref[F, BaseRegistry[F]],
+    fileWriteBuffer: Ref[F, Queue[F, WriteTask]])
 
   object Tbl {
 

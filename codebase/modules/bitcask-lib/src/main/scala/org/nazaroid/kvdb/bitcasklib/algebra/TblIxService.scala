@@ -5,9 +5,15 @@ import cats.data.Kleisli.ask
 import cats.effect.Async
 import fs2.io.file.Files
 import org.nazaroid.kvdb.binfileio.*
-import org.nazaroid.kvdb.bitcasklib.bindata.*
 
 trait TblIxService[F[_]: Async: Files] {
+
+  private val schema = List(
+    FieldDef("keySize", FieldType.Int32),
+    FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
+    FieldDef("segmentNameSize", FieldType.Int32),
+    FieldDef("segmentName", FieldType.StringUtf8(sizeFromField = "segmentNameSize"))
+  )
 
   def create(tbl: Tbl[F]): DbScript[F, TblIx[F]] = {
     for {
@@ -24,23 +30,15 @@ trait TblIxService[F[_]: Async: Files] {
     s:   Segment[F]
   ): DbScript[F, TblIx[F]] = {
     for {
-      env    <- ask[F, Env[F]]
-      record <- DbScript.lift(TblIxRecord.create(key, s.name))
-      _      <- env.files.appendToFile(ix.path, record)
-      _      <- env.cache.updateTblIx(ix, key, s)
+      env <- ask[F, Env[F]]
+      row: Row = Map("key" -> key, "segmentName" -> s.name, "keySize" -> key.length, "segmentNameSize" -> s.name.length)
+      _ <- env.files.appendToFile(ix.path, schema, row)
+      _ <- env.cache.updateTblIx(ix, key, s)
     } yield ix
   }
 
   def readData(filePath: String, segments: Map[SegmentName, Segment[F]]): DbScript[F, TblIxData[F]] = {
     def readTblIxFile(filePath: String): fs2.Stream[F, (Key, SegmentName)] = {
-      val schema = List(
-        FieldDef("recordSize", FieldType.Int32),
-        FieldDef("keySize", FieldType.Int32),
-        FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
-        FieldDef("segmentNameSize", FieldType.Int32),
-        FieldDef("segmentName", FieldType.StringUtf8(sizeFromField = "segmentNameSize"))
-      )
-
       BinFileIO
         .read[F](filePath, schema)
         .map(r => (r("key").asInstanceOf[Key], r("segmentName").asInstanceOf[SegmentName]))

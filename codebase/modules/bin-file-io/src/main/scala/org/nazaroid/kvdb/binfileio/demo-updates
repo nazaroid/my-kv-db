@@ -1,0 +1,83 @@
+Приведи пример Scala 3 + fs2 кода для интенсивной записи в файл бинарных данных. Сценарий такой: на вход
+
+как связать данный код со следующим методом?
+(writeBinary)
+
+
+входные запросы приходят в разные файлы
+
+схема в каждом файле своя
+
+
+
+Для реализации сценария, где каждый файл имеет свою схему, нам нужно инкапсулировать схему вместе с данными в одну структуру (например, WriteTask) и использовать динамическую диспетчеризацию потоков.
+В Scala 3 + FS2 это элегантно решается через groupBy, где ключом будет путь к файлу, а состояние (схема) будет извлекаться из первого сообщения группы.
+Реализация
+scala
+import cats.effect.*
+import fs2.*
+import fs2.io.file.{Files, Path, Flags, Flag}
+import scodec.bits.ByteVector
+import java.nio.charset.StandardCharsets
+
+// Структура запроса: куда пишем, по какой схеме и что именно
+case class WriteTask(filePath: String, schema: List[FieldDef], row: Row)
+
+object MultiFileBinaryWriter {
+
+  // Ваша логика сериализации, адаптированная под одну строку
+  private def rowToBytes(row: Row, schema: List[FieldDef]): Chunk[Byte] = {
+    val bv = schema.foldLeft(ByteVector.empty) { (acc, field) =>
+      val value = row.getOrElse(field.name, throw new Exception(s"Field ${field.name} missing"))
+      val fieldBytes = field.fType match {
+        case FieldType.Int32 => ByteVector.fromInt(value.asInstanceOf[Int])
+        case FieldType.Int64 => ByteVector.fromLong(value.asInstanceOf[Long])
+        case FieldType.StringUtf8(_) =>
+          ByteVector.view(value.asInstanceOf[String].getBytes(StandardCharsets.UTF_8))
+      }
+      acc ++ fieldBytes
+    }
+    Chunk.byteVector(bv)
+  }
+
+  def process[F[_]: Async: Files](tasks: Stream[F, WriteTask]): Stream[F, Unit] = {
+    // Группируем по пути файла. Каждая группа — это отдельный поток (Stream)
+    tasks.groupByUnbounded(_.filePath).map { case (path, group) =>
+
+      // Используем pull, чтобы достать схему из первого элемента, не теряя его
+      group.pull.peek1.flatMap {
+        case Some((firstTask, subStream)) =>
+          val currentSchema = firstTask.schema
+
+          subStream
+            .map(task => rowToBytes(task.row, currentSchema))
+            .unchunks
+            .through(Files[F].writeAll(
+              Path(path),
+              Flags(Flag.Create, Flag.Write, Flag.Append)
+            ))
+            .pull.echo
+        case None => Pull.done
+      }.stream
+
+    }.parJoinUnbounded // Записываем во все файлы параллельно
+  }
+}
+Используйте код с осторожностью.
+
+Почему это эффективно для интенсивной записи?
+Изоляция схем: Благодаря groupBy, каждый файл обрабатывается независимо. Схема фиксируется для конкретного пути при появлении первой записи.
+parJoinUnbounded: Позволяет одновременно писать в file1.bin и file2.bin. Медленный диск или большой объем данных в одном файле не затормозит запись в другие.
+Backpressure: Если система не справляется с объемом записи в конкретный файл, FS2 приостановит чтение именно тех задач из очереди, которые направлены в этот файл.
+Низкий Overhead: Chunk.byteVector не копирует данные лишний раз, работая напрямую с байтовыми массивами.
+Как использовать
+Просто отправляйте задачи в общую очередь:
+scala
+val task1 = WriteTask("users.bin", userSchema, Map("id" -> 1, "name" -> "Alice"))
+val task2 = WriteTask("orders.bin", orderSchema, Map("id" -> 100L, "amount" -> 500))
+
+// В основном цикле:
+// queue.offer(task1) >> queue.offer(task2)
+Используйте код с осторожностью.
+
+Стоит ли добавить ограничение на количество одновременно открытых файлов (maxOpenFiles), чтобы избежать ошибок ОС при очень большом количестве разных путей?

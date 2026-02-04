@@ -37,6 +37,7 @@ trait LibScenarios[F[_]: Async: Files] {
     DbScript.run {
       for {
         env <- ask[F, Env[F]]
+        _ <- env.files.initFileService()
         // TODO:
         // - impl load funs
         //   + loadTblIxData
