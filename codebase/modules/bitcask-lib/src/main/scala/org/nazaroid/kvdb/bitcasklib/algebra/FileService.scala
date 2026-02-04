@@ -14,7 +14,9 @@ trait FileService[F[_]: Async: fs2.io.file.Files] {
       env             <- ask[F, Env[F]]
       fileWriteBuffer <- DbScript.lift(env.state.fileWriteBuffer.get)
       taskStream = Stream.fromQueueUnterminated(fileWriteBuffer)
-      _ <- DbScript.lift(BinFileIO.write(input = taskStream, env.conf.fileWriteParallelism).compile.drain)
+      _ <- DbScript.lift(
+        Async[F].start(BinFileIO.write(input = taskStream, env.conf.fileWriteParallelism).compile.drain)
+      )
     } yield ()
 
   def createDirIfNotExists(path: Path): DbScript[F, Path] = {
