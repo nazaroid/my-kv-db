@@ -14,10 +14,8 @@ import java.nio.file.Paths
 trait SegmentService[F[_]: Async: Files] {
 
   private val schema = List(
-    FieldDef("keySize", FieldType.Int32),
-    FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
-    FieldDef("valueSize", FieldType.Int32),
-    FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize"))
+    FieldDef("recordSize", FieldType.Int32),
+    FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize"))
   )
 
   def create(tbl: Tbl[F], num: SegmentNum): DbScript[F, Segment[F]] = {
@@ -36,10 +34,11 @@ trait SegmentService[F[_]: Async: Files] {
   ): DbScript[F, Offset] = {
     for {
       env <- ask[F, Env[F]]
-      keySize = key.length
-      valueSize = value.length
-      recordSize = keySize + valueSize
-      row: Row = Map("key" -> key, "value" -> value, "keySize" -> keySize, "valueSize" -> valueSize)
+      recordSize = value.length
+      row: Row = Map(
+        "recordSize" -> recordSize,
+        "value"  -> value
+      )
       _         <- env.files.appendToFile(s.path, schema, row)
       sIx       <- env.segment.getOrAddSegmentIx(s)
       offset    <- env.cache.getSegmentOffset(s)

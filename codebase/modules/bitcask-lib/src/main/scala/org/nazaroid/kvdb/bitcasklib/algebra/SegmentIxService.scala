@@ -31,7 +31,7 @@ trait SegmentIxService[F[_]: Async: Files] {
   ): DbScript[F, SegmentIx[F]] = {
     for {
       env <- ask[F, Env[F]]
-      row: Row = Map("key" -> key, "offset" -> offset)
+      row: Row = Map("keySize" -> key.length, "key" -> key, "offset" -> offset)
       _ <- env.files.appendToFile(ix.path, schema, row)
       _ <- env.cache.updateSegmentIx(ix, key, offset)
     } yield ix

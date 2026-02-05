@@ -10,7 +10,6 @@ import scodec.bits.ByteVector
 import java.nio.charset.StandardCharsets
 
 def writeBinary[F[_]: Async: Files](input: Stream[F, WriteTask], parallelism: Int = 100): Stream[F, Unit] = {
-
   def rowToBytes(row: Row, schema: List[FieldDef]): Chunk[Byte] = {
     val bv = schema.foldLeft(ByteVector.empty) { (acc, field) =>
       val value = row.getOrElse(field.name, throw new Exception(s"Field ${field.name} missing"))
@@ -37,7 +36,6 @@ def writeBinary[F[_]: Async: Files](input: Stream[F, WriteTask], parallelism: In
             case Some(chan) =>
               // File is active: send task to channel
               (state, chan.send(task).void)
-
             case None =>
               // New file: check for eviction
               val (interimState, killAction) = if (state.channels.size >= parallelism) {
@@ -66,7 +64,7 @@ def writeBinary[F[_]: Async: Files](input: Stream[F, WriteTask], parallelism: In
                         .through(
                           Files[F].writeAll(
                             Path(task.filePath),
-                            Flags(Flag.Create, Flag.Write, Flag.Append)
+                            Flags(Flag.Create, Flag.Write)
                           )
                         )
                         .onFinalize {

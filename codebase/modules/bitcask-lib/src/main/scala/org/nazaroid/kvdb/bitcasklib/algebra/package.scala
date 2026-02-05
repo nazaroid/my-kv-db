@@ -23,7 +23,7 @@ package object algebra {
   type BaseRegistry[F[_]] = Map[BaseName, Base[F]]
   type BaseTables[F[_]] = Map[TblName, Tbl[F]]
   type DbScript[F[_], O] = Kleisli[F, Env[F], O]
-  type FileRecord = Array[Byte]
+  type BinRecord = Array[Byte]
 
   trait Env[F[_]: Async] {
     def conf: BitcaskConf

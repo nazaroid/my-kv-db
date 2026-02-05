@@ -7,20 +7,20 @@ import org.nazaroid.kvdb.bitcasklib.algebra.*
 import java.nio.ByteBuffer
 import java.nio.file.Path
 
-// TODO: refact to org.nazaroid.kvdb.bitcasklib.bindata
+// TODO: refact to org.nazaroid.kvdb.binfileio
 package object bindata {
 
   object BinRecord {
+    private val recordSizeCapacity: Int = 4
 
     /*
         binary record format:
         [ record size | fld_1 size | fld_1 | fld_2 size | fld_2 | ... | fld_N size | fld_N ]
      */
     def read[F[_]: Async](
-      path:               Path,
-      offset:             Offset,
-      recordSizeCapacity: Int = 4
-    ): DbScript[F, FileRecord] = {
+      path:   Path,
+      offset: Offset
+    ): DbScript[F, BinRecord] = {
       val stream = new java.io.FileInputStream(path.toFile)
       val ch = stream.getChannel
       val bSize = ByteBuffer.allocate(recordSizeCapacity)
@@ -39,7 +39,7 @@ package object bindata {
     private val keySizeCapacity:    Int = 4
     private val sNameSizeCapacity:  Int = 4
 
-    def create[F[_]: Async](key: Key, segmentName: SegmentName): F[FileRecord] = {
+    def create[F[_]: Async](key: Key, segmentName: SegmentName): F[BinRecord] = {
       val keyBytes = key.getBytes("UTF-8")
       val keySize = keyBytes.length
       val keySizeBytes = ByteBuffer.allocate(keySizeCapacity).putInt(keySize).array()
@@ -63,7 +63,7 @@ package object bindata {
   object SegmentRecord {
     private val recordSizeCapacity = 4
 
-    def create[F[_]: Async](value: Value): F[FileRecord] = {
+    def create[F[_]: Async](value: Value): F[BinRecord] = {
       val valueBytes = value.getBytes("UTF-8")
       val valueSize = valueBytes.length
       val valueSizeBytes = ByteBuffer.allocate(recordSizeCapacity).putInt(valueSize).array()
@@ -72,7 +72,7 @@ package object bindata {
       (recordSizeBytes ++ valueBytes).pure[F]
     }
 
-    def getValue[F[_]: Async](r: FileRecord): F[Value] = {
+    def getValue[F[_]: Async](r: BinRecord): F[Value] = {
       val value = new String(r, "UTF-8")
       value.pure[F]
     }
@@ -83,7 +83,7 @@ package object bindata {
     private val recordSizeCapacity: Int = 4
     private val offsetCapacity:     Int = 8
 
-    def create[F[_]: Async](key: Key, offset: Offset): F[FileRecord] = {
+    def create[F[_]: Async](key: Key, offset: Offset): F[BinRecord] = {
       val keyBytes = key.getBytes("UTF-8")
       val keySize = keyBytes.length
       val keySizeBytes = ByteBuffer.allocate(keySizeCapacity).putInt(keySize).array()

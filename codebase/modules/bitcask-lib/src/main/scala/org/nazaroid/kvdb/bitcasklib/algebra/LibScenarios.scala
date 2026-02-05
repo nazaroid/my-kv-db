@@ -15,24 +15,25 @@ trait LibScenarios[F[_]: Async: Files] {
     DbCatalog().pure[F]
   }
 
+
   def init(dbCatalog: DbCatalog): F[Unit] = {
-    val rootDir = "/Users/artem.nazarenko/IdeaProjects/my/my-kv-db/codebase/modules/server/kvdb/"
+    val rootDir = "/Users/artem.nazarenko/IdeaProjects/my/my-kv-db/kvdb/"
     val baseName = "db"
-    val basePath = "/Users/artem.nazarenko/IdeaProjects/my/my-kv-db/codebase/modules/server/kvdb/db"
+    val basePath = "/Users/artem.nazarenko/IdeaProjects/my/my-kv-db/kvdb/db"
 
     val tblName = "tbl"
-    val tblPath = "/Users/artem.nazarenko/IdeaProjects/my/my-kv-db/codebase/modules/server/kvdb/db/tbl"
+    val tblPath = "/Users/artem.nazarenko/IdeaProjects/my/my-kv-db/kvdb/db/tbl"
 
     val tblIxName = "table.ix"
-    val tblIxPath = "/Users/artem.nazarenko/IdeaProjects/my/my-kv-db/codebase/modules/server/kvdb/db/tbl/table.ix"
+    val tblIxPath = "/Users/artem.nazarenko/IdeaProjects/my/my-kv-db/kvdb/db/tbl/table.ix"
 
     val segmentName = "segment_1.seg"
     val segmentPath =
-      "/Users/artem.nazarenko/IdeaProjects/my/my-kv-db/codebase/modules/server/kvdb/db/tbl/segment_1.seg"
+      "/Users/artem.nazarenko/IdeaProjects/my/my-kv-db/kvdb/db/tbl/segment_1.seg"
 
     val segmentIxName = "segment_1.ix.ix"
     val segmentIxPath =
-      "/Users/artem.nazarenko/IdeaProjects/my/my-kv-db/codebase/modules/server/kvdb/db/tbl/segment_1.ix"
+      "/Users/artem.nazarenko/IdeaProjects/my/my-kv-db/kvdb/db/tbl/segment_1.ix"
 
     DbScript.run {
       for {
