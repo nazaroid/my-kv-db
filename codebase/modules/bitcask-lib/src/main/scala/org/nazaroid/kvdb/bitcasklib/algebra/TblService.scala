@@ -84,4 +84,18 @@ trait TblService[F[_]: Async] {
     } yield vOpt
   }
 
+  def getValue(
+    tbl: Tbl[F],
+    k:   Key
+  ): DbScript[F, Option[Value]] = {
+    for {
+      env <- ask[F, Env[F]]
+      tIx <- env.tbl.getOrAddTblIx(tbl)
+      vOpt <- env.cache.findSegment(tIx, k) >>= {
+        case Some(s) => env.segment.getValue(s, k).map(Some(_))
+        case None    => DbScript.lift(None.pure[F])
+      }
+    } yield vOpt
+  }
+
 }

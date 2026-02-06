@@ -35,11 +35,12 @@ trait FileService[F[_]: Async: fs2.io.file.Files] {
     }
   }
 
+  //TODO: добавить в очередь-кеш и читать из кеша, пока не произойдет сброс на диск
   def appendToFile(
     path:   Path,
     schema: List[FieldDef],
     row:    Row
-  ): DbScript[F, Unit] = {
+  ): DbScript[F, Offset] = {
     for {
       env             <- ask[F, Env[F]]
       fileWriteBuffer <- DbScript.lift(env.state.fileWriteBuffer.get)

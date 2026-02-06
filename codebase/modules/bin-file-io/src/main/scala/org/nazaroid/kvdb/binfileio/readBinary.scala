@@ -6,56 +6,33 @@ import fs2.{Pull, Stream}
 
 import java.nio.charset.StandardCharsets
 
-def readBinary[F[_]: Async: Files](
-  filePath: String,
-  schema:   List[FieldDef]
-): Stream[F, Row] = {
-  def decodeStream(s: Stream[F, Byte]): Pull[F, Row, Unit] = {
+def readBinaryWithOffset[F[_]: Async: Files](
+                                              filePath: String,
+                                              schema: List[FieldDef]
+                                            ): Stream[F, (Long, Row)] = {
 
-    def readFields(
-      currentStream:   Stream[F, Byte],
-      remainingSchema: List[FieldDef],
-      acc:             Row
-    ): Pull[F, Row, Unit] = {
-      remainingSchema match {
-        case Nil =>
-          // The record is completely read, we output it and recursively parse the next one
-          Pull.output1(acc) >> decodeStream(currentStream)
+  def loop(s: Stream[F, Byte], currentOffset: Long): Pull[F, (Long, Row), Unit] = {
+    // 1. Пытаемся считать заголовок длины (4 байта)
+    s.pull.unconsN(4).flatMap {
+      case Some((lenChunk, restAfterLen)) =>
+        val rowSize = lenChunk.toByteVector.toInt()
 
-        case FieldDef(name, fType) :: tail =>
-          val bytesToRead = fType match {
-            case FieldType.Int32           => Some(4)
-            case FieldType.Int64           => Some(8)
-            case FieldType.StringUtf8(ref) => acc.get(ref).map(_.toString.toInt)
-          }
-
-          bytesToRead match {
-            case Some(n) =>
-              currentStream.pull.unconsN(n).flatMap {
-                case Some((chunk, nextStream)) =>
-                  val bv = chunk.toByteVector
-                  val value = fType match {
-                    case FieldType.Int32         => bv.toInt()
-                    case FieldType.Int64         => bv.toLong()
-                    case FieldType.StringUtf8(_) => new String(bv.toArray, StandardCharsets.UTF_8)
-                  }
-                  readFields(nextStream, tail, acc + (name -> value))
-                case None => Pull.done // Unexpected end of file within record
-              }
-            case None =>
-              Pull.raiseError[F](new Exception(s"Size field not found for$name"))
-          }
-      }
-    }
-
-    // We check if there is at least 1 byte in the stream before starting to read fields
-    s.pull.peek1.flatMap {
-      case Some(_) => readFields(s, schema, Map.empty)
-      case None    => Pull.done // Natural end of file
+        // 2. Считываем само тело записи
+        restAfterLen.pull.unconsN(rowSize).flatMap {
+          case Some((dataChunk, nextStream)) =>
+            val row = parseFromChunk(dataChunk, schema)
+            // Выдаем текущий offset (начало 4-байтового заголовка) и данные
+            Pull.output1((currentOffset, row)) >>
+              loop(nextStream, currentOffset + 4 + rowSize)
+          case None =>
+            Pull.done
+        }
+      case None =>
+        Pull.done
     }
   }
 
   Files[F]
     .readAll(Path(filePath))
-    .through(s => decodeStream(s).stream)
+    .through(s => loop(s, 0L).stream)
 }

@@ -14,8 +14,7 @@ trait LibScenarios[F[_]: Async: Files] {
   def readDbCatalog(): F[DbCatalog] = {
     DbCatalog().pure[F]
   }
-
-
+  
   def init(dbCatalog: DbCatalog): F[Unit] = {
     val rootDir = "/Users/artem.nazarenko/IdeaProjects/my/my-kv-db/kvdb/"
     val baseName = "db"
@@ -37,8 +36,8 @@ trait LibScenarios[F[_]: Async: Files] {
 
     DbScript.run {
       for {
-        env    <- ask[F, Env[F]]
-        _      <- env.files.initFileService()
+        env <- ask[F, Env[F]]
+        _   <- env.files.initFileService()
         // TODO:
         // - impl load funs
         //   + loadTblIxData

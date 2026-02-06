@@ -10,4 +10,9 @@ case class FieldDef(name: String, fType: FieldType)
 
 type Row = Map[String, Any]
 
-final case class WriteTask(filePath: String, schema: List[FieldDef], row: Row)
+final case class WriteTask(
+  key:      String, // ID для индекса
+  filePath: String,
+  schema:   List[FieldDef],
+  row:      Row,
+  callback: Option[Deferred[F, Long]] = None)
