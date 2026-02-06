@@ -1,10 +1,11 @@
 package org.nazaroid.kvdb.binfileio
 
-import cats.effect.{Async, Deferred, Ref, Async as Files, *}
 import cats.syntax.all.*
+import cats.effect.*
 import fs2.io.file.{Files, Path}
 import fs2.{Pull, Stream}
 import org.nazaroid.kvdb.binfileio.{FieldDef, DiskStorageValue, WriteTask}
+import fs2.concurrent.Channel
 
 // Состояние индекса для одного файла
 // Any - это идентификатор записи (например, UUID или String)

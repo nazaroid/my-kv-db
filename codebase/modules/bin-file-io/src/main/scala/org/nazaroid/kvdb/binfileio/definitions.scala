@@ -1,5 +1,7 @@
 package org.nazaroid.kvdb.binfileio
 
+import cats.effect.*
+
 enum FieldType {
   case Int32
   case Int64

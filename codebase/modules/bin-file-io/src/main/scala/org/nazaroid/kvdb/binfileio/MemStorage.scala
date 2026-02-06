@@ -5,6 +5,7 @@ import cats.syntax.all.*
 import fs2.io.file.{Files, Path}
 import fs2.{Pull, Stream}
 import org.nazaroid.kvdb.binfileio.{FieldDef, WriteTask}
+import fs2.concurrent.Channel
 
 enum MemStorageValue {
   // Данные в очереди на запись
