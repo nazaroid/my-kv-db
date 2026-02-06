@@ -2,10 +2,10 @@ package org.nazaroid.kvdb.binfileio
 
 import cats.effect.{Async, Deferred, Ref, Async as Files, *}
 import cats.syntax.all.*
+import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import fs2.{Pull, Stream}
 import org.nazaroid.kvdb.binfileio.{FieldDef, WriteTask}
-import fs2.concurrent.Channel
 
 enum MemStorageValue {
   // Данные в очереди на запись
@@ -18,7 +18,8 @@ class MemStorage[F[_]: Async: Files](
   val index:  Ref[F, Map[String, MemStorageValue]],
   writeQueue: Channel[F, WriteTask],
   schema:     List[FieldDef],
-  filePath:   String) {
+  filePath:   String,
+  idField:    String) {
 
   // ЧТЕНИЕ: Максимально быстрое, так как Row всегда в памяти
   def read(id: String): F[Option[Row]] = {
@@ -69,7 +70,7 @@ class MemStorage[F[_]: Async: Files](
           readBinaryWithOffset(filePath, schema)
             .map { (offset, row) =>
               val id = row(idField).toString
-              id -> StorageValue.Persistent(row, offset)
+              id -> MemStorageValue.Persistent(row, offset)
             }
             .compile
             .to(Map)
