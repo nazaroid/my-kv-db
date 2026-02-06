@@ -1,6 +1,6 @@
 package org.nazaroid.kvdb.binfileio
 
-import cats.effect.{Async, Deferred, Ref, Async as Files, *}
+import cats.effect.*
 import cats.syntax.all.*
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
@@ -67,7 +67,7 @@ class MemStorage[F[_]: Async: Files](
       Files[F].exists(Path(filePath)).flatMap {
         case false => Async[F].pure(Map.empty)
         case true =>
-          readBinaryWithOffset(filePath, schema)
+          readBinary(filePath, schema)
             .map { (offset, row) =>
               val id = row(idField).toString
               id -> MemStorageValue.Persistent(row, offset)

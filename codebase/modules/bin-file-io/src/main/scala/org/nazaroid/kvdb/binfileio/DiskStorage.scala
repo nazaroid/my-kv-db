@@ -77,7 +77,7 @@ class DiskStorage[F[_]: Async: Files](
           readBinary(filePath, schema)
             .map { (offset, row) =>
               val id = row(idField).toString
-              id -> StorageValue.OnDisk(offset)
+              id -> DiskStorageValue.OnDisk(offset)
             }
             .compile
             .to(Map)

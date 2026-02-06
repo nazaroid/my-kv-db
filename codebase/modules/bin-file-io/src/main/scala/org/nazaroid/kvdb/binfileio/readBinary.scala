@@ -6,7 +6,7 @@ import fs2.{Pull, Stream}
 
 import java.nio.charset.StandardCharsets
 
-def readBinaryWithOffset[F[_]: Async: Files](
+def readBinary[F[_]: Async: Files](
                                               filePath: String,
                                               schema: List[FieldDef]
                                             ): Stream[F, (Long, Row)] = {
