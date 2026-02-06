@@ -52,7 +52,7 @@ class DiskStorage[F[_]: Async: Files](
       promise <- Deferred[F, Long]
 
       // 3. Отправляем в очередь (вам нужно добавить callback в WriteTask, как мы делали ранее)
-      task = WriteTask(filePath, schema, row, Some(promise))
+      task = WriteTask(key, filePath, schema, row, Some(promise))
       _ <- writeQueue.send(task)
 
       // 4. Запускаем фоновое обновление индекса
