@@ -1,7 +1,5 @@
 package org.nazaroid.kvdb.binfileio
 
-import cats.effect.*
-import fs2.io.file.{Files, Path}
 import fs2.{Chunk, Pull, Stream}
 import scodec.bits.ByteVector
 

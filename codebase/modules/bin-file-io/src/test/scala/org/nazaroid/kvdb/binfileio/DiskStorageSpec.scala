@@ -14,9 +14,9 @@ final class DiskStorageSpec extends AnyFlatSpecLike {
   it should "write and read same data" in {
     (for {
       ix     <- Async[IO].ref(Map[String, DiskStorageValue]())
-      buffer <- Channel.bounded[IO, WriteTask](2)
-      s = DiskStorage(ix, buffer, path, schema, keyField)
-      _  <- Stream.emits(writtenRows).evalMap(r => s1.write(r(keyField), r)).compile.drain
+      buffer <- Channel.bounded[IO, WriteTask[IO]](2)
+      s = DiskStorage[IO](ix, buffer, path, schema, keyField)
+      _  <- Stream.emits(writtenRows).evalMap(r => s.write(r(keyField).toString, r)).compile.drain
       _  <- Async[IO].sleep(100 millis)
       r1 <- s.read("user")
       r2 <- s.read("admin")
@@ -27,9 +27,9 @@ final class DiskStorageSpec extends AnyFlatSpecLike {
   it should "be able to recover index" in {
     (for {
       ix     <- Async[IO].ref(Map[String, DiskStorageValue]())
-      buffer <- Channel.bounded[IO, WriteTask](2)
-      s = DiskStorage(ix, buffer, path, schema, keyField)
-      _                 <- Stream.emits(writtenRows).evalMap(r => s1.write(r(keyField), r)).compile.drain
+      buffer <- Channel.bounded[IO, WriteTask[IO]](2)
+      s = DiskStorage[IO](ix, buffer, path, schema, keyField)
+      _                 <- Stream.emits(writtenRows).evalMap(r => s.write(r(keyField).toString, r)).compile.drain
       _                 <- Async[IO].sleep(100 millis)
       dataBeforeRecover <- ix.get
       _                 <- s.recoverIndex()

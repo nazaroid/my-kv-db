@@ -4,8 +4,6 @@ import cats.effect.*
 import cats.syntax.all.*
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
-import fs2.{Pull, Stream}
-import org.nazaroid.kvdb.binfileio.{FieldDef, WriteTask}
 
 enum MemStorageValue {
   // Данные в очереди на запись
@@ -16,7 +14,7 @@ enum MemStorageValue {
 
 class MemStorage[F[_]: Async: Files](
   val index:  Ref[F, Map[String, MemStorageValue]],
-  writeQueue: Channel[F, WriteTask],
+  writeQueue: Channel[F, WriteTask[F]],
   schema:     List[FieldDef],
   filePath:   String,
   idField:    String) {
@@ -77,6 +75,6 @@ class MemStorage[F[_]: Async: Files](
       }
     }
 
-    readIndex(filePath, schema, idField) >>= index.update
+    readIndex(filePath, schema, idField) >>= index.set
   }
 }

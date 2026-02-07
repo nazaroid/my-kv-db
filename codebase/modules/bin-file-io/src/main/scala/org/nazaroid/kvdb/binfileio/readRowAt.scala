@@ -3,7 +3,7 @@ package org.nazaroid.kvdb.binfileio
 import cats.effect.*
 import cats.syntax.all.*
 import fs2.io.file.{Files, Path}
-import fs2.{Pull, Stream, Chunk}
+import fs2.Chunk
 
 def readRowAt[F[_]: Async: Files](
   filePath: String,

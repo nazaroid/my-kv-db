@@ -3,8 +3,7 @@ package org.nazaroid.kvdb.binfileio
 import cats.syntax.all.*
 import cats.effect.*
 import fs2.io.file.{Files, Path}
-import fs2.{Pull, Stream}
-import org.nazaroid.kvdb.binfileio.{FieldDef, DiskStorageValue, WriteTask}
+import org.nazaroid.kvdb.binfileio.WriteTask
 import fs2.concurrent.Channel
 
 // Состояние индекса для одного файла
@@ -18,7 +17,7 @@ type Index[F[_]] = Ref[F, Map[String, DiskStorageValue]]
 
 class DiskStorage[F[_]: Async: Files](
   index:      Index[F],
-  writeQueue: Channel[F, WriteTask],
+  writeQueue: Channel[F, WriteTask[F]],
   filePath:   String,
   schema:     List[FieldDef],
   idField:    String) {
@@ -84,6 +83,6 @@ class DiskStorage[F[_]: Async: Files](
       }
     }
 
-    readIndex(filePath, schema, idField) >>= index.update
+    readIndex(filePath, schema, idField) >>= index.set
   }
 }

@@ -4,8 +4,6 @@ import cats.effect.*
 import fs2.io.file.{Files, Path}
 import fs2.{Pull, Stream}
 
-import java.nio.charset.StandardCharsets
-
 def readBinary[F[_]: Async: Files](
                                               filePath: String,
                                               schema: List[FieldDef]
