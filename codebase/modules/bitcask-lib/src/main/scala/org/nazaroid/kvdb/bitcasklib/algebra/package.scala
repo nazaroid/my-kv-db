@@ -1,9 +1,10 @@
 package org.nazaroid.kvdb.bitcasklib
 
 import cats.data.Kleisli
-import cats.effect.std.Queue
+import cats.data.Kleisli.ask
 import cats.effect.{Async, Ref}
 import cats.implicits.given
+import fs2.concurrent.Channel
 import org.nazaroid.kvdb.binfileio.*
 
 import java.nio.file.{Path, Paths}
@@ -53,14 +54,14 @@ package object algebra {
     tables: Ref[F, BaseTables[F]])
 
   final case class TblIx[F[_]: Async](
-    name: TblIxName,
-    path: Path,
-    data: Ref[F, TblIxData[F]])
+    name:    TblIxName,
+    path:    Path,
+    storage: MemStorage[F])
 
   final case class SegmentIx[F[_]: Async](
-    name: SegmentIxName,
-    path: Path,
-    data: Ref[F, SegmentIxData])
+    name:    SegmentIxName,
+    path:    Path,
+    storage: MemStorage[F])
 
   final case class Tbl[F[_]: Async](
     name:        TblName,
@@ -73,12 +74,12 @@ package object algebra {
     name:       SegmentName,
     path:       Path,
     ix:         Ref[F, Option[SegmentIx[F]]],
-    offset:     Ref[F, Offset],
+    storage:    DiskStorage[F],
     isReadOnly: Boolean = false)
 
   final case class State[F[_]: Async](
     registryRef:     Ref[F, BaseRegistry[F]],
-    fileWriteBuffer: Ref[F, Queue[F, WriteTask]])
+    fileWriteBuffer: Ref[F, Channel[F, WriteTask[F]]])
 
   object Tbl {
 
@@ -103,16 +104,35 @@ package object algebra {
 
   object TblIx {
 
-    def create[F[_]: Async](tbl: Tbl[F]): F[TblIx[F]] = {
+    private val schema = List(
+      FieldDef("keySize", FieldType.Int32),
+      FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
+      FieldDef("segmentNameSize", FieldType.Int32),
+      FieldDef("segmentName", FieldType.StringUtf8(sizeFromField = "segmentNameSize"))
+    )
+    private val keyField = "key"
+
+    def create[F[_]: Async](tbl: Tbl[F]): DbScript[F, TblIx[F]] = {
       val name = "table.ix"
       val path = Paths.get(f"${tbl.path.toAbsolutePath}/$name")
       for {
-        data <- Async[F].ref(Map.empty[Key, Segment[F]])
-      } yield TblIx(name, path, data)
+        env <- ask[F, Env[F]]
+        storage <- DbScript.lift {
+          for {
+            ix              <- Async[F].ref(Map[String, MemStorageValue]())
+            fileWriteBuffer <- env.state.fileWriteBuffer.get
+          } yield MemStorage(ix, fileWriteBuffer, schema, path.toString, keyField)
+        }
+      } yield TblIx(name, path, storage)
     }
   }
 
   object Segment {
+
+    private val schema = List(
+      FieldDef("recordSize", FieldType.Int32),
+      FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize"))
+    )
 
     def create[F[_]: Async](
       tbl: Tbl[F],
@@ -121,8 +141,13 @@ package object algebra {
       val name = f"segment_$num.seg"
       val path = Paths.get(f"${tbl.path.toAbsolutePath}/$name")
       for {
-        ix     <- Async[F].ref(Option.empty[SegmentIx[F]])
-        offset <- Async[F].ref(0L)
+        env <- ask[F, Env[F]]
+        storage <- DbScript.lift {
+          for {
+            ix              <- Async[F].ref(Map[String, DiskStorageValue]())
+            fileWriteBuffer <- env.state.fileWriteBuffer.get
+          } yield DiskStorage(ix, fileWriteBuffer, schema, path.toString, keyField)
+        }
       } yield Segment(num, name, path, ix, offset)
     }
   }

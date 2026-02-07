@@ -7,14 +7,7 @@ import fs2.io.file.Files
 import org.nazaroid.kvdb.binfileio.*
 
 trait TblIxService[F[_]: Async: Files] {
-
-  private val schema = List(
-    FieldDef("keySize", FieldType.Int32),
-    FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
-    FieldDef("segmentNameSize", FieldType.Int32),
-    FieldDef("segmentName", FieldType.StringUtf8(sizeFromField = "segmentNameSize"))
-  )
-
+  
   def create(tbl: Tbl[F]): DbScript[F, TblIx[F]] = {
     for {
       env <- ask[F, Env[F]]

@@ -1,0 +1,290 @@
+Идея разделения на три компонента — DataStorage, IndexStorage и координирующий Manager — это правильный архитектурный ход (паттерн Orchestrator). Это позволит переиспользовать логику хранилищ и четко разграничить ответственность.
+Вот реализация этой «связки»:
+1. Базовый Storage (Generic)
+Создадим универсальный класс, который умеет писать в свой файл и возвращать offset.
+scala
+class BaseStorage[F[_]: Async: Files](
+    val filePath: String,
+    val schema:   List[FieldDef],
+    val queue:    Channel[F, WriteTask]
+) {
+  def append(id: String, row: Row): F[Long] =
+    for {
+      promise <- Deferred[F, Long]
+      task = WriteTask(id, filePath, schema, row, Some(promise))
+      _ <- queue.send(task)
+      offset <- promise.get
+    } yield offset
+}
+Используйте код с осторожностью.
+
+2. Координирующий StorageManager
+Этот компонент связывает запись данных с записью индекса и обновлением Ref (кеша).
+scala
+// Состояние кеша в памяти для менеджера
+enum CacheEntry {
+  case Pending(row: Row)
+  case Persistent(row: Row, dataOffset: Long)
+}
+
+class StorageManager[F[_]: Async: Files](
+    dataStorage:  BaseStorage[F],
+    indexStorage: BaseStorage[F],
+    val cache:    Ref[F, Map[String, CacheEntry]]
+) {
+
+  def save(key: String, value: String): F[Unit] = {
+    val dataRow = Map(
+      "recordSize" -> value.getBytes("UTF-8").length,
+      "value"      -> value
+    )
+
+    for {
+      // 1. Сразу в кеш (Read-Your-Writes)
+      _ <- cache.update(_ + (key -> CacheEntry.Pending(dataRow)))
+
+      // 2. Пишем в файл данных и получаем offset
+      dataOffset <- dataStorage.append(key, dataRow)
+
+      // 3. Формируем строку для индексного файла
+      indexRow = Map(
+        "keySize" -> key.getBytes("UTF-8").length,
+        "key"     -> key,
+        "offset"  -> dataOffset
+      )
+
+      // 4. Пишем в индексный файл (нам не важен его собственный offset, но важно дождаться записи)
+      _ <- indexStorage.append(key, indexRow)
+
+      // 5. Финализируем кеш
+      _ <- cache.update(_ + (key -> CacheEntry.Persistent(dataRow, dataOffset)))
+    } yield ()
+  }
+
+  def get(key: String): F[Option[Row]] =
+    cache.get.map(_.get(key).map {
+      case CacheEntry.Pending(r)         => r
+      case CacheEntry.Persistent(r, _)   => r
+    })
+}
+Используйте код с осторожностью.
+
+3. Инициализация и Восстановление
+Функция сборки системы, которая при старте читает индексный файл и «прогревает» кеш данными из основного файла.
+scala
+object StorageManager {
+  def init[F[_]: Async: Files](
+      dataFilePath:  String,
+      indexFilePath: String,
+      dataSchema:    List[FieldDef],
+      indexSchema:   List[FieldDef],
+      writeQueue:    Channel[F, WriteTask] // Общая очередь для writeBinary
+  ): F[StorageManager[F]] = {
+
+    // Восстановление кеша при запуске
+    val recovery = readBinaryWithOffset(indexFilePath, indexSchema)
+      .evalMap { (_, indexRow) =>
+        val key = indexRow("key").toString
+        val offset = indexRow("offset").asInstanceOf[Long]
+
+        // Читаем данные из основного файла по сохраненному смещению
+        readRowAt(dataFilePath, dataSchema, offset).map {
+          case Some(row) => Some(key -> CacheEntry.Persistent(row, offset))
+          case None      => None
+        }
+      }
+      .unNone
+      .compile
+      .to(Map)
+      .handleError(_ => Map.empty) // Если файлов еще нет
+
+    for {
+      recovered <- recovery
+      cacheRef  <- Ref.of[F, Map[String, CacheEntry]](recovered)
+
+      dataStore  = new BaseStorage(dataFilePath, dataSchema, writeQueue)
+      indexStore = new BaseStorage(indexFilePath, indexSchema, writeQueue)
+    } yield new StorageManager(dataStore, indexStore, cacheRef)
+  }
+}
+Используйте код с осторожностью.
+
+В чем профит такой схемы:
+Симметрия и чистота: BaseStorage ничего не знает о кешах или соседних файлах. Он просто «писатель».
+Двойная надежность: Данные считаются сохраненными только после того, как indexStorage.append вернул управление. Если свет выключится между записью данных и индекса, recover просто проигнорирует «осиротевшие» данные в основном файле, так как в индексе их нет.
+Гибкость: Вы можете добавить третий LogStorage или AuditStorage в этот же Manager, не меняя существующий код.
+Хотите, чтобы мы добавили в Manager метод delete, который помечал бы запись удаленной в индексе (Tombstone), не переписывая основной файл данных?
+
+
+
+Для реализации удаления без перезаписи основного файла данных (механизм Tombstones), мы добавим в индексный файл специальный маркер (например, offset = -1), а в кеш — состояние Deleted.
+1. Обновление структур данных
+Добавим состояние Deleted в кеш менеджера.
+scala
+enum CacheEntry {
+  case Pending(row: Row)
+  case Persistent(row: Row, dataOffset: Long)
+  case Deleted // Пометка, что ключа больше нет
+}
+Используйте код с осторожностью.
+
+2. Реализация метода delete в StorageManager
+Логика проста: мы не трогаем файл данных (это дорого), а просто дописываем в файл индекса запись с тем же ключом, но специальным смещением -1. При чтении и восстановлении последняя запись в индексе будет иметь приоритет.
+scala
+class StorageManager[F[_]: Async: Files](
+    dataStorage:  BaseStorage[F],
+    indexStorage: BaseStorage[F],
+    val cache:    Ref[F, Map[String, CacheEntry]]
+) {
+
+  def delete(key: String): F[Unit] = {
+    for {
+      // 1. Помечаем в кеше как удаленное (Read-Your-Writes)
+      _ <- cache.update(_ + (key -> CacheEntry.Deleted))
+
+      // 2. Формируем "надгробную плиту" (Tombstone) для индекса
+      tombstoneRow = Map(
+        "keySize" -> key.getBytes("UTF-8").length,
+        "key"     -> key,
+        "offset"  -> -1L // Магическое число, означающее удаление
+      )
+
+      // 3. Записываем в индексный файл
+      _ <- indexStorage.append(key, tombstoneRow)
+    } yield ()
+  }
+
+  // Обновленный метод чтения: учитываем пометку об удалении
+  def get(key: String): F[Option[Row]] =
+    cache.get.map(_.get(key).flatMap {
+      case CacheEntry.Pending(r)         => Some(r)
+      case CacheEntry.Persistent(r, _)   => Some(r)
+      case CacheEntry.Deleted            => None // Данные удалены
+    })
+
+  // ... методы save и прочее остаются прежними ...
+}
+Используйте код с осторожностью.
+
+3. Обновление логики восстановления (Recovery)
+Поскольку файл индекса теперь может содержать несколько записей для одного ключа (сначала offset > 0, потом -1), нам нужно, чтобы при загрузке последняя запись побеждала.
+scala
+// Внутри метода StorageManager.init:
+val recovery = readBinaryWithOffset(indexFilePath, indexSchema)
+  .evalMap { (_, indexRow) =>
+    val key = indexRow("key").toString
+    val offset = indexRow("offset").asInstanceOf[Long]
+
+    if (offset == -1L) {
+      // Это Tombstone: помечаем ключ как удаленный
+      Async[F].pure(Some(key -> CacheEntry.Deleted))
+    } else {
+      // Обычная запись: читаем данные из основного файла
+      readRowAt(dataFilePath, dataSchema, offset).map {
+        case Some(row) => Some(key -> CacheEntry.Persistent(row, offset))
+        case None      => None // Если данные в основном файле почему-то не найдены
+      }
+    }
+  }
+  .unNone
+  // .to(Map) в Scala при дубликатах ключей оставляет ПОСЛЕДНЕЕ значение
+  .compile
+  .to(Map)
+Используйте код с осторожностью.
+
+Почему это эффективно:
+Мгновенное удаление: Вам не нужно перестраивать гигабайтные файлы. Запись 20-байтового маркера в индекс — это всё, что требуется.
+Консистентность: Если система упадет сразу после записи в файл данных, но до записи в индекс, при перезагрузке данных просто "не будет существовать", так как индексный файл — это единственный источник правды о наличии ключа.
+История: Теоретически, просканировав индекс, вы можете восстановить историю изменений ключа.
+Что делать с мусором? (Compaction)
+Со временем файл данных будет забит "удаленными" строками, которые никто не читает. Обычно для этого реализуют процесс Compaction:
+Раз в N часов создается новый чистый файл данных.
+Туда переписываются только те CacheEntry.Persistent, которых нет в списке Deleted.
+Старый файл удаляется.
+Нужно ли нам реализовать простую функцию Compaction для очистки места на диске?
+
+
+Процесс Compaction (уплотнение) — это фоновая операция, которая переносит только «живые» данные в новый файл, освобождая место от удаленных записей и старых версий.
+1. Логика Compaction
+Нам нужно:
+Создать временные файлы для данных и индекса.
+Пройтись по текущему In-Memory кешу (он — источник правды).
+Перезаписать все Persistent записи в новые файлы.
+Атомарно подменить старые файлы новыми.
+scala
+class StorageManager[F[_]: Async: Files](
+    dataStorage:  BaseStorage[F],
+    indexStorage: BaseStorage[F],
+    val cache:    Ref[F, Map[String, CacheEntry]],
+    dataSchema:   List[FieldDef],
+    indexSchema:  List[FieldDef]
+) {
+
+  def compact(): F[Unit] = {
+    val tempDataPath  = Path(dataStorage.filePath + ".tmp")
+    val tempIndexPath = Path(indexStorage.filePath + ".tmp")
+
+    for {
+      // 1. Берем снимок текущего кеша
+      currentSnapshot <- cache.get
+
+      // 2. Фильтруем только живые данные (Persistent)
+      aliveEntries = currentSnapshot.collect {
+        case (key, CacheEntry.Persistent(row, _)) => (key, row)
+      }.toList
+
+      // 3. Перезаписываем данные в новые временные файлы
+      newIndexMap <- aliveEntries.foldLeftM(Map.empty[String, CacheEntry]) {
+        case (acc, (key, row)) =>
+          for {
+            // Пишем в новый файл данных
+            dataBytes <- Async[F].delay(rowToBytes(row, dataSchema))
+            _ <- Stream.chunk(dataBytes)
+                  .through(Files[F].writeAll(tempDataPath, Flags(Flag.Append)))
+                  .compile.drain
+
+            // Получаем новый offset (размер файла до текущей записи)
+            newOffset <- Files[F].size(tempDataPath).map(_ - dataBytes.size)
+
+            // Пишем в новый файл индекса
+            indexRow = Map("keySize" -> key.getBytes("UTF-8").length, "key" -> key, "offset" -> newOffset)
+            indexBytes <- Async[F].delay(rowToBytes(indexRow, indexSchema))
+            _ <- Stream.chunk(indexBytes)
+                  .through(Files[F].writeAll(tempIndexPath, Flags(Flag.Append)))
+                  .compile.drain
+          } yield acc + (key -> CacheEntry.Persistent(row, newOffset))
+      }
+
+      // 4. Атомарная замена файлов (Move)
+      _ <- Files[F].move(tempDataPath, Path(dataStorage.filePath), Flags(Flag.ReplaceExisting))
+      _ <- Files[F].move(tempIndexPath, Path(indexStorage.filePath), Flags(Flag.ReplaceExisting))
+
+      // 5. Обновляем кеш новыми смещениями
+      _ <- cache.update(oldMap => oldMap ++ newIndexMap)
+
+      // Очищаем записи, которые были помечены как Deleted до начала компакции
+      _ <- cache.update(_.filter { case (_, entry) => entry != CacheEntry.Deleted })
+
+    } yield ()
+  }
+}
+Используйте код с осторожностью.
+
+2. Ключевые моменты реализации
+Изоляция: Пока идет компакция, новые write или delete могут продолжать поступать в cache и основные файлы. В конце мы используем update(oldMap => oldMap ++ newIndexMap), что сохранит новые записи, сделанные во время процесса, и обновит старые offset на новые.
+Безопасность: Если процесс упадет во время записи в .tmp файлы, оригинальные данные останутся нетронутыми.
+Очистка: Все записи CacheEntry.Deleted физически исчезают из файлов и из оперативной памяти.
+3. Как запускать Compaction
+Обычно это делается по расписанию (раз в час) или при достижении файлом определенного размера:
+scala
+// Пример фонового запуска каждые 30 минут
+val compactionLoop = (Stream.sleep[F](30.minutes) >> Stream.eval(manager.compact())).repeat.compile.drain.start
+Используйте код с осторожностью.
+
+Итоговая структура системы:
+Write: Быстро (Append-only в два файла + Cache).
+Read: Мгновенно (из Cache).
+Delete: Быстро (Tombstone в индекс + Cache).
+Recovery: Быстро (только чтение индекса).
+Compaction: Фоновая очистка «мусора».
+Стоит ли нам добавить механизм «блокировки» записи на время финальной подмены файлов (Step 4 и 5), чтобы избежать потери данных, которые могли записаться в старый файл в ту же миллисекунду?

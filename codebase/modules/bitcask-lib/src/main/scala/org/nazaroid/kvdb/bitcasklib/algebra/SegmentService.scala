@@ -13,11 +13,6 @@ import java.nio.file.Paths
 
 trait SegmentService[F[_]: Async: Files] {
 
-  private val schema = List(
-    FieldDef("recordSize", FieldType.Int32),
-    FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize"))
-  )
-
   def create(tbl: Tbl[F], num: SegmentNum): DbScript[F, Segment[F]] = {
     for {
       env <- ask[F, Env[F]]
