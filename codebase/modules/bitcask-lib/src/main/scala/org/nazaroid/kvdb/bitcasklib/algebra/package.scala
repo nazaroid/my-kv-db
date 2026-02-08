@@ -26,13 +26,7 @@ package object algebra {
     def base: BaseService[F]
 
     def tbl: TblService[F]
-
-    def segment: SegmentService[F]
-
-    def tblIx: TblIxService[F]
-
-    def segmentIx: SegmentIxService[F]
-
+    
     def cache: CacheService[F]
 
     def state: State[F]

@@ -10,10 +10,7 @@ package object instances {
       extends FileService[F]
       with CacheService[F]
       with BaseService[F]
-      with TblService[F]
-      with SegmentService[F]
-      with TblIxService[F]
-      with SegmentIxService[F] {}
+      with TblService[F] {}
 
   final class LibScenariosImpl[F[_]: Async: Files](c: BitcaskConf, s: State[F]) extends LibScenarios[F]:
     override def env: Env[F] = EnvImpl(c, s)
@@ -28,12 +25,6 @@ package object instances {
     override def base: BaseService[F] = dsl
 
     override def tbl: TblService[F] = dsl
-
-    override def segment: SegmentService[F] = dsl
-
-    override def tblIx: TblIxService[F] = dsl
-
-    override def segmentIx: SegmentIxService[F] = dsl
 
     override def cache: CacheService[F] = dsl
 

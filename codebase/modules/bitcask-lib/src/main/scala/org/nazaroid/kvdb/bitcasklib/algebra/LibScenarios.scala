@@ -14,7 +14,7 @@ trait LibScenarios[F[_]: Async: Files] {
   def readDbCatalog(): F[DbCatalog] = {
     DbCatalog().pure[F]
   }
-  
+
   def init(dbCatalog: DbCatalog): F[Unit] = {
     val rootDir = "/Users/artem.nazarenko/IdeaProjects/my/my-kv-db/kvdb/"
     val baseName = "db"
@@ -49,32 +49,8 @@ trait LibScenarios[F[_]: Async: Files] {
         // func style
         // move от bindata
 
-        // plan:
-        // create segmentIx
-        // create segment
-        // create tblIx
-        // create tbl
-        // create base
-
-        // segments
-        segmentIxData    <- env.segmentIx.readData(segmentIxPath)
-        segmentIxDataRef <- DbScript.lift(Async[F].ref(segmentIxData))
-        segmentIx = SegmentIx(segmentIxName, Paths.get(segmentIxPath), segmentIxDataRef)
-        segment <- env.segment.read(segmentPath)
-        tblSegments = Map(segment.name -> segment)
-        _ <- DbScript.lift(segment.ix.set(Some(segmentIx)))
-        // tables
-        tblIxData    <- env.tblIx.readData(tblIxPath, tblSegments)
-        tblIxDataRef <- DbScript.lift(Async[F].ref(tblIxData))
-        tblIx = TblIx[F](tblIxName, Paths.get(tblIxPath), tblIxDataRef)
-        tblIxRef       <- DbScript.lift(Async[F].ref(Option(tblIx)))
-        lastSegmentRef <- DbScript.lift(Async[F].ref(Option(segment)))
-        tbl = Tbl[F](tblName, Paths.get(tblPath), lastSegmentRef, tblIxRef)
-        baseTbls <- DbScript.lift(Async[F].ref(Map(tblName -> tbl)))
-        // base
-        base = Base(baseName, Paths.get(basePath), baseTbls)
-
-        _ <- env.cache.addBase(base)
+        base <- env.base.createIfNotExists(rootDir, baseName)
+        _ <- env.tbl.createIfNotExists(base, tblName)
       } yield ()
     }
   }
@@ -106,7 +82,7 @@ trait LibScenarios[F[_]: Async: Files] {
         env  <- ask[F, Env[F]]
         base <- env.base.get(baseName)
         tbl  <- env.tbl.get(base, tblName)
-        vOpt <- env.tbl.findInSegments(tbl, key)
+        vOpt <- env.tbl.readValue(tbl, key)
       } yield vOpt
     }
   }
@@ -122,7 +98,7 @@ trait LibScenarios[F[_]: Async: Files] {
         env  <- ask[F, Env[F]]
         base <- env.base.get(baseName)
         tbl  <- env.tbl.get(base, tblName)
-        _    <- env.tbl.appendToLastSegment(tbl, key, value)
+        _    <- env.tbl.writeValue(tbl, key, value)
       } yield ()
     }
   }
