@@ -52,7 +52,7 @@ def writeBinary[F[_]: Async: Files](
                             // Записываем конкретную строку
                             Stream
                               .chunk(bytes)
-                              .through(Files[F].writeAll(Path(t.filePath), Flags(Flag.Append)))
+                              .through(Files[F].writeAll(Path(t.filePath), Flags(Flag.Create, Flag.Append)))
                               .compile
                               .drain >>
                               // СТРАТЕГИЧЕСКИЙ МОМЕНТ: уведомляем Storage, что данные на диске
