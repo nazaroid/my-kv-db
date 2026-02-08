@@ -10,21 +10,13 @@ import org.nazaroid.kvdb.binfileio.*
 import java.nio.file.{Path, Paths}
 
 package object algebra {
-  type Offset = Long
   type Key = String
   type Value = String
   type BaseName = String
   type TblName = String
-  type TblIxName = String
-  type SegmentNum = Int
-  type SegmentName = String
-  type SegmentIxName = String
-  type SegmentIxData = Map[Key, Offset]
-  type TblIxData[F[_]] = Map[Key, Segment[F]]
   type BaseRegistry[F[_]] = Map[BaseName, Base[F]]
   type BaseTables[F[_]] = Map[TblName, Tbl[F]]
   type DbScript[F[_], O] = Kleisli[F, Env[F], O]
-  type BinRecord = Array[Byte]
 
   trait Env[F[_]: Async] {
     def conf: BitcaskConf
@@ -53,29 +45,10 @@ package object algebra {
     path:   Path,
     tables: Ref[F, BaseTables[F]])
 
-  final case class TblIx[F[_]: Async](
-    name:    TblIxName,
-    path:    Path,
-    storage: MemStorage[F])
-
-  final case class SegmentIx[F[_]: Async](
-    name:    SegmentIxName,
-    path:    Path,
-    storage: MemStorage[F])
-
   final case class Tbl[F[_]: Async](
-    name:        TblName,
-    path:        Path,
-    lastSegment: Ref[F, Option[Segment[F]]],
-    ix:          Ref[F, Option[TblIx[F]]])
-
-  final case class Segment[F[_]: Async](
-    num:        SegmentNum,
-    name:       SegmentName,
-    path:       Path,
-    ix:         Ref[F, Option[SegmentIx[F]]],
-    storage:    DiskStorage[F],
-    isReadOnly: Boolean = false)
+    name:    TblName,
+    path:    Path,
+    storage: StorageManager[F])
 
   final case class State[F[_]: Async](
     registryRef:     Ref[F, BaseRegistry[F]],
@@ -83,12 +56,36 @@ package object algebra {
 
   object Tbl {
 
-    def create[F[_]: Async](base: Base[F], name: TblName): F[Tbl[F]] = {
+    def create[F[_]: Async](base: Base[F], name: TblName): DbScript[F, Tbl[F]] = {
       val path = Paths.get(f"${base.path.toAbsolutePath}/$name")
+      val config = StorageConfig(
+        folder         = path.toString,
+        maxSegmentSize = 1024, // Маленький размер для теста ротации (1КБ)
+        dataSchema = List(
+          FieldDef("recordSize", FieldType.Int32),
+          FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize"))
+        ),
+        segmentSchema = List(
+          FieldDef("keySize", FieldType.Int32),
+          FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
+          FieldDef("offset", FieldType.Int64)
+        ),
+        tableSchema = List(
+          FieldDef("keySize", FieldType.Int32),
+          FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
+          FieldDef("segmentNameSize", FieldType.Int32),
+          FieldDef("segmentName", FieldType.StringUtf8(sizeFromField = "segmentNameSize"))
+        )
+      )
       for {
-        lastSegment <- Async[F].ref(Option.empty[Segment[F]])
-        ix          <- Async[F].ref(Option.empty[TblIx[F]])
-      } yield Tbl(name, path, lastSegment, ix)
+        env <- ask[F, Env[F]]
+        storage <- DbScript.lift {
+          for {
+            writeQueue <- env.state.fileWriteBuffer.get
+            storage    <- StorageManager.initialize(config = config, writeQueue = writeQueue)
+          } yield storage
+        }
+      } yield Tbl(name, path, storage)
     }
   }
 
@@ -99,68 +96,6 @@ package object algebra {
       for {
         tables <- Async[F].ref(Map.empty[TblName, Tbl[F]])
       } yield Base(name, path, tables)
-    }
-  }
-
-  object TblIx {
-
-    private val schema = List(
-      FieldDef("keySize", FieldType.Int32),
-      FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
-      FieldDef("segmentNameSize", FieldType.Int32),
-      FieldDef("segmentName", FieldType.StringUtf8(sizeFromField = "segmentNameSize"))
-    )
-    private val keyField = "key"
-
-    def create[F[_]: Async](tbl: Tbl[F]): DbScript[F, TblIx[F]] = {
-      val name = "table.ix"
-      val path = Paths.get(f"${tbl.path.toAbsolutePath}/$name")
-      for {
-        env <- ask[F, Env[F]]
-        storage <- DbScript.lift {
-          for {
-            ix              <- Async[F].ref(Map[String, MemStorageValue]())
-            fileWriteBuffer <- env.state.fileWriteBuffer.get
-          } yield MemStorage(ix, fileWriteBuffer, schema, path.toString, keyField)
-        }
-      } yield TblIx(name, path, storage)
-    }
-  }
-
-  object Segment {
-
-    private val schema = List(
-      FieldDef("recordSize", FieldType.Int32),
-      FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize"))
-    )
-
-    def create[F[_]: Async](
-      tbl: Tbl[F],
-      num: SegmentNum = 1
-    ): F[Segment[F]] = {
-      val name = f"segment_$num.seg"
-      val path = Paths.get(f"${tbl.path.toAbsolutePath}/$name")
-      for {
-        env <- ask[F, Env[F]]
-        storage <- DbScript.lift {
-          for {
-            ix              <- Async[F].ref(Map[String, DiskStorageValue]())
-            fileWriteBuffer <- env.state.fileWriteBuffer.get
-          } yield DiskStorage(ix, fileWriteBuffer, schema, path.toString, keyField)
-        }
-      } yield Segment(num, name, path, ix, offset)
-    }
-  }
-
-  object SegmentIx {
-
-    def create[F[_]: Async](s: Segment[F]): F[SegmentIx[F]] = {
-      val name = f"segment_${s.num}.ix"
-      s.path.getFileName
-      val path = Paths.get(f"${s.path.getParent.toAbsolutePath}/$name")
-      for {
-        data <- Async[F].ref(Map.empty[Key, Offset])
-      } yield SegmentIx(name, path, data)
     }
   }
 

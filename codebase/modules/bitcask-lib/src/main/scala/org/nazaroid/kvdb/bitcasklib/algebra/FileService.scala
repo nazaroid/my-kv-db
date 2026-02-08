@@ -13,9 +13,8 @@ trait FileService[F[_]: Async: fs2.io.file.Files] {
     for {
       env             <- ask[F, Env[F]]
       fileWriteBuffer <- DbScript.lift(env.state.fileWriteBuffer.get)
-      taskStream = Stream.fromQueueUnterminated(fileWriteBuffer)
       _ <- DbScript.lift(
-        Async[F].start(BinFileIO.write(input = taskStream, env.conf.fileWriteParallelism).compile.drain)
+        Async[F].start(BinFileIO.writeAll(fileWriteBuffer.stream, env.conf.fileWriteParallelism).compile.drain)
       )
     } yield ()
 
@@ -25,26 +24,4 @@ trait FileService[F[_]: Async: fs2.io.file.Files] {
     }
   }
 
-  def createFile(path: Path): DbScript[F, Path] = {
-    DbScript.lift {
-      Async[F].blocking {
-        if (Files.notExists(path)) {
-          Files.createFile(path)
-        } else path
-      }
-    }
-  }
-
-  //TODO: добавить в очередь-кеш и читать из кеша, пока не произойдет сброс на диск
-  def appendToFile(
-    path:   Path,
-    schema: List[FieldDef],
-    row:    Row
-  ): DbScript[F, Offset] = {
-    for {
-      env             <- ask[F, Env[F]]
-      fileWriteBuffer <- DbScript.lift(env.state.fileWriteBuffer.get)
-      _               <- DbScript.lift(fileWriteBuffer.offer(WriteTask(path.toString, schema, row)))
-    } yield ()
-  }
 }
