@@ -6,6 +6,43 @@ import cats.effect.*
 import cats.implicits.given
 import fs2.io.file.Files
 
+// TODO: refact
+
+/*
+выделить сущности: Catalog, Database, Table
+
+снуружи
+for {
+  engine <- BitcaskEngine.init[IO](config)
+
+   _ <- engine.crateDbIfNotExists
+   _ <- engine.crateTableIfNotExists
+   _ <- engine.get
+   _ <- engine.set
+
+} yield ()
+
+внутри
+
+for {
+  // 1. Инициализируем корень
+  catalog <-Catalog.init[IO](Path("./my_storage"))
+
+  // 2. Выбираем базу данных
+  db <- catalog.database("prod_db")
+
+  // 3. Выбираем таблицу
+  users <- db.table("users")
+
+  // 4. Работаем с данными
+  _ <- users.write("user:100", "Alice")
+  data <- users.read("user:100")
+
+  // 5. Обслуживание (например, для всех таблиц в базе)
+  _ <- db.listTables().evalMap(name => db.table(name).flatMap(_.compact())).compile.drain
+
+} yield ()
+*/
 trait LibScenarios[F[_]: Async: Files] {
   given env: Env[F]
 
