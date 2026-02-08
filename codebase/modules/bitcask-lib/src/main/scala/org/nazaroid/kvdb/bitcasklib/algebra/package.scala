@@ -5,6 +5,7 @@ import cats.data.Kleisli.ask
 import cats.effect.{Async, Ref}
 import cats.implicits.given
 import fs2.concurrent.Channel
+import fs2.io.file.Files
 import org.nazaroid.kvdb.binfileio.*
 
 import java.nio.file.{Path, Paths}
@@ -18,7 +19,7 @@ package object algebra {
   type BaseTables[F[_]] = Map[TblName, Tbl[F]]
   type DbScript[F[_], O] = Kleisli[F, Env[F], O]
 
-  trait Env[F[_]: Async] {
+  trait Env[F[_]: Async: Files] {
     def conf: BitcaskConf
 
     def files: FileService[F]
@@ -26,7 +27,7 @@ package object algebra {
     def base: BaseService[F]
 
     def tbl: TblService[F]
-    
+
     def cache: CacheService[F]
 
     def state: State[F]
@@ -34,23 +35,23 @@ package object algebra {
 
   final case class DbCatalog()
 
-  final case class Base[F[_]: Async](
+  final case class Base[F[_]: Async: Files](
     name:   BaseName,
     path:   Path,
     tables: Ref[F, BaseTables[F]])
 
-  final case class Tbl[F[_]: Async](
+  final case class Tbl[F[_]: Async: Files](
     name:    TblName,
     path:    Path,
     storage: StorageManager[F])
 
-  final case class State[F[_]: Async](
+  final case class State[F[_]: Async: Files](
     registryRef:     Ref[F, BaseRegistry[F]],
     fileWriteBuffer: Ref[F, Channel[F, WriteTask[F]]])
 
   object Tbl {
 
-    def create[F[_]: Async](base: Base[F], name: TblName): DbScript[F, Tbl[F]] = {
+    def create[F[_]: Async: Files](base: Base[F], name: TblName): DbScript[F, Tbl[F]] = {
       val path = Paths.get(f"${base.path.toAbsolutePath}/$name")
       val config = StorageConfig(
         folder         = path.toString,
@@ -85,11 +86,13 @@ package object algebra {
 
   object Base {
 
-    def create[F[_]: Async](rootDir: String, name: BaseName): F[Base[F]] = {
+    def create[F[_]: Async: Files](rootDir: String, name: BaseName): DbScript[F, Base[F]] = {
       val path = Paths.get(f"${rootDir}/$name")
-      for {
-        tables <- Async[F].ref(Map.empty[TblName, Tbl[F]])
-      } yield Base(name, path, tables)
+      DbScript.lift {
+        for {
+          tables <- Async[F].ref(Map.empty[TblName, Tbl[F]])
+        } yield Base(name, path, tables)
+      }
     }
   }
 

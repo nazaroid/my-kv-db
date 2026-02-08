@@ -6,8 +6,6 @@ import cats.effect.*
 import cats.implicits.given
 import fs2.io.file.Files
 
-import java.nio.file.Paths
-
 trait LibScenarios[F[_]: Async: Files] {
   given env: Env[F]
 
@@ -50,7 +48,7 @@ trait LibScenarios[F[_]: Async: Files] {
         // move от bindata
 
         base <- env.base.createIfNotExists(rootDir, baseName)
-        _ <- env.tbl.createIfNotExists(base, tblName)
+        _    <- env.tbl.createIfNotExists(base, tblName)
       } yield ()
     }
   }
@@ -76,7 +74,7 @@ trait LibScenarios[F[_]: Async: Files] {
     baseName: String,
     tblName:  String,
     key:      String
-  ): F[Option[String]] = {
+  ): F[Option[Value]] = {
     DbScript.run {
       for {
         env  <- ask[F, Env[F]]

@@ -1,12 +1,12 @@
 package org.nazaroid.kvdb.bitcasklib
 
 import cats.effect.Async
-import cats.effect.std.Queue
 import cats.implicits.given
+import fs2.concurrent.Channel
 import fs2.io.file.Files
 import org.nazaroid.kvdb.binfileio.*
 import org.nazaroid.kvdb.bitcasklib.algebra.*
-import org.nazaroid.kvdb.bitcasklib.instances.*
+import org.nazaroid.kvdb.bitcasklib.instances.LibScenariosImpl
 
 object BitcaskLib {
 
@@ -15,7 +15,7 @@ object BitcaskLib {
   def createState[F[_]: Async: Files](conf: BitcaskConf): F[State[F]] =
     for {
       baseRef            <- Async[F].ref(Map.empty[BaseName, Base[F]])
-      fileWriteBuffer    <- Queue.bounded[F, WriteTask](conf.fileWriteBufferSize)
+      fileWriteBuffer    <- Channel.bounded[F, WriteTask[F]](conf.fileWriteBufferSize)
       fileWriteBufferRef <- Async[F].ref(fileWriteBuffer)
     } yield State(baseRef, fileWriteBufferRef)
 
