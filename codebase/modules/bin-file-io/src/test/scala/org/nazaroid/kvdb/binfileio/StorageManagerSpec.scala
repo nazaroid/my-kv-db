@@ -1,11 +1,12 @@
 package org.nazaroid.kvdb.binfileio
 
 import cats.effect.*
+import cats.effect.testing.scalatest.AsyncIOSpec
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
-import cats.effect.testing.scalatest.AsyncIOSpec
-import org.scalatest.matchers.should.Matchers
 import org.scalatest.freespec.AsyncFreeSpec
+import org.scalatest.matchers.should.Matchers
+
 import scala.concurrent.duration.DurationInt
 
 final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
@@ -102,5 +103,53 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
         // Должен остаться только новый компакт-сегмент и активный пустой сегмент
       } yield assert(files.exists(_.startsWith("compact_")), "Должен появиться компактный сегмент")
     }
+  }
+
+  "Recovery: данные должны быть доступны после полной перезагрузки системы" in {
+    val key = "persistent_user"
+    val value = "{\"data\": \"important\"}"
+
+    // 1. Первая сессия: пишем данные и выключаемся
+    val session1 = storageResource.use { sm =>
+      sm.write(key, value) *> IO.sleep(100.millis) // Ждем завершения записи на диск
+    }
+
+    // 2. Вторая сессия: открываем хранилище заново и читаем
+    val session2 = storageResource.use { sm =>
+      sm.read(key).map { recoveredValue =>
+        assert(recoveredValue.contains(value), "Данные должны восстановиться из индексов на диске")
+      }
+    }
+
+    session1 *> session2
+  }
+
+  "Recovery with Deletion: удаленные данные не должны появиться после перезагрузки" in {
+    val keyToKeep = "keep_me"
+    val keyToDelete = "delete_me"
+
+    val scenario = for {
+      // Шаг 1: Пишем два ключа, один удаляем
+      _ <- storageResource.use { sm =>
+        for {
+          _ <- sm.write(keyToKeep, "value1")
+          _ <- sm.write(keyToDelete, "value2")
+          _ <- sm.delete(keyToDelete)
+          _ <- IO.sleep(100.millis)
+        } yield ()
+      }
+
+      // Шаг 2: Перезагружаемся и проверяем состояние
+      _ <- storageResource.use { sm =>
+        for {
+          val1 <- sm.read(keyToKeep)
+          val2 <- sm.read(keyToDelete)
+          _    <- IO.pure(assert(val1.contains("value1")))
+          _    <- IO.pure(assert(val2.isEmpty, "Удаленный ключ не должен восстановиться"))
+        } yield ()
+      }
+    } yield ()
+
+    scenario
   }
 }
