@@ -41,14 +41,11 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
         resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
         _    <- logger.info(f"set value response: $resp")
 
-        _ <- Async[IO].sleep(100.millis)
-
         req = Request[IO](GET, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key"))
         _    <- logger.info(f"get value request: $req")
         resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
         _    <- logger.info(f"get value response: $resp")
         _    <- Async[IO].blocking(rt.shutdown())
-        _ <- Async[IO].sleep(100.millis)
       } yield {
         assert(resp == "value")
       }
