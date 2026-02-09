@@ -27,7 +27,7 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
         logger <- Slf4jLogger.create[IO]
         rt = DbRuntime()
         _ <- Async[IO].blocking(DbInstance(rt).runAsync(config))
-        _ <- Async[IO].sleep(100.millis)
+        _ <- Async[IO].sleep(1000.millis)
         req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db"))
         _    <- logger.info(f"create db request: $req")
         resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
@@ -70,7 +70,7 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
 
         rt = DbRuntime()
         _ <- Async[IO].blocking(DbInstance(rt).runAsync(config))
-        _ <- Async[IO].sleep(100.millis)
+        _ <- Async[IO].sleep(1000.millis)
 
         req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db"))
         _    <- logger.info(f"create db request: $req")
