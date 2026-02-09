@@ -3,7 +3,7 @@ package org.nazaroid.kvdb.algebra
 import cats.effect.*
 
 trait Server[F[_]] {
-  def run(stopSignal: Deferred[F, Unit]): F[Unit]
+  def run(): Resource[F, Unit]
 }
 
 trait Engine[F[_]] {

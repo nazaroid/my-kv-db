@@ -18,39 +18,35 @@ import org.nazaroid.kvdb.algebra.{Engine, Server}
 import org.nazaroid.kvdb.srv.http.middlewares.Err
 import org.typelevel.log4cats.Logger
 
-final class HttpServer[F[_]: Async: Logger: Network](serverConfig: ServerConfig, engineResource: Resource[F, Engine[F]])
+final class HttpServer[F[_]: Async: Logger: Network](conf: ServerConfig.Http, engine: Engine[F])
     extends Server[F]
     with Err[F] {
   import dsl.*
-  private val conf: ServerConfig.Http = serverConfig.asInstanceOf[ServerConfig.Http]
 
-  def run(stopSignal: Deferred[F, Unit]): F[Unit] = {
+  def run(): Resource[F, Unit] = {
     val host = Ipv4Address
       .fromString(conf.host)
       .getOrElse(throw new IllegalArgumentException(conf.host))
     val port = Port
       .fromInt(conf.port)
       .getOrElse(throw new IllegalArgumentException(conf.port.toString))
-
-    for {
-      _ <- Logger[F].info("server starting...") >> routes
-        .flatMap { r =>
-          EmberServerBuilder
-            .default[F]
-            .withHost(host)
-            .withPort(port)
-            .withHttpApp(r.orNotFound)
-            .withIdleTimeout(conf.idleTimeout)
-            .withMaxConnections(conf.maxConnections)
-            .build
-        }
-        .use(_ => stopSignal.get >> Logger[F].warn("server shutting down..."))
-    } yield ()
+    
+    routes
+      .flatMap { r =>
+        EmberServerBuilder
+          .default[F]
+          .withHost(host)
+          .withPort(port)
+          .withHttpApp(r.orNotFound)
+          .withIdleTimeout(conf.idleTimeout)
+          .withMaxConnections(conf.maxConnections)
+          .build
+      }
+      .map(_ => ())
   }
 
-  def routes: Resource[F, HttpRoutes[F]] =
+  private def routes: Resource[F, HttpRoutes[F]] =
     for {
-      engine <- engineResource
       data   <- DataController(engine)
       health <- HealthController()
     } yield Router(
