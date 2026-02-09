@@ -6,8 +6,9 @@ import cats.implicits.given
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.EngineConfig
 import org.nazaroid.kvdb.algebra.Engine
-import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType, StorageConfig}
+import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType}
 import org.nazaroid.kvdb.bitcask.catalog.*
+import org.nazaroid.kvdb.bitcask.storage.*
 
 object BitcaskEngine {
 

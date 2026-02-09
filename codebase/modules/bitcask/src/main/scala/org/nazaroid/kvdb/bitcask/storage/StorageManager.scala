@@ -1,10 +1,11 @@
-package org.nazaroid.kvdb.binfileio
+package org.nazaroid.kvdb.bitcask.storage
 
 import cats.effect.*
 import cats.syntax.all.*
 import fs2.Stream
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Flag, Flags, Path}
+import org.nazaroid.kvdb.binfileio.*
 
 enum CacheEntry {
   case Pending(row: Row)
@@ -23,13 +24,6 @@ case class StorageConfig(
   segmentSchema:  List[FieldDef],
   tableSchema:    List[FieldDef])
 
-case class WriteTask[F[_]: Async: Files](
-  id:       String,
-  filePath: String,
-  schema:   List[FieldDef],
-  row:      Row,
-  callback: Option[Deferred[F, Long]])
-
 // --- 2. Базовое хранилище (Низкоуровневый Writer) ---
 class BaseStorage[F[_]: Async: Files](
   val filePath: String,
@@ -45,7 +39,7 @@ class BaseStorage[F[_]: Async: Files](
 }
 
 // --- 3. Stratum Storage Manager ---
-class StorageManager[F[_]: Async: Files](
+sealed class StorageManager[F[_]: Async: Files](
   val currentData:       Ref[F, BaseStorage[F]],
   val currentSegmentIdx: Ref[F, BaseStorage[F]],
   val tableStorage:      BaseStorage[F],

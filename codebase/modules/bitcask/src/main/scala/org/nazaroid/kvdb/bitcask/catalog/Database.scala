@@ -5,7 +5,8 @@ import cats.implicits.given
 import fs2.Stream
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
-import org.nazaroid.kvdb.binfileio.{StorageConfig, StorageManager, WriteTask}
+import org.nazaroid.kvdb.binfileio.WriteTask
+import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
 
 final class Database[F[_]: Async: Files](
   val dbName:         String,

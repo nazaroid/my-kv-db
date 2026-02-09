@@ -21,9 +21,9 @@ def rowToBytes(row: Row, schema: List[FieldDef]): Chunk[Byte] = {
 }
 
 def decodeSingleRow[F[_]](
-  s:      Stream[F, Byte],
-  schema: List[FieldDef]
-): Pull[F, Nothing, Option[(Row, Stream[F, Byte])]] = {
+                           s:      Stream[F, Byte],
+                           schema: List[FieldDef]
+                         ): Pull[F, Nothing, Option[(Row, Stream[F, Byte])]] = {
   // 1. Сначала читаем 4 байта заголовка длины
   s.pull.unconsN(4).flatMap {
     case Some((lenChunk, restAfterLen)) =>

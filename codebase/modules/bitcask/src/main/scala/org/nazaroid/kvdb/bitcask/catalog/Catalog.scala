@@ -6,6 +6,7 @@ import cats.implicits.given
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.*
+import org.nazaroid.kvdb.bitcask.storage.*
 
 final class Catalog[F[_]: Async: Files](
   val rootPath:       Path,
