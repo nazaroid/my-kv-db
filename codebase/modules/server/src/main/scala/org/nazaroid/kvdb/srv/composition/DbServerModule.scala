@@ -17,7 +17,7 @@ final class DbServerModule[F[_]: Async: Files: Logger: Parallel: Network](common
   def resolve: F[DbServer[F]] = {
     for {
       conf     <- Async[F].pure(config.engine.bitcask)
-      libState <- BitcaskLib.createState(conf)
+      libState <- State()
       lib = BitcaskLib(conf, libState)
       engine: DbEngine[F] = new BitcaskDbEngine(conf, lib) // new StubDbEngine[F]()
     } yield {
