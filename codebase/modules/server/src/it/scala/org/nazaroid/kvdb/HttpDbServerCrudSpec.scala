@@ -24,7 +24,7 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
       for {
         logger <- Slf4jLogger.create[IO]
         rt = DbRuntime()
-        _ <- Async[IO].blocking(Db(rt).runAsync(config))
+        _ <- Async[IO].blocking(DbInstance(rt).runAsync(config))
         _ <- Async[IO].sleep(100.millis)
         req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db"))
         _    <- logger.info(f"create db request: $req")
@@ -65,7 +65,7 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
         _ <- logger.info(f"=== first db session ===")
 
         rt = DbRuntime()
-        _ <- Async[IO].blocking(Db(rt).runAsync(config))
+        _ <- Async[IO].blocking(DbInstance(rt).runAsync(config))
         _ <- Async[IO].sleep(100.millis)
 
         req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db"))
@@ -89,7 +89,7 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
         _ <- logger.info(f"=== second db session ===")
 
         rt = DbRuntime()
-        _ <- Async[IO].blocking(Db(rt).runAsync(config))
+        _ <- Async[IO].blocking(DbInstance(rt).runAsync(config))
         _ <- Async[IO].sleep(100.millis)
 
         req = Request[IO](GET, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key"))

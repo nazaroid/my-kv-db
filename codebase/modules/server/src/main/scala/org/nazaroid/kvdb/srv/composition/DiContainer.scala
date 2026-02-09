@@ -3,28 +3,17 @@ package org.nazaroid.kvdb.srv.composition
 import cats.Parallel
 import cats.data.Kleisli
 import cats.effect.Async
-import cats.effect.kernel.Ref
 import cats.effect.std.Dispatcher
 import cats.implicits.*
 import fs2.io.file.Files
 import fs2.io.net.Network
-import org.nazaroid.kvdb.DbConf
-import org.nazaroid.kvdb.algebra.DbServer
-import org.nazaroid.kvdb.srv.DbSrvState
+import org.nazaroid.kvdb.algebra.Server
+import org.nazaroid.kvdb.DbInstanceConfig
 import org.typelevel.log4cats.Logger
 
 class DiContainer[F[_]: Async: Files: Logger: Parallel: Network] {
 
-  private val state =
-    DbSrvState(
-      Ref.unsafe("")
-    )
-
-  def resolveDbServer(
-    conf: DbConf
-  )(implicit
-    d: Dispatcher[F]
-  ): F[DbServer[F]] = {
+  def resolveDbServer(conf: DbInstanceConfig)(implicit d: Dispatcher[F]): F[Server[F]] = {
     commonModuleK >>> {
       for {
         dbServer <- dbServerK
@@ -32,22 +21,14 @@ class DiContainer[F[_]: Async: Files: Logger: Parallel: Network] {
     }
   }.run(conf)
 
-  private def dbServerK(
-    implicit
-    d: Dispatcher[F]
-  ): Kleisli[F, CommonModule[F], DbServer[F]] =
+  private def dbServerK(implicit d: Dispatcher[F]): Kleisli[F, CommonModule[F], Server[F]] =
     Kleisli { commonModule =>
-      new DbServerModule(commonModule).resolve
+      new ServerModule(commonModule).resolve
     }
 
   private def commonModuleK(
     implicit
     d: Dispatcher[F]
-  ): Kleisli[F, DbConf, CommonModule[F]] =
-    Kleisli { (conf: DbConf) =>
-      {
-        new CommonModule(conf, state, d).pure[F]
-      }
-
-    }
+  ): Kleisli[F, DbInstanceConfig, CommonModule[F]] =
+    Kleisli { (conf: DbInstanceConfig) => { new CommonModule(conf, d).pure[F] } }
 }

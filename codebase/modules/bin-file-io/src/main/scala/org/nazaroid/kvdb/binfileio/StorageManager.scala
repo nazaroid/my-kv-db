@@ -16,7 +16,6 @@ enum CacheEntry {
   case Deleted
 }
 
-
 case class StorageConfig(
   folder:         String,
   maxSegmentSize: Long,

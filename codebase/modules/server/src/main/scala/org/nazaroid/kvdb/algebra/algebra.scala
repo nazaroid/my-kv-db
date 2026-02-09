@@ -2,11 +2,11 @@ package org.nazaroid.kvdb.algebra
 
 import cats.effect.*
 
-trait DbServer[F[_]] {
+trait Server[F[_]] {
   def run(stopSignal: Deferred[F, Unit]): F[Unit]
 }
 
-trait DbEngine[F[_]] {
+trait Engine[F[_]] {
 
   def createDbIfNotExists(name: String): F[Unit]
 

@@ -13,17 +13,18 @@ import org.http4s.ember.server.*
 import org.http4s.metrics.prometheus.Prometheus
 import org.http4s.server.*
 import org.http4s.server.middleware.Metrics
-import org.nazaroid.kvdb.HttpSrvConf
-import org.nazaroid.kvdb.algebra.{DbEngine, DbServer}
+import org.nazaroid.kvdb.ServerConfig
+import org.nazaroid.kvdb.algebra.{Engine, Server}
 import org.nazaroid.kvdb.srv.http.middlewares.Err
 import org.typelevel.log4cats.Logger
 
-final class HttpDbServer[F[_]: Async: Logger: Network](conf: HttpSrvConf, engineResource: Resource[F, DbEngine[F]])
-    extends DbServer[F]
+final class HttpServer[F[_]: Async: Logger: Network](serverConfig: ServerConfig, engineResource: Resource[F, Engine[F]])
+    extends Server[F]
     with Err[F] {
   import dsl.*
+  private val conf: ServerConfig.Http = serverConfig.asInstanceOf[ServerConfig.Http]
 
-  override def run(stopSignal: Deferred[F, Unit]): F[Unit] = {
+  def run(stopSignal: Deferred[F, Unit]): F[Unit] = {
     val host = Ipv4Address
       .fromString(conf.host)
       .getOrElse(throw new IllegalArgumentException(conf.host))
@@ -47,7 +48,7 @@ final class HttpDbServer[F[_]: Async: Logger: Network](conf: HttpSrvConf, engine
     } yield ()
   }
 
-  private def routes: Resource[F, HttpRoutes[F]] =
+  def routes: Resource[F, HttpRoutes[F]] =
     for {
       engine <- engineResource
       data   <- DataController(engine)
@@ -62,7 +63,7 @@ final class HttpDbServer[F[_]: Async: Logger: Network](conf: HttpSrvConf, engine
 
   private object DataController {
 
-    def apply(engine: DbEngine[F]): Resource[F, HttpRoutes[F]] = {
+    def apply(engine: Engine[F]): Resource[F, HttpRoutes[F]] = {
       val dataService: HttpRoutes[F] = HttpRoutes.of[F] {
         // get value
         case GET -> Root / dbName / tblName / key =>

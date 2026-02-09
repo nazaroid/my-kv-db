@@ -6,7 +6,7 @@ import pureconfig.generic.derivation.default.*
 final case class AppConfig(
   metricsPort:    Int = 9091,
   metricsEnabled: Boolean = true,
-  dbConf:         DbConf = DbConf())
+  dbConf:         DbInstanceConfig = DbInstanceConfig())
     derives ConfigReader {}
 
 object AppConfig {

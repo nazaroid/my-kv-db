@@ -4,19 +4,14 @@ import cats.effect.Async
 import cats.effect.kernel.Resource
 import cats.implicits.given
 import fs2.io.file.{Files, Path}
-import org.nazaroid.kvdb.algebra.DbEngine
+import org.nazaroid.kvdb.EngineConfig
+import org.nazaroid.kvdb.algebra.Engine
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType, StorageConfig}
 import org.nazaroid.kvdb.bitcask.catalog.*
 
-object BitcaskDbEngine {
+object BitcaskEngine {
 
-  final case class Conf(
-    rootDir:              String = "kvdb",
-    fileWriteParallelism: Int = 10,
-    fileWriteBufferSize:  Int = 10000,
-    maxSegmentSize:       Int = 1024 * 10)
-
-  def init[F[_]: Async: Files](conf: BitcaskDbEngine.Conf): Resource[F, BitcaskDbEngine[F]] = {
+  def init[F[_]: Async: Files](conf: EngineConfig): Resource[F, Engine[F]] = {
     val storageConfig = StorageConfig(
       folder         = conf.rootDir,
       maxSegmentSize = conf.maxSegmentSize, // Маленький размер для теста ротации (1КБ)
@@ -38,26 +33,26 @@ object BitcaskDbEngine {
     )
     for {
       c <- Catalog.init(Path("./my_storage"), storageConfig, conf.fileWriteBufferSize, conf.fileWriteParallelism)
-    } yield BitcaskDbEngine(c)
+    } yield BitcaskEngine(c)
   }
 }
 
-final class BitcaskDbEngine[F[_]: Async](c: Catalog[F]) extends DbEngine[F] {
+final class BitcaskEngine[F[_]: Async](c: Catalog[F]) extends Engine[F] {
 
-  override def createDbIfNotExists(name: String): F[Unit] = {
+  def createDbIfNotExists(name: String): F[Unit] = {
     for {
       _ <- c.database(name)
     } yield ()
   }
 
-  override def createTableIfNotExists(baseName: String, tblName: String): F[Unit] = {
+  def createTableIfNotExists(baseName: String, tblName: String): F[Unit] = {
     for {
       db <- c.database(baseName)
       _  <- db.table(tblName)
     } yield ()
   }
 
-  override def get(
+  def get(
     baseName: String,
     tblName:  String,
     key:      String
@@ -69,7 +64,7 @@ final class BitcaskDbEngine[F[_]: Async](c: Catalog[F]) extends DbEngine[F] {
     } yield vOpt
   }
 
-  override def set(
+  def set(
     baseName: String,
     tblName:  String,
     key:      String,
@@ -81,5 +76,4 @@ final class BitcaskDbEngine[F[_]: Async](c: Catalog[F]) extends DbEngine[F] {
       _   <- tbl.write(key, value)
     } yield ()
   }
-
 }

@@ -9,13 +9,13 @@ import org.nazaroid.kvdb.srv.composition.DiContainer
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-final class Db(val rt: DbRuntime = new DbRuntime()) {
+final class DbInstance(val rt: DbRuntime = new DbRuntime()) {
 
-  def runSync(conf: DbConf): Unit = start(conf).unsafeRunSync()(rt.io)
+  def runSync(conf: DbInstanceConfig): Unit = start(conf).unsafeRunSync()(rt.io)
 
-  def runAsync(conf: DbConf): Unit = start(conf).unsafeRunAndForget()(rt.io)
+  def runAsync(conf: DbInstanceConfig): Unit = start(conf).unsafeRunAndForget()(rt.io)
 
-  private def start(conf: DbConf): IO[Unit] = {
+  private def start(conf: DbInstanceConfig): IO[Unit] = {
     implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
     val di = new DiContainer[IO]
