@@ -1,6 +1,6 @@
 package org.nazaroid.kvdb
 
-import org.nazaroid.kvdb.bitcasklib.BitcaskConf
+import org.nazaroid.kvdb.engine.bitcask.BitcaskDbEngine
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
@@ -13,7 +13,8 @@ final case class DbSrvConf(
   http: HttpSrvConf = HttpSrvConf())
 
 final case class DbEngineConf(
-  bitcask: BitcaskConf = BitcaskConf())
+  bitcask: BitcaskDbEngine.Conf = BitcaskDbEngine.Conf()
+)
 
 final case class HttpSrvConf(
   host:           String = "127.0.0.1",

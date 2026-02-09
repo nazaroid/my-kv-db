@@ -18,7 +18,7 @@ import org.nazaroid.kvdb.algebra.{DbEngine, DbServer}
 import org.nazaroid.kvdb.srv.http.middlewares.Err
 import org.typelevel.log4cats.Logger
 
-final class HttpDbServer[F[_]: Async: Logger: Network](conf: HttpSrvConf, engine: DbEngine[F])
+final class HttpDbServer[F[_]: Async: Logger: Network](conf: HttpSrvConf, engineResource: Resource[F, DbEngine[F]])
     extends DbServer[F]
     with Err[F] {
   import dsl.*
@@ -32,7 +32,6 @@ final class HttpDbServer[F[_]: Async: Logger: Network](conf: HttpSrvConf, engine
       .getOrElse(throw new IllegalArgumentException(conf.port.toString))
 
     for {
-      _ <- engine.init()
       _ <- Logger[F].info("server starting...") >> routes
         .flatMap { r =>
           EmberServerBuilder
@@ -50,6 +49,7 @@ final class HttpDbServer[F[_]: Async: Logger: Network](conf: HttpSrvConf, engine
 
   private def routes: Resource[F, HttpRoutes[F]] =
     for {
+      engine <- engineResource
       data   <- DataController(engine)
       health <- HealthController()
     } yield Router(

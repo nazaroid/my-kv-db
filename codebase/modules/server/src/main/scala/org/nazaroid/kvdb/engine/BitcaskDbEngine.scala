@@ -1,7 +1,7 @@
-package org.nazaroid.kvdb.engine.bitcask
+package org.nazaroid.kvdb.engine
 
-import cats.effect.implicits.given
-import cats.effect.{Async, Ref}
+import cats.effect.Async
+import cats.effect.kernel.Resource
 import cats.implicits.given
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.algebra.DbEngine
@@ -9,19 +9,14 @@ import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType, StorageConfig}
 import org.nazaroid.kvdb.bitcask.catalog.*
 
 object BitcaskDbEngine {
-  final case class State[F[_]: Async: Files](catalog: Ref[F, Catalog[F]])
 
   final case class Conf(
     rootDir:              String = "kvdb",
     fileWriteParallelism: Int = 10,
     fileWriteBufferSize:  Int = 10000,
     maxSegmentSize:       Int = 1024 * 10)
-}
 
-final class BitcaskDbEngine[F[_]: Async](conf: BitcaskDbEngine.Conf, state: BitcaskDbEngine.State[F])
-    extends DbEngine[F] {
-
-  override def init(): F[Unit] = {
+  def init[F[_]: Async: Files](conf: BitcaskDbEngine.Conf): Resource[F, BitcaskDbEngine[F]] = {
     val storageConfig = StorageConfig(
       folder         = conf.rootDir,
       maxSegmentSize = conf.maxSegmentSize, // Маленький размер для теста ротации (1КБ)
@@ -41,21 +36,22 @@ final class BitcaskDbEngine[F[_]: Async](conf: BitcaskDbEngine.Conf, state: Bitc
         FieldDef("segmentName", FieldType.StringUtf8(sizeFromField = "segmentNameSize"))
       )
     )
-    Catalog.init[F](Path("./my_storage"), storageConfig, conf.fileWriteBufferSize, conf.fileWriteParallelism).use {
-      state.catalog.set
-    }
+    for {
+      c <- Catalog.init(Path("./my_storage"), storageConfig, conf.fileWriteBufferSize, conf.fileWriteParallelism)
+    } yield BitcaskDbEngine(c)
   }
+}
+
+final class BitcaskDbEngine[F[_]: Async](c: Catalog[F]) extends DbEngine[F] {
 
   override def createDbIfNotExists(name: String): F[Unit] = {
     for {
-      c <- state.catalog.get
       _ <- c.database(name)
     } yield ()
   }
 
   override def createTableIfNotExists(baseName: String, tblName: String): F[Unit] = {
     for {
-      c  <- state.catalog.get
       db <- c.database(baseName)
       _  <- db.table(tblName)
     } yield ()
@@ -67,7 +63,6 @@ final class BitcaskDbEngine[F[_]: Async](conf: BitcaskDbEngine.Conf, state: Bitc
     key:      String
   ): F[Option[String]] = {
     for {
-      c    <- state.catalog.get
       db   <- c.database(baseName)
       tbl  <- db.table(tblName)
       vOpt <- tbl.read(key)
@@ -81,7 +76,6 @@ final class BitcaskDbEngine[F[_]: Async](conf: BitcaskDbEngine.Conf, state: Bitc
     value:    String
   ): F[Unit] = {
     for {
-      c   <- state.catalog.get
       db  <- c.database(baseName)
       tbl <- db.table(tblName)
       _   <- tbl.write(key, value)
