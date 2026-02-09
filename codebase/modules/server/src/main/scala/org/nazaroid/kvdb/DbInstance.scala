@@ -16,26 +16,6 @@ final class DbInstance(val rt: DbRuntime = new DbRuntime()) {
 
   def runAsync(conf: DbInstanceConfig): Unit = start(conf).unsafeRunAndForget()(rt.io)
 
-  // TODO: возвращать ресурс из resolveDbServer
-//  private def start(conf: DbInstanceConfig): IO[Unit] = {
-//    implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
-//
-//    val di = new DiContainer[IO]
-//    Dispatcher.parallel[IO] use { implicit d: Dispatcher[IO] =>
-//      di
-//        .resolveServer(conf)
-//        .flatMap { srv =>
-//          for {
-//            stopSignal <- Deferred[IO, Unit]
-//            _ = rt
-//              .stopRef
-//              .set(() => stopSignal.complete(()).map(_ => ()).unsafeRunSync()(rt.io))
-//            _ <- srv.run(stopSignal)
-//          } yield ()
-//        }
-//    }
-//  }
-
   private def start(conf: DbInstanceConfig): IO[Unit] = {
     implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
