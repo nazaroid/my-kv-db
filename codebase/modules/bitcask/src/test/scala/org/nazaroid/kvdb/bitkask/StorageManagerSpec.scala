@@ -4,21 +4,34 @@ import cats.effect.*
 import cats.effect.testing.scalatest.AsyncIOSpec
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
+import org.nazaroid.kvdb.*
+import org.nazaroid.kvdb.binfileio.*
+import org.nazaroid.kvdb.bitcask.storage.*
+import org.scalatest.FutureOutcome
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
-import org.nazaroid.kvdb.bitcask.storage.*
-import org.nazaroid.kvdb.binfileio.*
-import org.nazaroid.kvdb.*
 
+import java.nio.file.Paths
 import scala.concurrent.duration.DurationInt
+import scala.reflect.io.Directory
 
 final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
-  // Вспомогательная настройка для каждого теста
-  private val testFolder = "./test_data"
+  private val testDir = Paths.get("./testFolder")
+
+  override def withFixture(test: NoArgAsyncTest): FutureOutcome = {
+    java.nio.file.Files.createDirectories(testDir)
+    val outcome = super.withFixture(test)
+    outcome.onCompletedThen { _ =>
+      val dir = new Directory(testDir.toFile)
+      if (dir.exists) {
+        dir.deleteRecursively()
+      }
+    }
+  }
 
   private val config = StorageConfig(
-    folder         = testFolder,
+    folder         = testDir.toString,
     maxSegmentSize = 1024, // Маленький размер для теста ротации (1КБ)
     dataSchema = List(
       FieldDef("recordSize", FieldType.Int32),
@@ -39,7 +52,7 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
 
   // Ресурс для запуска менеджера в тестах
   private val storageResource: Resource[IO, StorageManager[IO]] = for {
-    _     <- Resource.eval(Files[IO].createDirectories(Path(testFolder)).handleError(_ => ()))
+    _     <- Resource.eval(Files[IO].createDirectories(Path(testDir.toString)).handleError(_ => ()))
     queue <- Channel.bounded[IO, WriteTask[IO]](100).toResource
     // Запускаем воркер записи в фоне
     _       <- writeBinary(queue.stream, parallelism = 1).compile.drain.background
@@ -102,7 +115,7 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
         _   <- IO.blocking(assert(res.contains("keep me")))
 
         // Проверяем физическое наличие файлов через Files.list
-        files <- Files[IO].list(Path(testFolder)).map(_.fileName.toString).compile.toList
+        files <- Files[IO].list(Path(testDir.toString)).map(_.fileName.toString).compile.toList
         // Должен остаться только новый компакт-сегмент и активный пустой сегмент
       } yield assert(files.exists(_.startsWith("compact_")), "Должен появиться компактный сегмент")
     }

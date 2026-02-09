@@ -7,14 +7,30 @@ import org.http4s.Method.{GET, POST}
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.{EntityDecoder, Request, Uri}
 import org.nazaroid.kvdb.srv.DbRuntime
+import org.scalatest.FutureOutcome
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
+import java.nio.file.Paths
 import scala.concurrent.duration.DurationInt
+import scala.reflect.io.Directory
 
 // noinspection ScalaUnusedSymbol
 final class HttpDbServerCrudSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
+
+  private val testDir = Paths.get("./testFolder")
+
+  override def withFixture(test: NoArgAsyncTest): FutureOutcome = {
+    java.nio.file.Files.createDirectories(testDir)
+    val outcome = super.withFixture(test)
+    outcome.onCompletedThen { _ =>
+      val dir = new Directory(testDir.toFile)
+      if (dir.exists) {
+        dir.deleteRecursively()
+      }
+    }
+  }
 
   "should `set` and `get` the same value" in {
     val responseDecoder: EntityDecoder[IO, String] = EntityDecoder.text

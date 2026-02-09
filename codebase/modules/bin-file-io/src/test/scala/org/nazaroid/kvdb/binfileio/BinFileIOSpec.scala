@@ -3,15 +3,31 @@ package org.nazaroid.kvdb.binfileio
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.effect.{Async, IO}
 import fs2.Stream
+import org.scalatest.FutureOutcome
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
 
+import java.nio.file.{Files, Paths}
 import scala.concurrent.duration.DurationInt
+import scala.reflect.io.Directory
 
 final class BinFileIOSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
+  private val testDir = Paths.get("./testFolder")
+
+  override def withFixture(test: NoArgAsyncTest): FutureOutcome = {
+    Files.createDirectories(testDir)
+    val outcome = super.withFixture(test)
+    outcome.onCompletedThen { _ =>
+      val dir = new Directory(testDir.toFile)
+      if (dir.exists) {
+        dir.deleteRecursively()
+      }
+    }
+  }
+
   "should write and read same data" in {
-    val path = "./segment_1.ix"
+    val path = f"$testDir/segment_1.ix"
     val schema = List(
       FieldDef("keySize", FieldType.Int32),
       FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),

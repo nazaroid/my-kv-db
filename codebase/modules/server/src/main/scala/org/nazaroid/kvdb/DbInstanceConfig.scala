@@ -15,7 +15,7 @@ enum ServerConfig:
     port: Int)
 
 final case class EngineConfig(
-  rootDir:              String = "./kvdb",
+  rootDir:              String = "./testFolder",
   fileWriteParallelism: Int = 10,
   fileWriteBufferSize:  Int = 10000,
   maxSegmentSize:       Long = 1024 * 10 // Используем Long для байтов

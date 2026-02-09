@@ -33,7 +33,7 @@ object BitcaskEngine {
       )
     )
     for {
-      c <- Catalog.init(Path("./my_storage"), storageConfig, conf.fileWriteBufferSize, conf.fileWriteParallelism)
+      c <- Catalog.init(Path(conf.rootDir), storageConfig, conf.fileWriteBufferSize, conf.fileWriteParallelism)
     } yield BitcaskEngine(c)
   }
 }
