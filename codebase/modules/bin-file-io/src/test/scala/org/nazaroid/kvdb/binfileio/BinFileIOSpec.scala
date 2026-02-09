@@ -1,15 +1,16 @@
 package org.nazaroid.kvdb.binfileio
 
-import cats.effect.unsafe.implicits.global
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.effect.{Async, IO}
 import fs2.Stream
-import org.scalatest.flatspec.AnyFlatSpecLike
+import org.scalatest.freespec.AsyncFreeSpec
+import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.duration.DurationInt
 
-final class BinFileIOSpec extends AnyFlatSpecLike {
+final class BinFileIOSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
-  it should "write and read same data" in {
+  "should write and read same data" in {
     val path = "./segment_1.ix"
     val schema = List(
       FieldDef("keySize", FieldType.Int32),
@@ -23,11 +24,11 @@ final class BinFileIOSpec extends AnyFlatSpecLike {
 
     val inputWriteTasks = writtenRows.map(r => WriteTask[IO]("key", path, schema = schema, row = r, None))
 
-    (for {
+    for {
       _        <- BinFileIO.writeAll[IO](Stream.emits(inputWriteTasks), 2).compile.drain
       _        <- Async[IO].sleep(100 millis)
       readRows <- BinFileIO.readAll[IO](path, schema).map(_._2).compile.toList
 
-    } yield assert(writtenRows == readRows)).unsafeRunSync()
+    } yield assert(writtenRows == readRows)
   }
 }

@@ -2,20 +2,21 @@ package org.nazaroid.kvdb
 
 import cats.effect.IO
 import cats.effect.kernel.Async
-import cats.effect.unsafe.IORuntime
+import cats.effect.testing.scalatest.AsyncIOSpec
 import org.http4s.Method.{GET, POST}
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.{EntityDecoder, Request, Uri}
 import org.nazaroid.kvdb.srv.DbRuntime
-import org.scalatest.flatspec.AnyFlatSpecLike
+import org.scalatest.freespec.AsyncFreeSpec
+import org.scalatest.matchers.should.Matchers
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import scala.concurrent.duration.DurationInt
 
 // noinspection ScalaUnusedSymbol
-final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
+final class HttpDbServerCrudSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
-  it should "`set` and `get` the same value" in {
+  "should `set` and `get` the same value" in {
     val responseDecoder: EntityDecoder[IO, String] = EntityDecoder.text
 
     val config = DbInstanceConfig()
@@ -48,15 +49,14 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
         resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
         _    <- logger.info(f"get value response: $resp")
         _    <- Async[IO].blocking(rt.shutdown())
-        _ <- Async[IO].sleep(100.millis)
+        _    <- Async[IO].sleep(100.millis)
       } yield {
         assert(resp == "value")
       }
-
-    }.unsafeRunSync()(IORuntime.builder().build())
+    }
   }
 
-  it should "can `get` value after db runtime restart" in {
+  "can `get` value after db runtime restart" in {
     val responseDecoder: EntityDecoder[IO, String] = EntityDecoder.text
 
     val config = DbInstanceConfig()
@@ -105,7 +105,7 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
         assert(resp == "value")
       }
 
-    }.unsafeRunSync()(IORuntime.builder().build())
+    }
   }
 
 }
