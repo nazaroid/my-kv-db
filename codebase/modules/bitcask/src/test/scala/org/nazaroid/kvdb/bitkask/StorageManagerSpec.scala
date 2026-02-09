@@ -1,4 +1,4 @@
-package org.nazaroid.kvdb.binfileio
+package org.nazaroid.kvdb.bitkask
 
 import cats.effect.*
 import cats.effect.testing.scalatest.AsyncIOSpec
@@ -6,6 +6,9 @@ import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
+import org.nazaroid.kvdb.bitcask.storage.*
+import org.nazaroid.kvdb.binfileio.*
+import org.nazaroid.kvdb.*
 
 import scala.concurrent.duration.DurationInt
 
