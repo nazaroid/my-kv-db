@@ -15,6 +15,7 @@ final class DbInstance(val rt: DbRuntime = new DbRuntime()) {
 
   def runAsync(conf: DbInstanceConfig): Unit = start(conf).unsafeRunAndForget()(rt.io)
 
+  // TODO: возвращать ресурс из resolveDbServer
   private def start(conf: DbInstanceConfig): IO[Unit] = {
     implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
