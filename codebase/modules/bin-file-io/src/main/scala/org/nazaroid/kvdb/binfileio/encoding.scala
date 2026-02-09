@@ -1,11 +1,11 @@
 package org.nazaroid.kvdb.binfileio
 
-import fs2.{Chunk, Pull, Stream}
+import fs2.Chunk
 import scodec.bits.ByteVector
 
 import java.nio.charset.StandardCharsets
 
-def rowToBytes(row: Row, schema: List[FieldDef]): Chunk[Byte] = {
+def encode(row: Row, schema: List[FieldDef]): Chunk[Byte] = {
   val dataBytes = schema.foldLeft(ByteVector.empty) { (acc, field) =>
     val value = row.getOrElse(field.name, throw new Exception(s"Field ${field.name} missing"))
     val fieldBytes = field.fType match {
@@ -20,28 +20,8 @@ def rowToBytes(row: Row, schema: List[FieldDef]): Chunk[Byte] = {
   Chunk.byteVector(sizeHeader ++ dataBytes)
 }
 
-def decodeSingleRow[F[_]](
-                           s:      Stream[F, Byte],
-                           schema: List[FieldDef]
-                         ): Pull[F, Nothing, Option[(Row, Stream[F, Byte])]] = {
-  // 1. Сначала читаем 4 байта заголовка длины
-  s.pull.unconsN(4).flatMap {
-    case Some((lenChunk, restAfterLen)) =>
-      val rowSize = lenChunk.toByteVector.toInt()
-
-      // 2. Читаем ровно столько байт, сколько указано в заголовке
-      restAfterLen.pull.unconsN(rowSize).flatMap {
-        case Some((dataChunk, nextStream)) =>
-          val row = parseFromChunk(dataChunk, schema)
-          Pull.pure(Some((row, nextStream)))
-        case None => Pull.pure(None)
-      }
-    case None => Pull.pure(None)
-  }
-}
-
 // Вспомогательный метод парсинга уже вычитанного куска
-private def parseFromChunk(chunk: Chunk[Byte], schema: List[FieldDef]): Row = {
+def decode(chunk: Chunk[Byte], schema: List[FieldDef]): Row = {
   val bv = chunk.toByteVector
   schema
     .foldLeft((Map.empty[String, Any], 0L)) { case ((acc, offset), field) =>

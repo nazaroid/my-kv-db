@@ -24,7 +24,7 @@ def readRowAt[F[_]: Async: Files](
         .to(Chunk)
         .map { dataChunk =>
           if (dataChunk.size < rowSize) None
-          else Some(parseFromChunk(dataChunk, schema))
+          else Some(decode(dataChunk, schema))
         }
     }
   }

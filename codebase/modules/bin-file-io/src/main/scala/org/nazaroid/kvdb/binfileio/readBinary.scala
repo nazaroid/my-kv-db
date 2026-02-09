@@ -18,7 +18,7 @@ def readBinary[F[_]: Async: Files](
         // 2. Считываем само тело записи
         restAfterLen.pull.unconsN(rowSize).flatMap {
           case Some((dataChunk, nextStream)) =>
-            val row = parseFromChunk(dataChunk, schema)
+            val row = decode(dataChunk, schema)
             // Выдаем текущий offset (начало 4-байтового заголовка) и данные
             Pull.output1((currentOffset, row)) >>
               loop(nextStream, currentOffset + 4 + rowSize)

@@ -46,7 +46,7 @@ def writeBinary[F[_]: Async: Files](
                         newChan
                           .stream
                           .evalMapAccumulate(initialSize) { (currentOffset, t) =>
-                            val bytes = rowToBytes(t.row, t.schema)
+                            val bytes = encode(t.row, t.schema)
                             val nextOffset = currentOffset + bytes.size
 
                             // Записываем конкретную строку
