@@ -1,4 +1,4 @@
-package org.nazaroid.kvdb.bitkask
+package org.nazaroid.kvdb.bitcask
 
 import cats.effect.*
 import cats.effect.testing.scalatest.AsyncIOSpec
