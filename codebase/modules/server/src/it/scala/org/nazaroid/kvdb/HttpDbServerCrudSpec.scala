@@ -18,8 +18,10 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
   it should "`set` and `get` the same value" in {
     val responseDecoder: EntityDecoder[IO, String] = EntityDecoder.text
 
-    val config = DbConf()
-    import config.server.http.*
+    val config = DbInstanceConfig()
+    val httpConf = config.server.asInstanceOf[ServerConfig.Http]
+    import httpConf.*
+
     {
       for {
         logger <- Slf4jLogger.create[IO]
@@ -56,8 +58,10 @@ final class HttpDbServerCrudSpec extends AnyFlatSpecLike {
   it should "can `get` value after db runtime restart" in {
     val responseDecoder: EntityDecoder[IO, String] = EntityDecoder.text
 
-    val config = DbConf()
-    import config.server.http.*
+    val config = DbInstanceConfig()
+    val httpConf = config.server.asInstanceOf[ServerConfig.Http]
+    import httpConf.*
+
     {
       for {
         logger <- Slf4jLogger.create[IO]
