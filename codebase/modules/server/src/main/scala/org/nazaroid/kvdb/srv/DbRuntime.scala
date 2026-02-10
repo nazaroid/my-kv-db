@@ -7,12 +7,12 @@ import java.util.concurrent.atomic.AtomicReference
 
 final class DbRuntime(
   val io:      IORuntime = IORuntime.builder().build(),
-  val stopRef: AtomicReference[() => Unit] = new AtomicReference[() => Unit](() => ())) {
+  val stopActionRef: AtomicReference[() => Unit] = new AtomicReference[() => Unit](() => ())) {
 
   def shutdown(): Unit = {
     {
       CollectorRegistry.defaultRegistry.clear()
-      stopRef.get().apply()
+      stopActionRef.get().apply()
       io.shutdown()
     }
   }

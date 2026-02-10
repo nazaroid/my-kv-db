@@ -24,7 +24,7 @@ final class DbInstance(val rt: DbRuntime = new DbRuntime()) {
       for {
         stopSignal <- Deferred[IO, Unit]
         _ = rt
-          .stopRef
+          .stopActionRef
           .set(() => stopSignal.complete(()).map(_ => ()).unsafeRunSync()(rt.io))
         _          <- Logger[IO].info("server starting...")
         runningSrv <- di.resolveServer(conf).map(_.flatMap(_.run()))
