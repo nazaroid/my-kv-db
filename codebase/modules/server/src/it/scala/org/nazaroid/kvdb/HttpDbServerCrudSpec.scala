@@ -73,7 +73,7 @@ final class HttpDbServerCrudSpec extends AsyncFreeSpec with AsyncIOSpec with Mat
     Dispatcher.parallel[IO] use { implicit d =>
       for {
         logger <- Slf4jLogger.create[IO]
-        _ <- logger.info(f"=== first db session ===")
+        _      <- logger.info(f"=== first db session ===")
         _ <- DbInstance[IO]().resource(config).use { handle =>
           for {
             req  <- Async[IO].blocking(Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db")))
