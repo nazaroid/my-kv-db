@@ -17,8 +17,6 @@ import scala.reflect.io.Directory
 
 final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
-  private val testDir = Paths.get("./testFolder")
-
   override def withFixture(test: NoArgAsyncTest): FutureOutcome = {
     java.nio.file.Files.createDirectories(testDir)
     val outcome = super.withFixture(test)
@@ -29,6 +27,8 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
       }
     }
   }
+  
+  private val testDir = Paths.get("./testFolder")
 
   private val config = StorageConfig(
     folder         = testDir.toString,

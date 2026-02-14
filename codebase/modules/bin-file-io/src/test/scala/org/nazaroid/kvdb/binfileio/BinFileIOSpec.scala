@@ -13,8 +13,6 @@ import scala.reflect.io.Directory
 
 final class BinFileIOSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
-  private val testDir = Paths.get("./testFolder")
-
   override def withFixture(test: NoArgAsyncTest): FutureOutcome = {
     Files.createDirectories(testDir)
     val outcome = super.withFixture(test)
@@ -25,6 +23,8 @@ final class BinFileIOSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
       }
     }
   }
+
+  private val testDir = Paths.get("./testFolder")
 
   "should write and read same data" in {
     val path = f"$testDir/segment_1.ix"
