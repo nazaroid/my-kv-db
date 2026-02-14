@@ -2,11 +2,11 @@ package org.nazaroid.kvdb
 
 import cats.effect.IO
 import cats.effect.kernel.Async
+import cats.effect.std.Dispatcher
 import cats.effect.testing.scalatest.AsyncIOSpec
 import org.http4s.Method.{GET, POST}
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.{EntityDecoder, Request, Uri}
-import org.nazaroid.kvdb.srv.DbRuntime
 import org.scalatest.FutureOutcome
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -19,8 +19,6 @@ import scala.reflect.io.Directory
 // noinspection ScalaUnusedSymbol
 final class HttpDbServerCrudSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
-  private val testDir = Paths.get("./testFolder")
-
   override def withFixture(test: NoArgAsyncTest): FutureOutcome = {
     java.nio.file.Files.createDirectories(testDir)
     val outcome = super.withFixture(test)
@@ -32,96 +30,84 @@ final class HttpDbServerCrudSpec extends AsyncFreeSpec with AsyncIOSpec with Mat
     }
   }
 
+  private val testDir  = Paths.get("./testFolder")
+  private val config   = DbInstanceConfig()
+  private val httpConf = config.server.asInstanceOf[ServerConfig.Http]
+  import httpConf.*
+  private val responseDecoder: EntityDecoder[IO, String] = EntityDecoder.text
+
   "should `set` and `get` the same value" in {
-    val responseDecoder: EntityDecoder[IO, String] = EntityDecoder.text
-
-    val config = DbInstanceConfig()
-    val httpConf = config.server.asInstanceOf[ServerConfig.Http]
-    import httpConf.*
-
-    {
+    Dispatcher.parallel[IO] use { implicit d =>
       for {
         logger <- Slf4jLogger.create[IO]
-        rt = DbRuntime()
-        _ <- Async[IO].blocking(DbInstance(rt).runAsync(config))
-        _ <- Async[IO].sleep(100.millis)
-        req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db"))
-        _    <- logger.info(f"create db request: $req")
-        resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
-        _    <- logger.info(f"create db response: $resp")
 
-        req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl"))
-        _    <- logger.info(f"create tbl request: $req")
-        resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
-        _    <- logger.info(f"create tbl response: $resp")
+        _ <- DbInstance[IO]().resource(config).use { handle =>
+          for {
+            req  <- Async[IO].blocking(Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db")))
+            _    <- logger.info(f"create db request: $req")
+            resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
+            _    <- logger.info(f"create db response: $resp")
 
-        req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key")).withEntity("value")
-        _    <- logger.info(f"set value request: $req")
-        resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
-        _    <- logger.info(f"set value response: $resp")
+            req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl"))
+            _    <- logger.info(f"create tbl request: $req")
+            resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
+            _    <- logger.info(f"create tbl response: $resp")
 
-        req = Request[IO](GET, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key"))
-        _    <- logger.info(f"get value request: $req")
-        resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
-        _    <- logger.info(f"get value response: $resp")
-        _    <- Async[IO].blocking(rt.shutdown())
-        _    <- Async[IO].sleep(100.millis)
-      } yield {
-        assert(resp == "value")
-      }
+            req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key")).withEntity("value")
+            _    <- logger.info(f"set value request: $req")
+            resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
+            _    <- logger.info(f"set value response: $resp")
+
+            req = Request[IO](GET, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key"))
+            _    <- logger.info(f"get value request: $req")
+            resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
+            _    <- logger.info(f"get value response: $resp")
+            _    <- handle.stop
+          } yield assert(resp == "value")
+        }
+      } yield ()
     }
   }
 
   "can `get` value after db runtime restart" in {
-    val responseDecoder: EntityDecoder[IO, String] = EntityDecoder.text
-
-    val config = DbInstanceConfig()
-    val httpConf = config.server.asInstanceOf[ServerConfig.Http]
-    import httpConf.*
-
-    {
+    Dispatcher.parallel[IO] use { implicit d =>
       for {
         logger <- Slf4jLogger.create[IO]
-
         _ <- logger.info(f"=== first db session ===")
+        _ <- DbInstance[IO]().resource(config).use { handle =>
+          for {
+            _ <- Async[IO].sleep(500.millis)
+            req  <- Async[IO].blocking(Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db")))
+            _    <- logger.info(f"create db request: $req")
+            resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
+            _    <- logger.info(f"create db response: $resp")
 
-        rt = DbRuntime()
-        _ <- Async[IO].blocking(DbInstance(rt).runAsync(config))
-        _ <- Async[IO].sleep(100.millis)
+            req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl"))
+            _    <- logger.info(f"create tbl request: $req")
+            resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
+            _    <- logger.info(f"create tbl response: $resp")
 
-        req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db"))
-        _    <- logger.info(f"create db request: $req")
-        resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
-        _    <- logger.info(f"create db response: $resp")
-
-        req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl"))
-        _    <- logger.info(f"create tbl request: $req")
-        resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
-        _    <- logger.info(f"create tbl response: $resp")
-
-        req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key")).withEntity("value")
-        _    <- logger.info(f"set value request: $req")
-        resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
-        _    <- logger.info(f"set value response: $resp")
-
-        _ <- Async[IO].blocking(rt.shutdown())
+            req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key")).withEntity("value")
+            _    <- logger.info(f"set value request: $req")
+            resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
+            _    <- logger.info(f"set value response: $resp")
+            _    <- handle.stop
+          } yield ()
+        }
         _ <- Async[IO].sleep(100.millis)
 
         _ <- logger.info(f"=== second db session ===")
-
-        rt = DbRuntime()
-        _ <- Async[IO].blocking(DbInstance(rt).runAsync(config))
-        _ <- Async[IO].sleep(100.millis)
-
-        req = Request[IO](GET, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key"))
-        _    <- logger.info(f"get value request: $req")
-        resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
-        _    <- logger.info(f"get value response: $resp")
-      } yield {
-        assert(resp == "value")
-      }
-
+        _ <- DbInstance[IO]().resource(config).use { handle =>
+          for {
+            _    <- Async[IO].sleep(1000.millis)
+            req  <- Async[IO].blocking(Request[IO](GET, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key")))
+            _    <- logger.info(f"get value request: $req")
+            resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
+            _    <- logger.info(f"get value response: $resp")
+            _    <- handle.stop
+          } yield assert(resp == "value")
+        }
+      } yield ()
     }
   }
-
 }

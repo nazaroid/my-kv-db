@@ -5,13 +5,14 @@ import cats.effect.std.Dispatcher
 import cats.effect.{Async, IO, IOApp}
 import cats.implicits.*
 import com.typesafe.config.ConfigFactory
+import fs2.io.file.Files
 import fs2.io.net.Network
 import org.nazaroid.kvdb.utils.metrics.MetricExporter
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import pureconfig.ConfigSource
 import pureconfig.module.catseffect.syntax.*
 
-final class Application[F[_]: Async: Parallel: Network](implicit d: Dispatcher[F]) {
+final class Application[F[_]: Async: Files: Parallel: Network](implicit d: Dispatcher[F]) {
 
   // noinspection ScalaUnusedSymbol
   def start(): F[Unit] =
@@ -22,7 +23,7 @@ final class Application[F[_]: Async: Parallel: Network](implicit d: Dispatcher[F
           .fromConfig(ConfigFactory.load(confName).getConfig(AppConfig.appName))
           .loadF[F, AppConfig]()
         _ <- if (appConfig.metricsEnabled) new MetricExporter(appConfig.metricsPort).start() else ().pure[F]
-        _ <- Async[F].blocking(new DbInstance().runSync(appConfig.dbConf))
+        _ <- DbInstance().resource(appConfig.dbConf).use(_ => Async[F].never)
       } yield ()
     }
 }
