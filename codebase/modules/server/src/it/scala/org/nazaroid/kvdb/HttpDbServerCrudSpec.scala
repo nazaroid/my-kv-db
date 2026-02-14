@@ -76,7 +76,6 @@ final class HttpDbServerCrudSpec extends AsyncFreeSpec with AsyncIOSpec with Mat
         _ <- logger.info(f"=== first db session ===")
         _ <- DbInstance[IO]().resource(config).use { handle =>
           for {
-            _ <- Async[IO].sleep(500.millis)
             req  <- Async[IO].blocking(Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db")))
             _    <- logger.info(f"create db request: $req")
             resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
@@ -99,7 +98,6 @@ final class HttpDbServerCrudSpec extends AsyncFreeSpec with AsyncIOSpec with Mat
         _ <- logger.info(f"=== second db session ===")
         _ <- DbInstance[IO]().resource(config).use { handle =>
           for {
-            _    <- Async[IO].sleep(1000.millis)
             req  <- Async[IO].blocking(Request[IO](GET, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key")))
             _    <- logger.info(f"get value request: $req")
             resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))

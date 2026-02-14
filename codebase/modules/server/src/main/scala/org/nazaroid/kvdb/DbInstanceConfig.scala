@@ -2,8 +2,12 @@ package org.nazaroid.kvdb
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
-enum ServerConfig:
+trait ServerConfigBase {
+  val host: String
+  val port: Int
+}
 
+enum ServerConfig extends ServerConfigBase:
   case Http(
     host:           String = "127.0.0.1",
     port:           Int = 9000,
