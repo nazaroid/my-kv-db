@@ -27,12 +27,12 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
       }
     }
   }
-  
+
   private val testDir = Paths.get("./testFolder")
 
   private val config = StorageConfig(
     folder         = testDir.toString,
-    maxSegmentSize = 1024, // Маленький размер для теста ротации (1КБ)
+    maxSegmentSize = 1024, // Small size for rotation testing (1KB)
     dataSchema = List(
       FieldDef("recordSize", FieldType.Int32),
       FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize"))
@@ -50,16 +50,16 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
     )
   )
 
-  // Ресурс для запуска менеджера в тестах
+  // Resource for running the manager in tests
   private val storageResource: Resource[IO, StorageManager[IO]] = for {
     _     <- Resource.eval(Files[IO].createDirectories(Path(testDir.toString)).handleError(_ => ()))
     queue <- Channel.bounded[IO, WriteTask[IO]](100).toResource
-    // Запускаем воркер записи в фоне
+    // Run the background binary write worker
     _       <- writeBinary(queue.stream, parallelism = 1).compile.drain.background
     manager <- Resource.eval(StorageManager.initialize[IO](config, queue))
   } yield manager
 
-  "Write and Read: записанное значение должно быть доступно" in {
+  "Write and Read: written value should be accessible" in {
     storageResource.use { sm =>
       for {
         _   <- sm.write("user:1", "hello stratum")
@@ -68,7 +68,7 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
     }
   }
 
-  "Delete: удаленное значение должно возвращать None" in {
+  "Delete: deleted value should return None" in {
     storageResource.use { sm =>
       for {
         _   <- sm.write("user:2", "to be deleted")
@@ -78,74 +78,74 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
     }
   }
 
-  "Rotation: при превышении лимита должен создаваться новый сегмент" in {
+  "Rotation: new segment should be created when limit is exceeded" in {
     storageResource.use { sm =>
       for {
-        // Пишем много данных, чтобы вызвать ротацию (1КБ лимит)
+        // Write enough data to trigger rotation (1KB limit)
         _    <- sm.write("k1", "a" * 600)
         seg1 <- sm.currentData.get.map(_.filePath)
 
         _    <- sm.write("k2", "b" * 600)
         seg2 <- sm.currentData.get.map(_.filePath)
 
-        _ <- IO.sleep(100.millis) // Даем время файловой системе
+        _ <- IO.sleep(100.millis) // Allow time for file system operations
 
-        // Проверяем, что пути к файлам разные
-        _ <- IO.blocking(assert(seg1 != seg2, s"Сегмент должен был смениться: $seg1 vs $seg2"))
+        // Verify that file paths are different
+        _ <- IO.blocking(assert(seg1 != seg2, s"Segment should have rotated: $seg1 vs $seg2"))
 
-        // Данные из старого сегмента должны быть доступны
+        // Data from the old segment should still be accessible
         val1 <- sm.read("k1")
       } yield assert(val1.contains("a" * 600))
     }
   }
 
-  "Compaction & Cleanup: после компакции старые файлы должны удалиться" in {
+  "Compaction & Cleanup: old files should be removed after compaction" in {
     storageResource.use { sm =>
       for {
         _ <- sm.write("temp", "data")
-        _ <- sm.delete("temp") // Создаем "мусор"
+        _ <- sm.delete("temp") // Create "garbage"
         _ <- sm.write("permanent", "keep me")
 
-        // Запускаем уплотнение
+        // Trigger compaction
         _ <- sm.compact()
         _ <- IO.sleep(200.millis)
 
-        // Проверяем, что живые данные на месте
+        // Verify live data is still present
         res <- sm.read("permanent")
         _   <- IO.blocking(assert(res.contains("keep me")))
 
-        // Проверяем физическое наличие файлов через Files.list
+        // Verify physical file existence via Files.list
         files <- Files[IO].list(Path(testDir.toString)).map(_.fileName.toString).compile.toList
-        // Должен остаться только новый компакт-сегмент и активный пустой сегмент
-      } yield assert(files.exists(_.startsWith("compact_")), "Должен появиться компактный сегмент")
+        // Only the new compact-segment and active empty segment should remain
+      } yield assert(files.exists(_.startsWith("compact_")), "Compact segment should exist")
     }
   }
 
-  "Recovery: данные должны быть доступны после полной перезагрузки системы" in {
+  "Recovery: data should be accessible after full system restart" in {
     val key = "persistent_user"
     val value = "{\"data\": \"important\"}"
 
-    // 1. Первая сессия: пишем данные и выключаемся
+    // 1. First session: write data and shutdown
     val session1 = storageResource.use { sm =>
-      sm.write(key, value) *> IO.sleep(100.millis) // Ждем завершения записи на диск
+      sm.write(key, value) *> IO.sleep(100.millis) // Wait for disk write completion
     }
 
-    // 2. Вторая сессия: открываем хранилище заново и читаем
+    // 2. Second session: reopen storage and read
     val session2 = storageResource.use { sm =>
       sm.read(key).map { recoveredValue =>
-        assert(recoveredValue.contains(value), "Данные должны восстановиться из индексов на диске")
+        assert(recoveredValue.contains(value), "Data should be recovered from disk indexes")
       }
     }
 
     session1 *> session2
   }
 
-  "Recovery with Deletion: удаленные данные не должны появиться после перезагрузки" in {
+  "Recovery with Deletion: deleted data should not reappear after restart" in {
     val keyToKeep = "keep_me"
     val keyToDelete = "delete_me"
 
     val scenario = for {
-      // Шаг 1: Пишем два ключа, один удаляем
+      // Step 1: Write two keys, delete one
       _ <- storageResource.use { sm =>
         for {
           _ <- sm.write(keyToKeep, "value1")
@@ -155,13 +155,13 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
         } yield ()
       }
 
-      // Шаг 2: Перезагружаемся и проверяем состояние
+      // Step 2: Restart and verify state
       _ <- storageResource.use { sm =>
         for {
           val1 <- sm.read(keyToKeep)
           val2 <- sm.read(keyToDelete)
           _    <- IO.pure(assert(val1.contains("value1")))
-          _    <- IO.pure(assert(val2.isEmpty, "Удаленный ключ не должен восстановиться"))
+          _    <- IO.pure(assert(val2.isEmpty, "Deleted key should not be recovered"))
         } yield ()
       }
     } yield ()

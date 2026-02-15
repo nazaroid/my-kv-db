@@ -15,7 +15,7 @@ object BitcaskEngine {
   def init[F[_]: Async: Files](conf: EngineConfig): Resource[F, Engine[F]] = {
     val storageConfig = StorageConfig(
       folder         = conf.rootDir,
-      maxSegmentSize = conf.maxSegmentSize, // Маленький размер для теста ротации (1КБ)
+      maxSegmentSize = conf.maxSegmentSize,
       dataSchema = List(
         FieldDef("recordSize", FieldType.Int32),
         FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize"))

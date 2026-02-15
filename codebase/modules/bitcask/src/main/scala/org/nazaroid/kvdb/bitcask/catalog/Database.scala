@@ -9,13 +9,12 @@ import org.nazaroid.kvdb.binfileio.WriteTask
 import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
 
 final class Database[F[_]: Async: Files](
-  val dbName:         String,
-  val dbPath:         Path,
-  val writeQueue:     Channel[F, WriteTask[F]],
-  val configTemplate: StorageConfig,
-  val tables:         Ref[F, Map[String, Table[F]]]) {
+                                          val dbName:         String,
+                                          val dbPath:         Path,
+                                          val writeQueue:     Channel[F, WriteTask[F]],
+                                          val configTemplate: StorageConfig,
+                                          val tables:         Ref[F, Map[String, Table[F]]]) {
 
-  /** Получить таблицу или создать её, если не существует */
   def table(tableName: String): F[Table[F]] = {
     tables.get.flatMap { activeTables =>
       activeTables.get(tableName) match {
@@ -24,9 +23,9 @@ final class Database[F[_]: Async: Files](
           val tablePath = dbPath / tableName
           for {
             _ <- Files[F].createDirectories(tablePath).handleError(_ => ())
-            // Настраиваем конфиг конкретно под папку этой таблицы
+            // Configure storage settings specifically for this table's directory
             tableConfig = configTemplate.copy(folder = tablePath.toString)
-            // Инициализируем менеджер (с восстановлением из файлов)
+            // Initialize storage manager (including recovery from existing files)
             sm <- StorageManager.initialize[F](tableConfig, writeQueue)
             _  <- tables.update(_ + (tableName -> sm))
           } yield sm
@@ -34,10 +33,10 @@ final class Database[F[_]: Async: Files](
     }
   }
 
-  /** Список всех таблиц (физических папок в БД) */
+  /** List all tables (physical directories within the database) */
   def listTables(): Stream[F, String] = Files[F].list(dbPath).filter(_.extName == "").map(_.fileName.toString)
 
-  /** Удаление таблицы */
+  /** Delete a table */
   def dropTable(tableName: String): F[Unit] =
     tables.update(_ - tableName) *> Files[F].deleteRecursively(dbPath / tableName)
 }

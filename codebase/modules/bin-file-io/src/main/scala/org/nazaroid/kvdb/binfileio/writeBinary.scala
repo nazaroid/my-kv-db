@@ -24,6 +24,7 @@ def writeBinary[F[_]: Async: Files](
               (state, chan.send(task).void)
 
             case None =>
+              // Evict the oldest channel if the parallelism limit is reached
               val (interimState, killAction) = if (state.channels.size >= parallelism) {
                 val victim = state.fifo.head
                 val victimChan = state.channels(victim)
@@ -41,7 +42,7 @@ def writeBinary[F[_]: Async: Files](
                 ) >>
                   Async[F]
                     .start {
-                      // Узнаем размер файла один раз при открытии канала
+                      // Determine the initial file size once when opening the channel
                       Files[F].size(Path(task.filePath)).handleError(_ => 0L).flatMap { initialSize =>
                         newChan
                           .stream
@@ -49,13 +50,13 @@ def writeBinary[F[_]: Async: Files](
                             val bytes = encode(t.row, t.schema)
                             val nextOffset = currentOffset + bytes.size
 
-                            // Записываем конкретную строку
+                            // Write the specific row to disk
                             Stream
                               .chunk(bytes)
                               .through(Files[F].writeAll(Path(t.filePath), Flags(Flag.Create, Flag.Append)))
                               .compile
                               .drain >>
-                              // СТРАТЕГИЧЕСКИЙ МОМЕНТ: уведомляем Storage, что данные на диске
+                              // STRATEGIC MOMENT: notify Storage that the data is persisted on disk
                               t.callback.traverse(_.complete(currentOffset)) >>
                               Async[F].pure((nextOffset, ()))
                           }

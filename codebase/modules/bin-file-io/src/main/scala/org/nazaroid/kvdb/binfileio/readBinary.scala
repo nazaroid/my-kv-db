@@ -5,21 +5,21 @@ import fs2.io.file.{Files, Path}
 import fs2.{Pull, Stream}
 
 def readBinary[F[_]: Async: Files](
-                                              filePath: String,
-                                              schema: List[FieldDef]
-                                            ): Stream[F, (Long, Row)] = {
+  filePath: String,
+  schema:   List[FieldDef]
+): Stream[F, (Long, Row)] = {
 
   def loop(s: Stream[F, Byte], currentOffset: Long): Pull[F, (Long, Row), Unit] = {
-    // 1. Пытаемся считать заголовок длины (4 байта)
+    // 1. Attempt to read the length header (4 bytes)
     s.pull.unconsN(4).flatMap {
       case Some((lenChunk, restAfterLen)) =>
         val rowSize = lenChunk.toByteVector.toInt()
 
-        // 2. Считываем само тело записи
+        // 2. Read the actual record body
         restAfterLen.pull.unconsN(rowSize).flatMap {
           case Some((dataChunk, nextStream)) =>
             val row = decode(dataChunk, schema)
-            // Выдаем текущий offset (начало 4-байтового заголовка) и данные
+            // Emit current offset (start of the 4-byte header) and the decoded data
             Pull.output1((currentOffset, row)) >>
               loop(nextStream, currentOffset + 4 + rowSize)
           case None =>

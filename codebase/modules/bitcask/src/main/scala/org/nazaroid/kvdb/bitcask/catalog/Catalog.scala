@@ -14,7 +14,6 @@ final class Catalog[F[_]: Async: Files](
   val configTemplate: StorageConfig,
   val databases:      Ref[F, Map[String, Database[F]]]) {
 
-  /** Получить базу данных по имени */
   def database(dbName: String): F[Database[F]] = {
     databases.get.flatMap { activeDbs =>
       activeDbs.get(dbName) match {
@@ -38,20 +37,20 @@ object Catalog {
     rootPath:       Path,
     configTemplate: StorageConfig,
     queueSize:      Int = 10000,
-    parallelism: Int = 10
+    parallelism:    Int = 10
   ): Resource[F, Catalog[F]] = {
     for {
-      // 1. Создаем корневую директорию, если её нет
+      // 1. Create root directory if it doesn't exist
       _ <- Resource.eval(Files[F].createDirectories(rootPath).handleError(_ => ()))
 
-      // 2. Создаем единую очередь записи для всего каталога
+      // 2. Create a unified write queue for the entire catalog
       writeQueue <- Channel.bounded[F, WriteTask[F]](queueSize).toResource
 
-      // 3. Запускаем фоновый воркер записи (параллелизм можно вынести в конфиг)
-      // Он будет обрабатывать задачи от всех таблиц всех баз данных
+      // 3. Start background write worker (parallelism can be moved to config)
+      // It will process tasks from all tables across all databases
       _ <- writeBinary(writeQueue.stream, parallelism = 1).compile.drain.background
 
-      // 4. Инициализируем реестр открытых баз данных
+      // 4. Initialize the registry for open databases
       activeDbs <- Resource.eval(Ref.of(Map.empty[String, Database[F]]))
 
       catalog = new Catalog[F](

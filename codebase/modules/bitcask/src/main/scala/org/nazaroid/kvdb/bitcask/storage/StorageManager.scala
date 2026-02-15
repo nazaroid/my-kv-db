@@ -24,7 +24,6 @@ case class StorageConfig(
   segmentSchema:  List[FieldDef],
   tableSchema:    List[FieldDef])
 
-// --- 2. Базовое хранилище (Низкоуровневый Writer) ---
 class BaseStorage[F[_]: Async: Files](
   val filePath: String,
   val schema:   List[FieldDef],
@@ -38,7 +37,6 @@ class BaseStorage[F[_]: Async: Files](
     } yield offset
 }
 
-// --- 3. Stratum Storage Manager ---
 sealed class StorageManager[F[_]: Async: Files](
   val currentData:       Ref[F, BaseStorage[F]],
   val currentSegmentIdx: Ref[F, BaseStorage[F]],
@@ -47,7 +45,7 @@ sealed class StorageManager[F[_]: Async: Files](
   val config:            StorageConfig,
   val writeQueue:        Channel[F, WriteTask[F]]) {
 
-  /** ЗАПИСЬ: Data -> Segment -> Table -> Cache */
+  /** WRITE: Data -> Segment -> Table -> Cache */
   def write(key: String, value: String): F[Unit] = {
     val dataRow = Map(
       "recordSize" -> value.getBytes("UTF-8").length,
@@ -59,11 +57,11 @@ sealed class StorageManager[F[_]: Async: Files](
       ds   <- currentData.get
       size <- Files[F].size(Path(ds.filePath)).handleError(_ => 0L)
 
-      // Ротация если текущий .bin переполнен
+      // Rotate if the current .bin file exceeds max size
       activeDS <- if (size > config.maxSegmentSize) rotate() else Async[F].pure(ds)
       activeSS <- currentSegmentIdx.get
 
-      // Каскадная запись
+      // Cascading write operations
       offset <- activeDS.append(key, dataRow)
 
       segRow = Map("keySize" -> key.length, "key" -> key, "offset" -> offset)
@@ -82,7 +80,7 @@ sealed class StorageManager[F[_]: Async: Files](
     } yield ()
   }
 
-  /** ЧТЕНИЕ: Всегда из кэша (O(1)) */
+  /** READ: Always from cache (O(1)) */
   def read(key: String): F[Option[String]] = {
     cache
       .get
@@ -93,7 +91,7 @@ sealed class StorageManager[F[_]: Async: Files](
       })
   }
 
-  /** УДАЛЕНИЕ: Запись Tombstone */
+  /** DELETE: Write a Tombstone record */
   def delete(key: String): F[Unit] = {
     for {
       _ <- cache.update(_ + (key -> CacheEntry.Deleted))
@@ -102,7 +100,7 @@ sealed class StorageManager[F[_]: Async: Files](
     } yield ()
   }
 
-  /** COMPACTION: Уплотнение всех сегментов в один новый */
+  /** COMPACTION: Merge all segments into a single new one */
   def compact(): F[Unit] = {
     for {
       snapshot <- cache.get
@@ -143,7 +141,7 @@ sealed class StorageManager[F[_]: Async: Files](
     } yield ()
   }
 
-  /** CLEANUP: Физическое удаление "осиротевших" файлов */
+  /** CLEANUP: Physical deletion of orphaned files */
   def cleanup(): F[Unit] = {
     for {
       snapshot <- cache.get
@@ -180,7 +178,7 @@ object StorageManager {
       .filter(_._2("key").toString == targetKey)
       .map(_._2("offset").asInstanceOf[Long])
       .compile
-      .last // Берем самое свежее смещение в этом сегменте
+      .last // Take the most recent offset in this segment
   }
 
   def initialize[F[_]: Async: Files](
@@ -191,8 +189,8 @@ object StorageManager {
     val tableIndexPath = s"${config.folder}/table.idx"
 
     for {
-      // 1. Читаем table.idx и строим карту Key -> SegmentName
-      // Stream гарантирует, что при дубликатах ключей в Map попадет ПОСЛЕДНЕЕ значение
+      // 1. Read table.idx and build Key -> SegmentName map
+      // Stream guarantees that for duplicate keys, the LAST value persists in the Map
       tableMapping <- Files[F].exists(Path(tableIndexPath)).flatMap {
         case false => Async[F].pure(Map.empty[String, String])
         case true =>
@@ -204,7 +202,7 @@ object StorageManager {
             .to(Map)
       }
 
-      // 2. На основе маппинга восстанавливаем CacheEntry
+      // 2. Restore CacheEntries based on the mapping
       recoveredCache <- tableMapping
         .toList
         .traverse {
@@ -216,12 +214,12 @@ object StorageManager {
             val segBinPath = s"${config.folder}/$segName.bin"
 
             for {
-              // Ищем последний offset ключа в индексе сегмента
+              // Look for the latest key offset in the segment index
               maybeOffset <- findLastOffsetInSegment(key, segIdxPath, config.segmentSchema)
 
               entry <- maybeOffset match {
                 case Some(offset) =>
-                  // Читаем саму строку из данных для прогрева кэша
+                  // Read the row from data to warm up the cache
                   readRowAt(segBinPath, config.dataSchema, offset).map {
                     case Some(row) => Some(key -> CacheEntry.Persistent(row, segName, offset))
                     case None      => None
@@ -232,10 +230,10 @@ object StorageManager {
         }
         .map(_.flatten.toMap)
 
-      // 3. Создаем Ref для кэша
+      // 3. Create Ref for the cache
       cacheRef <- Ref.of[F, Map[String, CacheEntry]](recoveredCache)
 
-      // 4. Подготавливаем текущий активный сегмент
+      // 4. Prepare the current active segment
       currentSegName <- Async[F].delay(s"seg_${System.currentTimeMillis()}")
 
       dataStorage = new BaseStorage(s"${config.folder}/$currentSegName.bin", config.dataSchema, writeQueue)
