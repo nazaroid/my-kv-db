@@ -17,6 +17,7 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
 
 (cv CrudSpec)
 
+- (IN PROGRESS) перевести все на Scala 3 syntax
 - (TODO) подключить compact в фоне
 - (TODO) реализовать сценарий с удалением значения
 - (TODO) проработать результаты CODE_REVIEW (особенно исправить баг по длинне ключей)
