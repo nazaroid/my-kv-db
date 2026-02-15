@@ -13,113 +13,15 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
 в bitcast считается для каждой строки (см bitcask-intro.pdf на google диске)
 
 
-## Архитектура
-- уровень server: http/grpc
--- (позже) Уровень запросов: SQL/JSON 
-- сервисный уровень: API: инстанс
-- движок (файловый уровень) : модуль bitcask
--- DSL + интерпретатор
-- https://typelevel.org/cats/datatypes/freemonad.html
-- App Layer
-- Server Layer
-- Svc Layer
-- Persistence Layer
-  https://gitlab.com/VictorWinbringer/ddd_scala/-/blob/main/src/main/scala/vw/ddd_scala/core/domain/services/UuidsRepository.scala?ref_type=heads
--- гексагональная арх-ра
-
-## DONE
-
-* реализовать сценарий create_db, create_tb, write, read
-    * база данных и таблица - это папки
-    * segment - это append only - file
-    * table index - получить сегмент по ключу (Key -> Segment)
-    * segment index - получить offset в segment по ключу ( (Segment, Key) -> SegmentOffsetInfo)
-    * Замечание: в bitcast вместо этих двух индексов есть индкекс keydir: giving the file, offset, and size of the most recently
-      written entry for that key
-
-
-(+) выделить слои (Config, Env, Di)
-App  
-Server (Http / Grpc)
-Engine (BitCaskDbEngine)
-
-(+) реализовать HttpDbServer
-- POST 201 http://$host:$port/data/db
-- POST 201 http://$host:$port/data/db/tbl
-- POST http://$host:$port/data/db/key
-- GET  http://$host:$port/data/db/key
-  (+) сделать Engine на Map[String, String]
-
-потом начать делать BitCask
-- (+) Проектирование:
-    - описать систему классов
-    - описать файловую структуру (все файлы и папки)
-      -- обдумать какое содержимое индексов и описать каждый
-      -- см раздел Индексирвание в файле на GoogleDisk
-- (+) реализация get/set
-
-- (+) рефакт: декомпозировть модуль server на части
-    - например:db, server, engine http,  bitcask
-        - app
-
-        - db
-            - (opt) config
-                - возможно конфиги лучше в server
-            - server
-                - http
-                - grpc
-            - transact
-                - fs2 cmd interface
-            - engine
-                - ddl, dml
-            - bitcask
-                - BitcaskLib
-                - algebra
-                    - ...
-                - instances
-                    - ...
-            - metrics
-    - отдельно fileformat (Persistence)
-
-- (+) рефакт: декомпозировть BitcaskLib
-    - (сейчас все в одном файле BitcaskLib)
-  
-  
 ## TODO
 
 (cv CrudSpec)
 
-- (IN PROGRESS) рефакт: выделить слой хранения в бинарном виде
-    - см файл BinFileIO
-    - подключить к БД
-    - избавиться от bindata
-
-- (IN PROGRESS) восстановление кеша при старте
-  - (читаем структуру и загружаем граф сущностей в кеше)
-  - план:
-  - прочитать файловую струткуру (придумать название.):
-    - получить список баз и внутри них списки таблиц+сегментов+индексов
-  - наполнить кеш сервис: 
-    - создать сущности, из файлов (индексы + сегменты) 
-    - наполнить свойства data (см src/main/scala/org/nazaroid/kvdb/bitcask/lib/algebra/package.scala)
-
-- (TODO) Небольшие доработки
-* логирование
-* переписать тесты на munit.CatsEffectSuite
-* удалять bin-файлы после теста в teardown
-
-* (TODO) поменять архитектуру чтения/записи
-- нужно чтобы после записи мы могли сразу читать (мы кладем в очередь на запись)
-- поэтому нужен кеш-очередь: кладем в кеш-очередь, а оттуда выгребаем на запись
-- при чтении смотрим в кеш, только потом лезем читаем с диска 
-
 - (TODO) реализовать сценарий с удалением значения
+- (TODO) проработать результаты CODE_REVIEW (особенно исправить баг по длинне ключей)
+- (TODO) «v2 формата» с CRC и чёткой моделью сбоев (см ревью)
 
 - (TODO) подготовить для OpenSource
-
-- (TODO) (проектирование/реализация) сделать в engine приемку команд при помощи fs2
-- модуль transact
-** public CompletableFuture<DatabaseCommandResult> executeNextCommand(DatabaseCommand command)
 
 - (TODO) MVP: попробовать переделать на DSL + Free (можно только AppL и ServiceL)
      (AppL (run), 
