@@ -7,7 +7,7 @@ import io.prometheus.client.hotspot.DefaultExports
 import org.typelevel.log4cats.SelfAwareStructuredLogger
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 
-final class MetricExporter[F[_] : Async](metricsPort: Int) {
+final class MetricExporter[F[_]: Async](metricsPort: Int) {
 
   private val logger: SelfAwareStructuredLogger[F] = Slf4jFactory.create[F].getLogger
 

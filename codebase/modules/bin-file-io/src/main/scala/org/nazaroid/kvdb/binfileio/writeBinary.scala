@@ -6,14 +6,14 @@ import fs2.Stream
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Flag, Flags, Path}
 
-def writeBinary[F[_] : Async : Files](
-                                       input: Stream[F, WriteTask[F]],
-                                       parallelism: Int = 100
-                                     ): Stream[F, Unit] = {
+def writeBinary[F[_]: Async: Files](
+  input:       Stream[F, WriteTask[F]],
+  parallelism: Int = 100
+): Stream[F, Unit] = {
 
   final case class State(
-                          channels: Map[String, Channel[F, WriteTask[F]]],
-                          fifo: List[String])
+    channels: Map[String, Channel[F, WriteTask[F]]],
+    fifo:     List[String])
 
   Stream.eval(Ref.of[F, State](State(Map.empty, Nil))).flatMap { stateRef =>
     input
@@ -37,7 +37,7 @@ def writeBinary[F[_] : Async : Files](
                 stateRef.update(s =>
                   s.copy(
                     channels = s.channels + (task.filePath -> newChan),
-                    fifo = s.fifo :+ task.filePath
+                    fifo     = s.fifo :+ task.filePath
                   )
                 ) >>
                   Async[F]
@@ -64,7 +64,7 @@ def writeBinary[F[_] : Async : Files](
                             stateRef.update(s =>
                               s.copy(
                                 channels = s.channels - task.filePath,
-                                fifo = s.fifo.filterNot(_ == task.filePath)
+                                fifo     = s.fifo.filterNot(_ == task.filePath)
                               )
                             )
                           }

@@ -12,9 +12,9 @@ case class FieldDef(name: String, fType: FieldType)
 
 type Row = Map[String, Any]
 
-case class WriteTask[F[_] : Async](
-                                    id: String,
-                                    filePath: String,
-                                    schema: List[FieldDef],
-                                    row: Row,
-                                    callback: Option[Deferred[F, Long]])
+case class WriteTask[F[_]: Async](
+  id:       String,
+  filePath: String,
+  schema:   List[FieldDef],
+  row:      Row,
+  callback: Option[Deferred[F, Long]])

@@ -11,7 +11,7 @@ import org.nazaroid.kvdb.engine.BitcaskEngine
 import org.nazaroid.kvdb.srv.http.HttpServer
 import org.typelevel.log4cats.Logger
 
-final class ServerModule[F[_] : Async : Files : Logger : Parallel : Network](commonModule: CommonModule[F]) {
+final class ServerModule[F[_]: Async: Files: Logger: Parallel: Network](commonModule: CommonModule[F]) {
   private val config = commonModule.config
 
   def resolve: Resource[F, Server[F]] = {
@@ -20,7 +20,7 @@ final class ServerModule[F[_] : Async : Files : Logger : Parallel : Network](com
     } yield {
       config.server match {
         case httpConf: ServerConfig.Http => HttpServer[F](httpConf, engine)
-        case _: ServerConfig.Grpc => throw NotImplementedError(f"'GRPC' - server not supported yet")
+        case _: ServerConfig.Grpc        => throw NotImplementedError(f"'GRPC' - server not supported yet")
       }
     }
   }

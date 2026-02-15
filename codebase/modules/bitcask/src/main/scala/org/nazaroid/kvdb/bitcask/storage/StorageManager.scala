@@ -11,50 +11,50 @@ enum CacheEntry {
   case Pending(row: Row)
 
   case Persistent(
-                   row: Row,
-                   segment: String,
-                   offset: Long)
+    row:     Row,
+    segment: String,
+    offset:  Long)
   case Deleted
 }
 
 case class StorageConfig(
-                          folder: String,
-                          maxSegmentSize: Long,
-                          dataSchema: List[FieldDef],
-                          segmentSchema: List[FieldDef],
-                          tableSchema: List[FieldDef])
+  folder:         String,
+  maxSegmentSize: Long,
+  dataSchema:     List[FieldDef],
+  segmentSchema:  List[FieldDef],
+  tableSchema:    List[FieldDef])
 
-class BaseStorage[F[_] : Async : Files](
-                                         val filePath: String,
-                                         val schema: List[FieldDef],
-                                         val queue: Channel[F, WriteTask[F]]) {
+class BaseStorage[F[_]: Async: Files](
+  val filePath: String,
+  val schema:   List[FieldDef],
+  val queue:    Channel[F, WriteTask[F]]) {
 
   def append(id: String, row: Row): F[Long] =
     for {
       promise <- Deferred[F, Long]
-      _ <- queue.send(WriteTask(id, filePath, schema, row, Some(promise)))
-      offset <- promise.get
+      _       <- queue.send(WriteTask(id, filePath, schema, row, Some(promise)))
+      offset  <- promise.get
     } yield offset
 }
 
-sealed class StorageManager[F[_] : Async : Files](
-                                                   val currentData: Ref[F, BaseStorage[F]],
-                                                   val currentSegmentIdx: Ref[F, BaseStorage[F]],
-                                                   val tableStorage: BaseStorage[F],
-                                                   val cache: Ref[F, Map[String, CacheEntry]],
-                                                   val config: StorageConfig,
-                                                   val writeQueue: Channel[F, WriteTask[F]]) {
+sealed class StorageManager[F[_]: Async: Files](
+  val currentData:       Ref[F, BaseStorage[F]],
+  val currentSegmentIdx: Ref[F, BaseStorage[F]],
+  val tableStorage:      BaseStorage[F],
+  val cache:             Ref[F, Map[String, CacheEntry]],
+  val config:            StorageConfig,
+  val writeQueue:        Channel[F, WriteTask[F]]) {
 
   /** WRITE: Data -> Segment -> Table -> Cache */
   def write(key: String, value: String): F[Unit] = {
     val dataRow = Map(
       "recordSize" -> value.getBytes("UTF-8").length,
-      "value" -> value
+      "value"      -> value
     )
     for {
       _ <- cache.update(_ + (key -> CacheEntry.Pending(dataRow)))
 
-      ds <- currentData.get
+      ds   <- currentData.get
       size <- Files[F].size(Path(ds.filePath)).handleError(_ => 0L)
 
       // Rotate if the current .bin file exceeds max size
@@ -69,10 +69,10 @@ sealed class StorageManager[F[_] : Async : Files](
 
       segName = Path(activeDS.filePath).fileName.toString.replace(".bin", "")
       tableRow = Map(
-        "keySize" -> key.length,
-        "key" -> key,
+        "keySize"         -> key.length,
+        "key"             -> key,
         "segmentNameSize" -> segName.length,
-        "segmentName" -> segName
+        "segmentName"     -> segName
       )
       _ <- tableStorage.append(key, tableRow)
 
@@ -85,9 +85,9 @@ sealed class StorageManager[F[_] : Async : Files](
     cache
       .get
       .map(_.get(key).flatMap {
-        case CacheEntry.Pending(row) => row.get("value").map(_.toString)
+        case CacheEntry.Pending(row)          => row.get("value").map(_.toString)
         case CacheEntry.Persistent(row, _, _) => row.get("value").map(_.toString)
-        case CacheEntry.Deleted => None
+        case CacheEntry.Deleted               => None
       })
   }
 
@@ -117,18 +117,26 @@ sealed class StorageManager[F[_] : Async : Files](
           newMappings <- aliveEntries.foldLeftM(Map.empty[String, CacheEntry]) { case (acc, (key, row)) =>
             for {
               bytes <- Async[F].delay(encode(row, config.dataSchema))
-              _ <- Stream.chunk(bytes).through(Files[F].writeAll(cDataPath, Flags(Flag.Create, Flag.Append))).compile.drain
+              _ <- Stream
+                .chunk(bytes)
+                .through(Files[F].writeAll(cDataPath, Flags(Flag.Create, Flag.Append)))
+                .compile
+                .drain
               off <- Files[F].size(cDataPath).map(_ - bytes.size)
 
               iRow = Map("keySize" -> key.length, "key" -> key, "offset" -> off)
               iBytes <- Async[F].delay(encode(iRow, config.segmentSchema))
-              _ <- Stream.chunk(iBytes).through(Files[F].writeAll(cIdxPath, Flags(Flag.Create, Flag.Append))).compile.drain
+              _ <- Stream
+                .chunk(iBytes)
+                .through(Files[F].writeAll(cIdxPath, Flags(Flag.Create, Flag.Append)))
+                .compile
+                .drain
 
               tRow = Map(
-                "keySize" -> key.length,
-                "key" -> key,
+                "keySize"         -> key.length,
+                "key"             -> key,
                 "segmentNameSize" -> compName.length,
-                "segmentName" -> compName
+                "segmentName"     -> compName
               )
               _ <- tableStorage.append(key, tRow)
             } yield acc + (key -> CacheEntry.Persistent(row, compName, off))
@@ -169,11 +177,11 @@ sealed class StorageManager[F[_] : Async : Files](
 
 object StorageManager {
 
-  private def findLastOffsetInSegment[F[_] : Async : Files](
-                                                             targetKey: String,
-                                                             path: String,
-                                                             schema: List[FieldDef]
-                                                           ): F[Option[Long]] = {
+  private def findLastOffsetInSegment[F[_]: Async: Files](
+    targetKey: String,
+    path:      String,
+    schema:    List[FieldDef]
+  ): F[Option[Long]] = {
     readBinary(path, schema)
       .filter(_._2("key").toString == targetKey)
       .map(_._2("offset").asInstanceOf[Long])
@@ -181,10 +189,10 @@ object StorageManager {
       .last // Take the most recent offset in this segment
   }
 
-  def initialize[F[_] : Async : Files](
-                                        config: StorageConfig,
-                                        writeQueue: Channel[F, WriteTask[F]]
-                                      ): F[StorageManager[F]] = {
+  def initialize[F[_]: Async: Files](
+    config:     StorageConfig,
+    writeQueue: Channel[F, WriteTask[F]]
+  ): F[StorageManager[F]] = {
 
     val tableIndexPath = s"${config.folder}/table.idx"
 
@@ -222,7 +230,7 @@ object StorageManager {
                   // Read the row from data to warm up the cache
                   readRowAt(segBinPath, config.dataSchema, offset).map {
                     case Some(row) => Some(key -> CacheEntry.Persistent(row, segName, offset))
-                    case None => None
+                    case None      => None
                   }
                 case None => Async[F].pure(None)
               }

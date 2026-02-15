@@ -8,12 +8,12 @@ import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.WriteTask
 import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
 
-final class Database[F[_] : Async : Files](
-                                            val dbName: String,
-                                            val dbPath: Path,
-                                            val writeQueue: Channel[F, WriteTask[F]],
-                                            val configTemplate: StorageConfig,
-                                            val tables: Ref[F, Map[String, Table[F]]]) {
+final class Database[F[_]: Async: Files](
+  val dbName:         String,
+  val dbPath:         Path,
+  val writeQueue:     Channel[F, WriteTask[F]],
+  val configTemplate: StorageConfig,
+  val tables:         Ref[F, Map[String, Table[F]]]) {
 
   def table(tableName: String): F[Table[F]] = {
     tables.get.flatMap { activeTables =>
@@ -27,7 +27,7 @@ final class Database[F[_] : Async : Files](
             tableConfig = configTemplate.copy(folder = tablePath.toString)
             // Initialize storage manager (including recovery from existing files)
             sm <- StorageManager.initialize[F](tableConfig, writeQueue)
-            _ <- tables.update(_ + (tableName -> sm))
+            _  <- tables.update(_ + (tableName -> sm))
           } yield sm
       }
     }

@@ -7,12 +7,12 @@ import sbtassembly.AssemblyKeys.*
 object BuildSettings {
   val javaVersion = "1.8"
 
-  lazy val Integration = config("it") extend Test
+  lazy val Integration     = config("it") extend Test
   lazy val publishSnapshot = taskKey[Unit]("Custom docker:publish")
-  lazy val publishRelease = taskKey[Unit]("Custom docker:publish")
+  lazy val publishRelease  = taskKey[Unit]("Custom docker:publish")
 
   def dockerPublishConditional(isProd: Boolean): Def.Initialize[Task[Unit]] =
-    Def.taskDyn({
+    Def.taskDyn {
       (isProd, isSnapshot.value) match {
         case (false, false) =>
           throw new IllegalStateException(
@@ -25,25 +25,25 @@ object BuildSettings {
             "Please check GLOBAL_VERSION. It should not contain SNAPSHOT postfix"
           )
       }
-    })
+    }
 
   lazy val commonSettings: Seq[Setting[?]] = Seq(
     organization := s"org.nazaroid.db",
     libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Http4s.all ++ Prometheus.all ++ Testing.all,
     scalaVersion := Dependencies.Scala.version,
     javacOptions ++= Seq("-source", javaVersion, "-target", javaVersion),
-    updateOptions := updateOptions.value.withGigahorse(false),
-    publishSnapshot := dockerPublishConditional(false).value,
-    publishRelease := dockerPublishConditional(true).value,
-    update / logLevel := Level.Warn,
-    Global / cancelable := true,
-    Test / parallelExecution := false,
-    Integration / parallelExecution := false,
+    updateOptions                       := updateOptions.value.withGigahorse(false),
+    publishSnapshot                     := dockerPublishConditional(false).value,
+    publishRelease                      := dockerPublishConditional(true).value,
+    update / logLevel                   := Level.Warn,
+    Global / cancelable                 := true,
+    Test / parallelExecution            := false,
+    Integration / parallelExecution     := false,
     IntegrationTest / parallelExecution := false,
-    Test / fork := true,
-    Integration / fork := true,
-    IntegrationTest / fork := true,
-    Compile / fork := true,
+    Test / fork                         := true,
+    Integration / fork                  := true,
+    IntegrationTest / fork              := true,
+    Compile / fork                      := true,
     javaOptions += "-Djava.net.preferIPv4Stack=true",
     assembly / test := {},
     scalacOptions ++= Seq(
@@ -58,7 +58,8 @@ object BuildSettings {
       "-encoding",
       "UTF-8",
       "-unchecked",
-      "-Xmax-inlines", "200"
+      "-Xmax-inlines",
+      "200"
     ),
     semanticdbEnabled := true
   )

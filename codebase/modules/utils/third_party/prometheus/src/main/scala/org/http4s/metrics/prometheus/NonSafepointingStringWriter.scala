@@ -41,11 +41,20 @@ private[prometheus] class NonSafepointingStringWriter extends Writer {
     ()
   }
 
-  override def write(str: String, start: Int, limit: Int): Unit = write(str.slice(start, limit))
+  override def write(
+    str:   String,
+    start: Int,
+    limit: Int
+  ): Unit = write(str.slice(start, limit))
 
-  override def write(buff: Array[Char], start: Int, limit: Int): Unit = write(
-    buff.slice(start, limit)
-  )
+  override def write(
+    buff:  Array[Char],
+    start: Int,
+    limit: Int
+  ): Unit =
+    write(
+      buff.slice(start, limit)
+    )
 
   override def append(c: Char): Writer = {
     buf.append(c)
@@ -57,7 +66,11 @@ private[prometheus] class NonSafepointingStringWriter extends Writer {
     this
   }
 
-  override def append(cs: CharSequence, start: Int, limit: Int): Writer =
+  override def append(
+    cs:    CharSequence,
+    start: Int,
+    limit: Int
+  ): Writer =
     // Replicating behaviour of StringWriter ¯\_(ツ)_/¯
     if (cs == null) append("null")
     else

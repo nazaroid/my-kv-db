@@ -12,9 +12,9 @@ import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
 
 object BitcaskEngine {
 
-  def init[F[_] : Async : Files](conf: EngineConfig): Resource[F, Engine[F]] = {
+  def init[F[_]: Async: Files](conf: EngineConfig): Resource[F, Engine[F]] = {
     val storageConfig = StorageConfig(
-      folder = conf.rootDir,
+      folder         = conf.rootDir,
       maxSegmentSize = conf.maxSegmentSize,
       dataSchema = List(
         FieldDef("recordSize", FieldType.Int32),
@@ -38,7 +38,7 @@ object BitcaskEngine {
   }
 }
 
-final class BitcaskEngine[F[_] : Async](c: Catalog[F]) extends Engine[F] {
+final class BitcaskEngine[F[_]: Async](c: Catalog[F]) extends Engine[F] {
 
   def createDbIfNotExists(name: String): F[Unit] = {
     for {
@@ -49,32 +49,32 @@ final class BitcaskEngine[F[_] : Async](c: Catalog[F]) extends Engine[F] {
   def createTableIfNotExists(baseName: String, tblName: String): F[Unit] = {
     for {
       db <- c.database(baseName)
-      _ <- db.table(tblName)
+      _  <- db.table(tblName)
     } yield ()
   }
 
   def get(
-           baseName: String,
-           tblName: String,
-           key: String
-         ): F[Option[String]] = {
+    baseName: String,
+    tblName:  String,
+    key:      String
+  ): F[Option[String]] = {
     for {
-      db <- c.database(baseName)
-      tbl <- db.table(tblName)
+      db   <- c.database(baseName)
+      tbl  <- db.table(tblName)
       vOpt <- tbl.read(key)
     } yield vOpt
   }
 
   def set(
-           baseName: String,
-           tblName: String,
-           key: String,
-           value: String
-         ): F[Unit] = {
+    baseName: String,
+    tblName:  String,
+    key:      String,
+    value:    String
+  ): F[Unit] = {
     for {
-      db <- c.database(baseName)
+      db  <- c.database(baseName)
       tbl <- db.table(tblName)
-      _ <- tbl.write(key, value)
+      _   <- tbl.write(key, value)
     } yield ()
   }
 }

@@ -4,10 +4,10 @@ import cats.effect.Async
 import fs2.io.file.{Files, Path}
 import fs2.{Pull, Stream}
 
-def readBinary[F[_] : Async : Files](
-                                      filePath: String,
-                                      schema: List[FieldDef]
-                                    ): Stream[F, (Long, Row)] = {
+def readBinary[F[_]: Async: Files](
+  filePath: String,
+  schema:   List[FieldDef]
+): Stream[F, (Long, Row)] = {
 
   def loop(s: Stream[F, Byte], currentOffset: Long): Pull[F, (Long, Row), Unit] = {
     // 1. Attempt to read the length header (4 bytes)

@@ -13,7 +13,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import pureconfig.ConfigSource
 import pureconfig.module.catseffect.syntax.given
 
-final class Application[F[_] : Async : Files : Parallel : Network](using Dispatcher[F]) {
+final class Application[F[_]: Async: Files: Parallel: Network](using Dispatcher[F]) {
 
   // noinspection ScalaUnusedSymbol
   def start(): F[Unit] =

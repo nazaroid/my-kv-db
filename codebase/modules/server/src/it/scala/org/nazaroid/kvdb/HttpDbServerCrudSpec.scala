@@ -32,10 +32,11 @@ final class HttpDbServerCrudSpec extends AsyncFreeSpec with AsyncIOSpec with Mat
   }
 
   private val testDir = Paths.get("./testFolder")
-  private val config = DbInstanceConfig()
+  private val config  = DbInstanceConfig()
+
   private val httpConf = config.server match {
     case http: ServerConfig.Http => http
-    case _ => throw new IllegalStateException("Expected Http server configuration")
+    case _                       => throw new IllegalStateException("Expected Http server configuration")
   }
   private val host = httpConf.host
   private val port = httpConf.port
@@ -51,26 +52,26 @@ final class HttpDbServerCrudSpec extends AsyncFreeSpec with AsyncIOSpec with Mat
 
         _ <- DbInstance[IO]().resource(config).use { handle =>
           for {
-            req <- Async[IO].blocking(Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db")))
-            _ <- logger.info(f"create db request: $req")
+            req  <- Async[IO].blocking(Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db")))
+            _    <- logger.info(f"create db request: $req")
             resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
-            _ <- logger.info(f"create db response: $resp")
+            _    <- logger.info(f"create db response: $resp")
 
             req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl"))
-            _ <- logger.info(f"create tbl request: $req")
+            _    <- logger.info(f"create tbl request: $req")
             resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
-            _ <- logger.info(f"create tbl response: $resp")
+            _    <- logger.info(f"create tbl response: $resp")
 
             req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key")).withEntity("value")
-            _ <- logger.info(f"set value request: $req")
+            _    <- logger.info(f"set value request: $req")
             resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
-            _ <- logger.info(f"set value response: $resp")
+            _    <- logger.info(f"set value response: $resp")
 
             req = Request[IO](GET, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key"))
-            _ <- logger.info(f"get value request: $req")
+            _    <- logger.info(f"get value request: $req")
             resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
-            _ <- logger.info(f"get value response: $resp")
-            _ <- handle.stop
+            _    <- logger.info(f"get value response: $resp")
+            _    <- handle.stop
           } yield assert(resp == "value")
         }
       } yield ()
@@ -87,21 +88,21 @@ final class HttpDbServerCrudSpec extends AsyncFreeSpec with AsyncIOSpec with Mat
         _ <- logger.info(f"=== first db session ===")
         _ <- DbInstance[IO]().resource(config).use { handle =>
           for {
-            req <- Async[IO].blocking(Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db")))
-            _ <- logger.info(f"create db request: $req")
+            req  <- Async[IO].blocking(Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db")))
+            _    <- logger.info(f"create db request: $req")
             resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
-            _ <- logger.info(f"create db response: $resp")
+            _    <- logger.info(f"create db response: $resp")
 
             req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl"))
-            _ <- logger.info(f"create tbl request: $req")
+            _    <- logger.info(f"create tbl request: $req")
             resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
-            _ <- logger.info(f"create tbl response: $resp")
+            _    <- logger.info(f"create tbl response: $resp")
 
             req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key")).withEntity("value")
-            _ <- logger.info(f"set value request: $req")
+            _    <- logger.info(f"set value request: $req")
             resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
-            _ <- logger.info(f"set value response: $resp")
-            _ <- handle.stop
+            _    <- logger.info(f"set value response: $resp")
+            _    <- handle.stop
           } yield ()
         }
         _ <- Async[IO].sleep(100.millis)
@@ -109,11 +110,11 @@ final class HttpDbServerCrudSpec extends AsyncFreeSpec with AsyncIOSpec with Mat
         _ <- logger.info(f"=== second db session ===")
         _ <- DbInstance[IO]().resource(config).use { handle =>
           for {
-            req <- Async[IO].blocking(Request[IO](GET, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key")))
-            _ <- logger.info(f"get value request: $req")
+            req  <- Async[IO].blocking(Request[IO](GET, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key")))
+            _    <- logger.info(f"get value request: $req")
             resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
-            _ <- logger.info(f"get value response: $resp")
-            _ <- handle.stop
+            _    <- logger.info(f"get value response: $resp")
+            _    <- handle.stop
           } yield assert(resp == "value")
         }
       } yield ()

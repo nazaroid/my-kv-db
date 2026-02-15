@@ -8,11 +8,11 @@ import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.{WriteTask, writeBinary}
 import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
 
-final class Catalog[F[_] : Async : Files](
-                                           val rootPath: Path,
-                                           val writeQueue: Channel[F, WriteTask[F]],
-                                           val configTemplate: StorageConfig,
-                                           val databases: Ref[F, Map[String, Database[F]]]) {
+final class Catalog[F[_]: Async: Files](
+  val rootPath:       Path,
+  val writeQueue:     Channel[F, WriteTask[F]],
+  val configTemplate: StorageConfig,
+  val databases:      Ref[F, Map[String, Database[F]]]) {
 
   def database(dbName: String): F[Database[F]] = {
     databases.get.flatMap { activeDbs =>
@@ -21,7 +21,7 @@ final class Catalog[F[_] : Async : Files](
         case None =>
           val dbPath = rootPath / dbName
           for {
-            _ <- Files[F].createDirectories(dbPath).handleError(_ => ())
+            _         <- Files[F].createDirectories(dbPath).handleError(_ => ())
             tablesRef <- Ref.of[F, Map[String, StorageManager[F]]](Map.empty)
             db = new Database(dbName, dbPath, writeQueue, configTemplate, tablesRef)
             _ <- databases.update(_ + (dbName -> db))
@@ -33,12 +33,12 @@ final class Catalog[F[_] : Async : Files](
 
 object Catalog {
 
-  def init[F[_] : Async : Files](
-                                  rootPath: Path,
-                                  configTemplate: StorageConfig,
-                                  queueSize: Int = 10000,
-                                  parallelism: Int = 10
-                                ): Resource[F, Catalog[F]] = {
+  def init[F[_]: Async: Files](
+    rootPath:       Path,
+    configTemplate: StorageConfig,
+    queueSize:      Int = 10000,
+    parallelism:    Int = 10
+  ): Resource[F, Catalog[F]] = {
     for {
       // 1. Create root directory if it doesn't exist
       _ <- Resource.eval(Files[F].createDirectories(rootPath).handleError(_ => ()))

@@ -5,11 +5,11 @@ import cats.implicits.given
 import fs2.Chunk
 import fs2.io.file.{Files, Path}
 
-def readRowAt[F[_] : Async : Files](
-                                     filePath: String,
-                                     schema: List[FieldDef],
-                                     offset: Long
-                                   ): F[Option[Row]] = {
+def readRowAt[F[_]: Async: Files](
+  filePath: String,
+  schema:   List[FieldDef],
+  offset:   Long
+): F[Option[Row]] = {
   val path = Path(filePath)
 
   // Step 1: Read the header (4 bytes)
