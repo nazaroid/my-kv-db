@@ -17,14 +17,13 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
 
 (cv CrudSpec)
 
+- (TODO) подключить compact в фоне
 - (TODO) реализовать сценарий с удалением значения
 - (TODO) проработать результаты CODE_REVIEW (особенно исправить баг по длинне ключей)
 - (TODO) «v2 формата» с CRC и чёткой моделью сбоев (см ревью)
-
 - (TODO) подготовить для OpenSource
-
 - (TODO) добавить метрики
-- 
+- (TODO) оптимизировать: size <- Files[F].size(Path(ds.filePath)).handleError(_ => 0L)
 - (TODO) MVP: попробовать переделать на DSL + Free (можно только AppL и ServiceL)
      (AppL (run), 
      ServiceL (startEndpoint httpCfg | grpcCfg)
