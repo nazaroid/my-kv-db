@@ -82,7 +82,7 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
     storageResource.use { sm =>
       for {
         // Write enough data to trigger rotation (1KB limit)
-        _    <- sm.write("k1", "a" * 600)
+        _    <- sm.write("k1", "a" * 1025)
         seg1 <- sm.currentData.get.map(_.filePath)
 
         _    <- sm.write("k2", "b" * 600)
@@ -95,7 +95,7 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
 
         // Data from the old segment should still be accessible
         val1 <- sm.read("k1")
-      } yield assert(val1.contains("a" * 600))
+      } yield assert(val1.contains("a" * 1025))
     }
   }
 

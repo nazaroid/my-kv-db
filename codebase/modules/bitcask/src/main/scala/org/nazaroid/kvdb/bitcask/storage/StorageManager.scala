@@ -117,12 +117,12 @@ sealed class StorageManager[F[_]: Async: Files](
           newMappings <- aliveEntries.foldLeftM(Map.empty[String, CacheEntry]) { case (acc, (key, row)) =>
             for {
               bytes <- Async[F].delay(encode(row, config.dataSchema))
-              _     <- Stream.chunk(bytes).through(Files[F].writeAll(cDataPath, Flags(Flag.Append))).compile.drain
+              _     <- Stream.chunk(bytes).through(Files[F].writeAll(cDataPath, Flags(Flag.Create, Flag.Append))).compile.drain
               off   <- Files[F].size(cDataPath).map(_ - bytes.size)
 
               iRow = Map("keySize" -> key.length, "key" -> key, "offset" -> off)
               iBytes <- Async[F].delay(encode(iRow, config.segmentSchema))
-              _      <- Stream.chunk(iBytes).through(Files[F].writeAll(cIdxPath, Flags(Flag.Append))).compile.drain
+              _      <- Stream.chunk(iBytes).through(Files[F].writeAll(cIdxPath, Flags(Flag.Create, Flag.Append))).compile.drain
 
               tRow = Map(
                 "keySize"         -> key.length,
