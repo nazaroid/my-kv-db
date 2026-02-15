@@ -1,13 +1,12 @@
 package org.nazaroid.kvdb.srv.http.middlewares
 
 import cats.data.OptionT
-import cats.effect.*
-import org.http4s.*
-import org.http4s.server.*
+import cats.effect.MonadCancelThrow
 import org.http4s.server.middleware.{ErrorAction, ErrorHandling}
+import org.http4s.HttpRoutes
 import org.typelevel.log4cats.Logger
 
-trait Err[F[_]: MonadCancelThrow: Logger] {
+trait Err[F[_] : MonadCancelThrow : Logger] {
 
   // noinspection TypeAnnotation,ScalaStyle
   def withErrorLogging(r: HttpRoutes[F]) =
@@ -17,7 +16,7 @@ trait Err[F[_]: MonadCancelThrow: Logger] {
         ErrorAction.log(
           r,
           messageFailureLogAction = errorHandler,
-          serviceErrorLogAction   = errorHandler
+          serviceErrorLogAction = errorHandler
         )
       )
 

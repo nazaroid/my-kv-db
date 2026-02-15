@@ -4,12 +4,12 @@ object Dependencies {
 
   object CatsEffect {
     private val catsLogsVersion = "2.7.0"
-    private val core           = "org.typelevel"         %% "cats-core"              % "2.12.0"
-    private val catsEffect     = "org.typelevel"         %% "cats-effect"            % "3.5.4"
-    private val catsLogs       = "org.typelevel"         %% "log4cats-core"          % catsLogsVersion
-    private val catsLog4j      = "org.typelevel"         %% "log4cats-slf4j"         % catsLogsVersion
+    private val core = "org.typelevel" %% "cats-core" % "2.12.0"
+    private val catsEffect = "org.typelevel" %% "cats-effect" % "3.5.4"
+    private val catsLogs = "org.typelevel" %% "log4cats-core" % catsLogsVersion
+    private val catsLog4j = "org.typelevel" %% "log4cats-slf4j" % catsLogsVersion
     private val pureconfigCats = "com.github.pureconfig" %% "pureconfig-cats-effect" % "0.17.6"
-    val catsTest        = "org.typelevel" %% "cats-effect-testing-scalatest" % "1.5.0" % Test
+    val catsTest = "org.typelevel" %% "cats-effect-testing-scalatest" % "1.5.0" % Test
     val all: Seq[ModuleID] = Seq(core, catsEffect, catsLogs, catsLog4j, pureconfigCats)
 
   }
@@ -27,9 +27,9 @@ object Dependencies {
     private val prometheusSimpleClientV = "0.16.0"
 
     val all: Seq[ModuleID] = Seq(
-      "me.dinowernli" % "java-grpc-prometheus"    % "0.6.0" excludeAll "io.grpc",
+      "me.dinowernli" % "java-grpc-prometheus" % "0.6.0" excludeAll "io.grpc",
       "io.prometheus" % "simpleclient_httpserver" % prometheusSimpleClientV,
-      "io.prometheus" % "simpleclient_hotspot"    % prometheusSimpleClientV
+      "io.prometheus" % "simpleclient_hotspot" % prometheusSimpleClientV
     )
   }
 
@@ -41,10 +41,10 @@ object Dependencies {
       "org.http4s" %% "http4s-ember-client" % Http4sVersion,
       "org.http4s" %% "http4s-circe" % Http4sVersion,
       "org.http4s" %% "http4s-dsl" % Http4sVersion,
-      "com.disneystreaming.smithy4s" %% "smithy4s-http4s" % smithy4sVersion excludeAll(
+      "com.disneystreaming.smithy4s" %% "smithy4s-http4s" % smithy4sVersion excludeAll (
         ExclusionRule("org.scala-lang.modules")
         ),
-      "com.disneystreaming.smithy4s" %% "smithy4s-http4s-swagger" % smithy4sVersion excludeAll(
+      "com.disneystreaming.smithy4s" %% "smithy4s-http4s-swagger" % smithy4sVersion excludeAll (
         ExclusionRule("org.scala-lang.modules")
         )
     )

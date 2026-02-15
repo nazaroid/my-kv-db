@@ -18,7 +18,7 @@ package org.http4s.metrics.prometheus
 
 import cats.data.NonEmptyList
 import cats.effect.{Resource, Sync}
-import cats.syntax.all.*
+import cats.implicits.given
 import io.prometheus.client.*
 import org.http4s.metrics.TerminationType.{Abnormal, Canceled, Error, Timeout}
 import org.http4s.metrics.prometheus.Prometheus.{registerCollector, toFlatArray}
@@ -77,13 +77,14 @@ import org.http4s.{Method, Status}
 // * custom labels: custom labels, provided by customLabelsAndValues.map(_._1)
 // * values: custom label values, provided by customLabelsAndValues.map(_._2)
 // */
-final class Prometheus[F[_]: Sync] private (
+final class Prometheus[F[_] : Sync] private(
                                              private val prefix: String,
                                              private val registry: CollectorRegistry,
                                              private val sampleExemplar: F[Option[Map[String, String]]],
                                              private val customLabelsAndValues: List[(String, String)],
                                              private val responseDurationSecondsHistogramBuckets: NonEmptyList[Double],
-                                           ) { self =>
+                                           ) {
+  self =>
   private def copy(
                     prefix: String = self.prefix,
                     registry: CollectorRegistry = self.registry,
@@ -101,6 +102,7 @@ final class Prometheus[F[_]: Sync] private (
     )
 
   def withPrefix(prefix: String): Prometheus[F] = copy(prefix = prefix)
+
   def withRegister(registry: CollectorRegistry): Prometheus[F] = copy(registry = registry)
 
   def withSampleExemplar(sampleExemplar: F[Option[Map[String, String]]]): Prometheus[F] =
@@ -115,7 +117,7 @@ final class Prometheus[F[_]: Sync] private (
                                                  ): Prometheus[F] =
     copy(responseDurationSecondsHistogramBuckets = responseDurationSecondsHistogramBuckets)
 
-//  /** Build a [[MetricsOps]] that supports Prometheus metrics */
+  //  /** Build a [[MetricsOps]] that supports Prometheus metrics */
   def build: Resource[F, MetricsOps[F]] = createMetricsCollection.map(createMetricsOps)
 
   private def createMetricsOps(metrics: MetricsCollection): MetricsOps[F] = {
@@ -126,14 +128,14 @@ final class Prometheus[F[_]: Sync] private (
       override def increaseActiveRequests(classifier: Option[String]): F[Unit] =
         Sync[F].delay {
           metrics.activeRequests
-            .labels(label(classifier) +: customLabelValues*)
+            .labels(label(classifier) +: customLabelValues *)
             .inc()
         }
 
       override def decreaseActiveRequests(classifier: Option[String]): F[Unit] =
         Sync[F].delay {
           metrics.activeRequests
-            .labels(label(classifier) +: customLabelValues*)
+            .labels(label(classifier) +: customLabelValues *)
             .dec()
         }
 
@@ -149,11 +151,11 @@ final class Prometheus[F[_]: Sync] private (
                 label(classifier) +:
                   reportMethod(method) +:
                   Phase.report(Phase.Headers) +:
-                  customLabelValues*
+                  customLabelValues *
               )
               .observeWithExemplar(
                 SimpleTimer.elapsedSecondsFromNanos(0, elapsed),
-                exemplarOpt.orNull*
+                exemplarOpt.orNull *
               )
           }
         }
@@ -171,20 +173,20 @@ final class Prometheus[F[_]: Sync] private (
                 label(classifier) +:
                   reportMethod(method) +:
                   Phase.report(Phase.Body) +:
-                  customLabelValues*
+                  customLabelValues *
               )
               .observeWithExemplar(
                 SimpleTimer.elapsedSecondsFromNanos(0, elapsed),
-                exemplarOpt.orNull*
+                exemplarOpt.orNull *
               )
             metrics.requests
               .labels(
                 label(classifier) +:
                   reportMethod(method) +:
                   reportStatus(status) +:
-                  customLabelValues*
+                  customLabelValues *
               )
-              .incWithExemplar(exemplarOpt.orNull*)
+              .incWithExemplar(exemplarOpt.orNull *)
           }
         }
 
@@ -208,11 +210,11 @@ final class Prometheus[F[_]: Sync] private (
                 label(classifier) +:
                   AbnormalTermination.report(AbnormalTermination.Canceled) +:
                   label(Option.empty) +:
-                  customLabelValues*
+                  customLabelValues *
               )
               .observeWithExemplar(
                 SimpleTimer.elapsedSecondsFromNanos(0, elapsed),
-                exemplarOpt.orNull*
+                exemplarOpt.orNull *
               )
           }
         }
@@ -229,11 +231,11 @@ final class Prometheus[F[_]: Sync] private (
                 label(classifier) +:
                   AbnormalTermination.report(AbnormalTermination.Abnormal) +:
                   label(Option(cause.getClass.getName)) +:
-                  customLabelValues*
+                  customLabelValues *
               )
               .observeWithExemplar(
                 SimpleTimer.elapsedSecondsFromNanos(0, elapsed),
-                exemplarOpt.orNull*
+                exemplarOpt.orNull *
               )
           }
         }
@@ -250,11 +252,11 @@ final class Prometheus[F[_]: Sync] private (
                 label(classifier) +:
                   AbnormalTermination.report(AbnormalTermination.Error) +:
                   label(Option(cause.getClass.getName)) +:
-                  customLabelValues*
+                  customLabelValues *
               )
               .observeWithExemplar(
                 SimpleTimer.elapsedSecondsFromNanos(0, elapsed),
-                exemplarOpt.orNull*
+                exemplarOpt.orNull *
               )
           }
         }
@@ -267,11 +269,11 @@ final class Prometheus[F[_]: Sync] private (
                 label(classifier) +:
                   AbnormalTermination.report(AbnormalTermination.Timeout) +:
                   label(Option.empty) +:
-                  customLabelValues*
+                  customLabelValues *
               )
               .observeWithExemplar(
                 SimpleTimer.elapsedSecondsFromNanos(0, elapsed),
-                exemplarOpt.orNull*
+                exemplarOpt.orNull *
               )
           }
         }
@@ -310,10 +312,10 @@ final class Prometheus[F[_]: Sync] private (
     val responseDuration: Resource[F, Histogram] = registerCollector(
       Histogram
         .build()
-        .buckets(responseDurationSecondsHistogramBuckets.toList*)
+        .buckets(responseDurationSecondsHistogramBuckets.toList *)
         .name(prefix + "_" + "response_duration_seconds")
         .help("Response Duration in seconds.")
-        .labelNames("classifier" +: "method" +: "phase" +: customLabels*)
+        .labelNames("classifier" +: "method" +: "phase" +: customLabels *)
         .create(),
       registry,
     )
@@ -323,7 +325,7 @@ final class Prometheus[F[_]: Sync] private (
         .build()
         .name(prefix + "_" + "active_request_count")
         .help("Total Active Requests.")
-        .labelNames("classifier" +: customLabels*)
+        .labelNames("classifier" +: customLabels *)
         .create(),
       registry,
     )
@@ -333,7 +335,7 @@ final class Prometheus[F[_]: Sync] private (
         .build()
         .name(prefix + "_" + "request_count")
         .help("Total Requests.")
-        .labelNames("classifier" +: "method" +: "status" +: customLabels*)
+        .labelNames("classifier" +: "method" +: "status" +: customLabels *)
         .create(),
       registry,
     )
@@ -343,7 +345,7 @@ final class Prometheus[F[_]: Sync] private (
         .build()
         .name(prefix + "_" + "abnormal_terminations")
         .help("Total Abnormal Terminations.")
-        .labelNames("classifier" +: "termination_type" +: "cause" +: customLabels*)
+        .labelNames("classifier" +: "termination_type" +: "cause" +: customLabels *)
         .create(),
       registry,
     )
@@ -356,39 +358,39 @@ object Prometheus {
   def collectorRegistry[F[_]](implicit F: Sync[F]): Resource[F, CollectorRegistry] =
     Resource.make(F.delay(new CollectorRegistry()))(cr => F.blocking(cr.clear()))
 
-//  /** Creates a [[MetricsOps]] that supports Prometheus metrics
-//   *
-//   * @param registry a metrics collector registry
-//   * @param prefix a prefix that will be added to all metrics
-//   */
-  def metricsOps[F[_]: Sync](
-                              registry: CollectorRegistry,
-                              prefix: String = "org_http4s_server",
-                              responseDurationSecondsHistogramBuckets: NonEmptyList[Double] = DefaultHistogramBuckets,
-                            ): Resource[F, MetricsOps[F]] =
+  //  /** Creates a [[MetricsOps]] that supports Prometheus metrics
+  //   *
+  //   * @param registry a metrics collector registry
+  //   * @param prefix a prefix that will be added to all metrics
+  //   */
+  def metricsOps[F[_] : Sync](
+                               registry: CollectorRegistry,
+                               prefix: String = "org_http4s_server",
+                               responseDurationSecondsHistogramBuckets: NonEmptyList[Double] = DefaultHistogramBuckets,
+                             ): Resource[F, MetricsOps[F]] =
     Prometheus
       .default(registry)
       .withPrefix(prefix)
       .withResponseDurationSecondsHistogramBuckets(responseDurationSecondsHistogramBuckets)
       .build
 
-//  /** Creates a [[MetricsOps]] that supports Prometheus metrics and records exemplars.
-//   *
-//   * Warning: The sampler effect is responsible for producing exemplar labels that are valid for the underlying
-//   * implementation as errors happening during metric recording will not be handled! For Prometheus version < 1.0,
-//   * this means the combined length of keys and values may not exceed 128 characters and the parts must adhere
-//   * to the label regex Prometheus defines.
-//   *
-//   * @param registry a metrics collector registry
-//   * @param sampleExemplar an effect that returns the corresponding exemplar labels
-//   * @param prefix a prefix that will be added to all metrics
-//   */
-  def metricsOpsWithExemplars[F[_]: Sync](
-                                           registry: CollectorRegistry,
-                                           sampleExemplar: F[Option[Map[String, String]]],
-                                           prefix: String = "org_http4s_server",
-                                           responseDurationSecondsHistogramBuckets: NonEmptyList[Double] = DefaultHistogramBuckets,
-                                         ): Resource[F, MetricsOps[F]] =
+  //  /** Creates a [[MetricsOps]] that supports Prometheus metrics and records exemplars.
+  //   *
+  //   * Warning: The sampler effect is responsible for producing exemplar labels that are valid for the underlying
+  //   * implementation as errors happening during metric recording will not be handled! For Prometheus version < 1.0,
+  //   * this means the combined length of keys and values may not exceed 128 characters and the parts must adhere
+  //   * to the label regex Prometheus defines.
+  //   *
+  //   * @param registry a metrics collector registry
+  //   * @param sampleExemplar an effect that returns the corresponding exemplar labels
+  //   * @param prefix a prefix that will be added to all metrics
+  //   */
+  def metricsOpsWithExemplars[F[_] : Sync](
+                                            registry: CollectorRegistry,
+                                            sampleExemplar: F[Option[Map[String, String]]],
+                                            prefix: String = "org_http4s_server",
+                                            responseDurationSecondsHistogramBuckets: NonEmptyList[Double] = DefaultHistogramBuckets,
+                                          ): Resource[F, MetricsOps[F]] =
     Prometheus
       .default[F](registry)
       .withPrefix(prefix)
@@ -420,7 +422,7 @@ object Prometheus {
     arr
   }
 
-  def default[F[_]: Sync](registry: CollectorRegistry) =
+  def default[F[_] : Sync](registry: CollectorRegistry) =
     new Prometheus[F](
       prefix = "org_http4s_server",
       registry = registry,
@@ -439,9 +441,12 @@ final case class MetricsCollection(
                                   )
 
 private sealed trait Phase
+
 private object Phase {
   case object Headers extends Phase
+
   case object Body extends Phase
+
   def report(s: Phase): String =
     s match {
       case Headers => "headers"
@@ -450,11 +455,16 @@ private object Phase {
 }
 
 private sealed trait AbnormalTermination
+
 private object AbnormalTermination {
   case object Abnormal extends AbnormalTermination
+
   case object Error extends AbnormalTermination
+
   case object Timeout extends AbnormalTermination
+
   case object Canceled extends AbnormalTermination
+
   def report(t: AbnormalTermination): String =
     t match {
       case Abnormal => "abnormal"

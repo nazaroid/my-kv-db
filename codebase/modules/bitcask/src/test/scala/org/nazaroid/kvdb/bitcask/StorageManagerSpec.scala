@@ -1,12 +1,11 @@
 package org.nazaroid.kvdb.bitcask
 
-import cats.effect.*
 import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.effect.{IO, Resource}
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
-import org.nazaroid.kvdb.*
-import org.nazaroid.kvdb.binfileio.*
-import org.nazaroid.kvdb.bitcask.storage.*
+import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType, writeBinary, WriteTask}
+import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
 import org.scalatest.FutureOutcome
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -31,7 +30,7 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
   private val testDir = Paths.get("./testFolder")
 
   private val config = StorageConfig(
-    folder         = testDir.toString,
+    folder = testDir.toString,
     maxSegmentSize = 1024, // Small size for rotation testing (1KB)
     dataSchema = List(
       FieldDef("recordSize", FieldType.Int32),
@@ -52,17 +51,17 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
 
   // Resource for running the manager in tests
   private val storageResource: Resource[IO, StorageManager[IO]] = for {
-    _     <- Resource.eval(Files[IO].createDirectories(Path(testDir.toString)).handleError(_ => ()))
+    _ <- Resource.eval(Files[IO].createDirectories(Path(testDir.toString)).handleError(_ => ()))
     queue <- Channel.bounded[IO, WriteTask[IO]](100).toResource
     // Run the background binary write worker
-    _       <- writeBinary(queue.stream, parallelism = 1).compile.drain.background
+    _ <- writeBinary(queue.stream, parallelism = 1).compile.drain.background
     manager <- Resource.eval(StorageManager.initialize[IO](config, queue))
   } yield manager
 
   "Write and Read: written value should be accessible" in {
     storageResource.use { sm =>
       for {
-        _   <- sm.write("user:1", "hello stratum")
+        _ <- sm.write("user:1", "hello stratum")
         res <- sm.read("user:1")
       } yield assert(res.contains("hello stratum"))
     }
@@ -71,8 +70,8 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
   "Delete: deleted value should return None" in {
     storageResource.use { sm =>
       for {
-        _   <- sm.write("user:2", "to be deleted")
-        _   <- sm.delete("user:2")
+        _ <- sm.write("user:2", "to be deleted")
+        _ <- sm.delete("user:2")
         res <- sm.read("user:2")
       } yield assert(res.isEmpty)
     }
@@ -82,10 +81,10 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
     storageResource.use { sm =>
       for {
         // Write enough data to trigger rotation (1KB limit)
-        _    <- sm.write("k1", "a" * 1025)
+        _ <- sm.write("k1", "a" * 1025)
         seg1 <- sm.currentData.get.map(_.filePath)
 
-        _    <- sm.write("k2", "b" * 600)
+        _ <- sm.write("k2", "b" * 600)
         seg2 <- sm.currentData.get.map(_.filePath)
 
         _ <- IO.sleep(100.millis) // Allow time for file system operations
@@ -112,7 +111,7 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
 
         // Verify live data is still present
         res <- sm.read("permanent")
-        _   <- IO.blocking(assert(res.contains("keep me")))
+        _ <- IO.blocking(assert(res.contains("keep me")))
 
         // Verify physical file existence via Files.list
         files <- Files[IO].list(Path(testDir.toString)).map(_.fileName.toString).compile.toList
@@ -160,8 +159,8 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
         for {
           val1 <- sm.read(keyToKeep)
           val2 <- sm.read(keyToDelete)
-          _    <- IO.pure(assert(val1.contains("value1")))
-          _    <- IO.pure(assert(val2.isEmpty, "Deleted key should not be recovered"))
+          _ <- IO.pure(assert(val1.contains("value1")))
+          _ <- IO.pure(assert(val2.isEmpty, "Deleted key should not be recovered"))
         } yield ()
       }
     } yield ()

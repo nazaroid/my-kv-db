@@ -34,15 +34,15 @@ final class BinFileIOSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
       FieldDef("offset", FieldType.Int64)
     )
     val writtenRows: List[Row] = List(
-      Map("keySize" -> 4, "key" -> "user", "offset"  -> 1024L),
+      Map("keySize" -> 4, "key" -> "user", "offset" -> 1024L),
       Map("keySize" -> 5, "key" -> "admin", "offset" -> 2048L)
     )
 
     val inputWriteTasks = writtenRows.map(r => WriteTask[IO]("key", path, schema = schema, row = r, None))
 
     for {
-      _        <- BinFileIO.writeAll[IO](Stream.emits(inputWriteTasks), 2).compile.drain
-      _        <- Async[IO].sleep(100 millis)
+      _ <- BinFileIO.writeAll[IO](Stream.emits(inputWriteTasks), 2).compile.drain
+      _ <- Async[IO].sleep(100 millis)
       readRows <- BinFileIO.readAll[IO](path, schema).map(_._2).compile.toList
 
     } yield assert(writtenRows == readRows)

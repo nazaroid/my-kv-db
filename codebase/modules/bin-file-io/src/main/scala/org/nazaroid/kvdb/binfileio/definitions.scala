@@ -1,7 +1,6 @@
 package org.nazaroid.kvdb.binfileio
 
 import cats.effect.{Async, Deferred}
-import fs2.io.file.Files
 
 enum FieldType {
   case Int32
@@ -13,9 +12,9 @@ case class FieldDef(name: String, fType: FieldType)
 
 type Row = Map[String, Any]
 
-case class WriteTask[F[_]: Async: Files](
-  id:       String,
-  filePath: String,
-  schema:   List[FieldDef],
-  row:      Row,
-  callback: Option[Deferred[F, Long]])
+case class WriteTask[F[_] : Async](
+                                    id: String,
+                                    filePath: String,
+                                    schema: List[FieldDef],
+                                    row: Row,
+                                    callback: Option[Deferred[F, Long]])

@@ -1,4 +1,4 @@
-import Dependencies.{CatsEffect, Fs2, Http4s, Prometheus, Testing}
+import Dependencies.*
 import com.typesafe.sbt.SbtNativePackager.Docker
 import sbt.Keys.*
 import sbt.{Def, *}

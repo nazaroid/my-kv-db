@@ -10,15 +10,15 @@ lazy val root = (project in file("."))
   )
   .settings(
     commonSettings,
-    name                                   := "kvdb",
-    version                                := GLOBAL_VERSION,
-    Compile / unmanagedSourceDirectories   := Nil,
+    name := "kvdb",
+    version := GLOBAL_VERSION,
+    Compile / unmanagedSourceDirectories := Nil,
     Compile / unmanagedResourceDirectories := Nil,
-    Test / unmanagedSourceDirectories      := Nil,
-    Test / unmanagedResourceDirectories    := Nil,
-    sbt.Keys.`package`                     := target.value,
-    publish                                := {},
-    publishLocal                           := {}
+    Test / unmanagedSourceDirectories := Nil,
+    Test / unmanagedResourceDirectories := Nil,
+    sbt.Keys.`package` := target.value,
+    publish := {},
+    publishLocal := {}
   )
 
 lazy val `prometheus` = (project in file("codebase/modules/utils/third_party/prometheus"))
@@ -27,7 +27,7 @@ lazy val `prometheus` = (project in file("codebase/modules/utils/third_party/pro
   .configs(Integration)
   .settings(
     commonSettings,
-    name    := "prometheus",
+    name := "prometheus",
     version := GLOBAL_VERSION,
     excludeDependencies -= ExclusionRule("log4j", "log4j"),
     Test / testOptions += Tests
@@ -44,7 +44,7 @@ lazy val `metrics` = (project in file("codebase/modules/utils/metrics"))
   .configs(Integration)
   .settings(
     commonSettings,
-    name    := "metrics",
+    name := "metrics",
     version := GLOBAL_VERSION,
     excludeDependencies -= ExclusionRule("log4j", "log4j"),
     Test / testOptions += Tests
@@ -60,7 +60,7 @@ lazy val `bin-file-io` = (project in file("codebase/modules/bin-file-io"))
   .configs(Integration)
   .settings(
     commonSettings,
-    name    := "bin-file-io",
+    name := "bin-file-io",
     version := GLOBAL_VERSION,
     libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Logging.all ++ Testing.all,
     excludeDependencies -= ExclusionRule("log4j", "log4j"),
@@ -78,7 +78,7 @@ lazy val `bitcask` = (project in file("codebase/modules/bitcask"))
   .configs(Integration)
   .settings(
     commonSettings,
-    name    := "bitcask",
+    name := "bitcask",
     version := GLOBAL_VERSION,
     libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Logging.all ++ Testing.all,
     excludeDependencies -= ExclusionRule("log4j", "log4j"),
@@ -97,7 +97,7 @@ lazy val `server` = (project in file("codebase/modules/server"))
   .configs(Integration)
   .settings(
     commonSettings,
-    name    := "server",
+    name := "server",
     version := GLOBAL_VERSION,
     libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Http4s.all ++ Logging.all ++ Prometheus.all ++ Testing.all,
     excludeDependencies -= ExclusionRule("log4j", "log4j"),
@@ -116,7 +116,7 @@ lazy val `service` = (project in file("codebase/service"))
   .configs(Integration)
   .settings(
     commonSettings,
-    name    := "service",
+    name := "service",
     version := GLOBAL_VERSION,
     libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Http4s.all ++ Logging.all ++ Prometheus.all ++ Testing.all,
     excludeDependencies -= ExclusionRule("log4j", "log4j"),
@@ -125,12 +125,12 @@ lazy val `service` = (project in file("codebase/service"))
     inConfig(Integration)(Defaults.testSettings),
     Integration / testOptions += Tests
       .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/service/integration-tests-html-report"),
-    dockerBaseImage      := "openjdk:25-oraclelinux8",
+    dockerBaseImage := "openjdk:25-oraclelinux8",
     Docker / packageName := "org/nazaroid/kvdb/server",
-    Docker / version     := version.value,
+    Docker / version := version.value,
     envVars += (sys.props.get("config") match {
       case Some(confName: String) => "config" -> confName
-      case _                      => "config" -> "application.conf"
+      case _ => "config" -> "application.conf"
     })
   )
 
