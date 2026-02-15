@@ -33,6 +33,7 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
 * (TODO) (проектирование/реализация) добавить bloom filter
     * спроектировать сценарии использования
     * реализовать
+* (TODO) поддержи GRPC
 
 grafana + prometheus
 https://github.com/gvolpe/trading/blob/main/docker-compose.yml
