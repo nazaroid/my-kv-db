@@ -121,6 +121,33 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
     }
   }
 
+  "Segment threshold: compaction should run when segment count exceeds limit" in {
+    val compactConfig = config.copy(maxSegmentSize = 200, maxSegmentCount = 1)
+    val compactResource: Resource[IO, StorageManager[IO]] = for {
+      _     <- Resource.eval(Files[IO].createDirectories(Path(testDir.toString)).handleError(_ => ()))
+      queue <- Channel.bounded[IO, WriteTask[IO]](100).toResource
+      _       <- writeBinary(queue.stream, parallelism = 1).compile.drain.background
+      manager <- Resource.eval(StorageManager.initialize[IO](compactConfig, queue))
+    } yield manager
+
+    compactResource.use { sm =>
+      for {
+        _ <- sm.write("k1", "a" * 500)
+        _ <- sm.write("k2", "b" * 500)
+        _ <- IO.sleep(300.millis)
+        v1 <- sm.read("k1")
+        v2 <- sm.read("k2")
+        files <- Files[IO].list(Path(testDir.toString)).map(_.fileName.toString).compile.toList
+        binCount = files.count(_.endsWith(".bin"))
+      } yield {
+        assert(v1.contains("a" * 500))
+        assert(v2.contains("b" * 500))
+        assert(files.exists(_.startsWith("compact_")), "Compact segment should exist")
+        assert(binCount <= 2, s"Unexpected bin files count: $binCount")
+      }
+    }
+  }
+
   "Recovery: data should be accessible after full system restart" in {
     val key = "persistent_user"
     val value = "{\"data\": \"important\"}"
