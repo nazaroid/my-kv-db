@@ -32,6 +32,7 @@ final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Match
   private val config = StorageConfig(
     folder         = testDir.toString,
     maxSegmentSize = 1024, // Small size for rotation testing (1KB)
+    maxSegmentCount = 10,
     dataSchema = List(
       FieldDef("recordSize", FieldType.Int32),
       FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize"))

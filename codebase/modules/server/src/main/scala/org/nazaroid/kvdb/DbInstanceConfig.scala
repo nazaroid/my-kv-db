@@ -23,7 +23,8 @@ final case class EngineConfig(
   rootDir:              String = "./testFolder",
   fileWriteParallelism: Int = 10,
   fileWriteBufferSize:  Int = 10000,
-  maxSegmentSize:       Long = 1024 * 10)
+  maxSegmentSize:       Long = 1024 * 10,
+  maxSegmentCount:      Int = 10)
 
 final case class DbInstanceConfig(
   server: ServerConfig = ServerConfig.Http(),

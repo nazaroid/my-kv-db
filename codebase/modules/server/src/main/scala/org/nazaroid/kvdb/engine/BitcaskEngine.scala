@@ -16,6 +16,7 @@ object BitcaskEngine {
     val storageConfig = StorageConfig(
       folder         = conf.rootDir,
       maxSegmentSize = conf.maxSegmentSize,
+      maxSegmentCount = conf.maxSegmentCount,
       dataSchema = List(
         FieldDef("recordSize", FieldType.Int32),
         FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize"))

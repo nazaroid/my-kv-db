@@ -20,6 +20,7 @@ enum CacheEntry {
 case class StorageConfig(
   folder:         String,
   maxSegmentSize: Long,
+  maxSegmentCount: Int,
   dataSchema:     List[FieldDef],
   segmentSchema:  List[FieldDef],
   tableSchema:    List[FieldDef])
@@ -57,8 +58,8 @@ sealed class StorageManager[F[_]: Async: Files](
       ds   <- currentData.get
       size <- Files[F].size(Path(ds.filePath)).handleError(_ => 0L)
 
-      // Rotate if the current .bin file exceeds max size
-      activeDS <- if (size > config.maxSegmentSize) rotate() else Async[F].pure(ds)
+      rotation <- if (size > config.maxSegmentSize) rotate().map(_ -> true) else Async[F].pure((ds, false))
+      (activeDS, rotated) = rotation
       activeSS <- currentSegmentIdx.get
 
       // Cascading write operations
@@ -77,6 +78,7 @@ sealed class StorageManager[F[_]: Async: Files](
       _ <- tableStorage.append(key, tableRow)
 
       _ <- cache.update(_ + (key -> CacheEntry.Persistent(dataRow, segName, offset)))
+      _ <- Async[F].whenA(rotated)(compactIfNeeded)
     } yield ()
   }
 
@@ -173,6 +175,21 @@ sealed class StorageManager[F[_]: Async: Files](
     val nSS = new BaseStorage(s"${config.folder}/$name.idx", config.segmentSchema, writeQueue)
     currentData.set(nDS) *> currentSegmentIdx.set(nSS) *> Async[F].pure(nDS)
   }
+
+  private def segmentCount: F[Int] =
+    Files[F]
+      .list(Path(config.folder))
+      .map(_.fileName.toString)
+      .filter(_.endsWith(".bin"))
+      .compile
+      .count
+      .handleError(_ => 0L)
+      .map(_.toInt)
+
+  private def compactIfNeeded: F[Unit] =
+    segmentCount.flatMap { count =>
+      Async[F].whenA(count > config.maxSegmentCount)(compact())
+    }
 }
 
 object StorageManager {
