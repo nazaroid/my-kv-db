@@ -24,4 +24,10 @@ trait Engine[F[_]] {
     key: String,
     value: String
   ): F[Unit]
+
+  def delete(
+    baseName: String,
+    tblName: String,
+    key: String
+  ): F[Unit]
 }

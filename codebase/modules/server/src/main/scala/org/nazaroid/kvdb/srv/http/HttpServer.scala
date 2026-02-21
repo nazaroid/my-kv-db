@@ -81,6 +81,13 @@ final class HttpServer[F[_]: Async: Logger: Network](conf: ServerConfig.Http, en
               _ <- engine.set(dbName, tblName, key, v)
             } yield Ok("OK")
           }.flatten
+        // delete value
+        case r @ DELETE -> Root / dbName / tblName / key =>
+          {
+            for {
+              _ <- engine.delete(dbName, tblName, key)
+            } yield Ok("OK")
+          }.flatten
         // create tbl
         case POST -> Root / dbName / tblName =>
           {

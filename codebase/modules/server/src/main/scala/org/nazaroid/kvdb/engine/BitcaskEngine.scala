@@ -14,8 +14,8 @@ object BitcaskEngine {
 
   def init[F[_]: Async: Files](conf: EngineConfig): Resource[F, Engine[F]] = {
     val storageConfig = StorageConfig(
-      folder         = conf.rootDir,
-      maxSegmentSize = conf.maxSegmentSize,
+      folder          = conf.rootDir,
+      maxSegmentSize  = conf.maxSegmentSize,
       maxSegmentCount = conf.maxSegmentCount,
       dataSchema = List(
         FieldDef("recordSize", FieldType.Int32),
@@ -41,20 +41,20 @@ object BitcaskEngine {
 
 final class BitcaskEngine[F[_]: Async](c: Catalog[F]) extends Engine[F] {
 
-  def createDbIfNotExists(name: String): F[Unit] = {
+  override def createDbIfNotExists(name: String): F[Unit] = {
     for {
       _ <- c.database(name)
     } yield ()
   }
 
-  def createTableIfNotExists(baseName: String, tblName: String): F[Unit] = {
+  override def createTableIfNotExists(baseName: String, tblName: String): F[Unit] = {
     for {
       db <- c.database(baseName)
       _  <- db.table(tblName)
     } yield ()
   }
 
-  def get(
+  override def get(
     baseName: String,
     tblName:  String,
     key:      String
@@ -66,7 +66,7 @@ final class BitcaskEngine[F[_]: Async](c: Catalog[F]) extends Engine[F] {
     } yield vOpt
   }
 
-  def set(
+  override def set(
     baseName: String,
     tblName:  String,
     key:      String,
@@ -76,6 +76,18 @@ final class BitcaskEngine[F[_]: Async](c: Catalog[F]) extends Engine[F] {
       db  <- c.database(baseName)
       tbl <- db.table(tblName)
       _   <- tbl.write(key, value)
+    } yield ()
+  }
+
+  override def delete(
+    baseName: String,
+    tblName:  String,
+    key:      String
+  ): F[Unit] = {
+    for {
+      db  <- c.database(baseName)
+      tbl <- db.table(tblName)
+      _   <- tbl.delete(key)
     } yield ()
   }
 }

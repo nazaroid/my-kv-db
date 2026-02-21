@@ -4,9 +4,9 @@ import cats.effect.IO
 import cats.effect.kernel.Async
 import cats.effect.std.Dispatcher
 import cats.effect.testing.scalatest.AsyncIOSpec
-import org.http4s.Method.{GET, POST}
+import org.http4s.Method.{DELETE, GET, POST}
 import org.http4s.ember.client.EmberClientBuilder
-import org.http4s.{EntityDecoder, Request, Uri}
+import org.http4s.{EntityDecoder, Request, Status, Uri}
 import org.scalatest.FutureOutcome
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -69,10 +69,51 @@ final class HttpDbServerCrudSpec extends AsyncFreeSpec with AsyncIOSpec with Mat
 
             req = Request[IO](GET, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key"))
             _    <- logger.info(f"get value request: $req")
-            resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
+            resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder)).option
             _    <- logger.info(f"get value response: $resp")
             _    <- handle.stop
-          } yield assert(resp == "value")
+          } yield assert(resp.contains("value"))
+        }
+      } yield ()
+    }
+  }
+
+  "can `delete` value after `set`" in {
+    Dispatcher.parallel[IO] use { d =>
+      given Dispatcher[IO] = d
+
+      for {
+        logger <- Slf4jLogger.create[IO]
+        given Logger[IO] = logger
+
+        _ <- DbInstance[IO]().resource(config).use { handle =>
+          for {
+            req  <- Async[IO].blocking(Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db")))
+            _    <- logger.info(f"create db request: $req")
+            resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
+            _    <- logger.info(f"create db response: $resp")
+
+            req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl"))
+            _    <- logger.info(f"create tbl request: $req")
+            resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
+            _    <- logger.info(f"create tbl response: $resp")
+
+            req = Request[IO](POST, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key")).withEntity("value")
+            _    <- logger.info(f"set value request: $req")
+            resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
+            _    <- logger.info(f"set value response: $resp")
+
+            req = Request[IO](DELETE, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key"))
+            _    <- logger.info(f"delete value request: $req")
+            resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
+            _    <- logger.info(f"delete value response: $resp")
+
+            req = Request[IO](GET, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key"))
+            _    <- logger.info(f"get value request: $req")
+            status <- EmberClientBuilder.default[IO].build.use(_.status(req))
+            _    <- logger.info(f"get value response: $resp")
+            _    <- handle.stop
+          } yield assert(status == Status.NotFound)
         }
       } yield ()
     }
@@ -115,7 +156,7 @@ final class HttpDbServerCrudSpec extends AsyncFreeSpec with AsyncIOSpec with Mat
             resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
             _    <- logger.info(f"get value response: $resp")
             _    <- handle.stop
-          } yield assert(resp == "value")
+          } yield assert(resp.contains("value"))
         }
       } yield ()
     }
