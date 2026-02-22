@@ -18,10 +18,15 @@ def readBinary[F[_]: Async: Files](
         // 2. Read the actual record body
         restAfterLen.pull.unconsN(rowSize).flatMap {
           case Some((dataChunk, nextStream)) =>
-            val row = decode(dataChunk, schema)
-            // Emit current offset (start of the 4-byte header) and the decoded data
-            Pull.output1((currentOffset, row)) >>
-              loop(nextStream, currentOffset + 4 + rowSize)
+            decode(dataChunk, schema) match {
+              case Right(row) =>
+                // Emit current offset (start of the 4-byte header) and the decoded data
+                Pull.output1((currentOffset, row)) >>
+                  loop(nextStream, currentOffset + 4 + rowSize)
+              case Left(error) =>
+                // Log CRC error and continue
+                Pull.done // Skip corrupted record
+            }
           case None =>
             Pull.done
         }

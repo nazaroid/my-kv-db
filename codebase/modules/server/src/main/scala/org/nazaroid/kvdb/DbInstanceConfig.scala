@@ -24,7 +24,9 @@ final case class EngineConfig(
   fileWriteParallelism: Int = 10,
   fileWriteBufferSize:  Int = 10000,
   maxSegmentSize:       Long = 1024 * 10,
-  maxSegmentCount:      Int = 10)
+  maxSegmentCount:      Int = 10,
+  maxRetries:           Int = 3,
+  failureRecovery:      Boolean = true)
 
 final case class DbInstanceConfig(
   server: ServerConfig = ServerConfig.Http(),

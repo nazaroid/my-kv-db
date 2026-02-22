@@ -9,29 +9,44 @@ import org.nazaroid.kvdb.algebra.Engine
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType}
 import org.nazaroid.kvdb.bitcask.catalog.Catalog
 import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
+import org.typelevel.log4cats.Logger
 
 object BitcaskEngine {
 
   def init[F[_]: Async: Files](conf: EngineConfig): Resource[F, Engine[F]] = {
+    // Data files use CRC, segment and table - no
+    val dataSchema = List(
+      FieldDef("recordSize", FieldType.Int32),
+      FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize")),
+      FieldDef("timestamp", FieldType.Timestamp),
+      FieldDef("status", FieldType.RecordStatus),
+      FieldDef("crc", FieldType.CRC32) // CRC only for data
+    )
+    val segmentSchema = List(
+      FieldDef("keySize", FieldType.Int32),
+      FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
+      FieldDef("offset", FieldType.Int64),
+      FieldDef("timestamp", FieldType.Timestamp),
+      FieldDef("status", FieldType.RecordStatus)
+      // No CRC for segment
+    )
+    val tableSchema = List(
+      FieldDef("keySize", FieldType.Int32),
+      FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
+      FieldDef("segmentNameSize", FieldType.Int32),
+      FieldDef("segmentName", FieldType.StringUtf8(sizeFromField = "segmentNameSize")),
+      FieldDef("timestamp", FieldType.Timestamp),
+      FieldDef("status", FieldType.RecordStatus)
+      // No CRC for table
+    )
+    
     val storageConfig = StorageConfig(
       folder          = conf.rootDir,
       maxSegmentSize  = conf.maxSegmentSize,
       maxSegmentCount = conf.maxSegmentCount,
-      dataSchema = List(
-        FieldDef("recordSize", FieldType.Int32),
-        FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize"))
-      ),
-      segmentSchema = List(
-        FieldDef("keySize", FieldType.Int32),
-        FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
-        FieldDef("offset", FieldType.Int64)
-      ),
-      tableSchema = List(
-        FieldDef("keySize", FieldType.Int32),
-        FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
-        FieldDef("segmentNameSize", FieldType.Int32),
-        FieldDef("segmentName", FieldType.StringUtf8(sizeFromField = "segmentNameSize"))
-      )
+      dataSchema      = dataSchema,
+      segmentSchema   = segmentSchema,
+      tableSchema     = tableSchema
     )
     for {
       c <- Catalog.init(Path(conf.rootDir), storageConfig, conf.fileWriteBufferSize, conf.fileWriteParallelism)
@@ -40,6 +55,7 @@ object BitcaskEngine {
 }
 
 final class BitcaskEngine[F[_]: Async](c: Catalog[F]) extends Engine[F] {
+  given Logger[F] = org.typelevel.log4cats.slf4j.Slf4jFactory.getLogger[F]
 
   override def createDbIfNotExists(name: String): F[Unit] = {
     for {
@@ -75,7 +91,13 @@ final class BitcaskEngine[F[_]: Async](c: Catalog[F]) extends Engine[F] {
     for {
       db  <- c.database(baseName)
       tbl <- db.table(tblName)
-      _   <- tbl.write(key, value)
+      result <- tbl.write(key, value)
+      _ <- result match {
+        case Right(()) => Async[F].unit
+        case Left(error) => 
+          Logger[F].error(s"Failed to set key $key in table $tblName: $error") *>
+          Async[F].raiseError(new RuntimeException(s"Write operation failed: $error"))
+      }
     } yield ()
   }
 

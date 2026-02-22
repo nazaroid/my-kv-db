@@ -24,7 +24,12 @@ def readRowAt[F[_]: Async: Files](
         .to(Chunk)
         .map { dataChunk =>
           if (dataChunk.size < rowSize) None
-          else Some(decode(dataChunk, schema))
+          else {
+            decode(dataChunk, schema) match {
+              case Right(row) => Some(row)
+              case Left(_) => None // CRC error, return None
+            }
+          }
         }
     }
   }
