@@ -6,7 +6,7 @@ import fs2.Chunk
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
-class ErrorHandlingSpec extends AnyFunSuite with Matchers {
+class EncodingErrorHandlingSpec extends AnyFunSuite with Matchers {
 
   test("decode should handle corrupted data gracefully") {
     val schema = List(

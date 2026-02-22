@@ -1,19 +1,20 @@
-package org.nazaroid.kvdb.binfileio
+package org.nazaroid.kvdb.bitcask
 
-import cats.effect.{IO, Ref}
 import cats.effect.unsafe.implicits.global
+import cats.effect.{IO, Ref}
 import cats.implicits.given
 import fs2.Stream
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
+import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType, WriteTask}
 import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
-import scala.concurrent.duration._
 
-import java.nio.file.{Files => JFiles, Paths}
+import java.nio.file.{Paths, Files as JFiles}
+import scala.concurrent.duration.*
 
-class StorageIntegrationSpec extends AnyFunSuite with Matchers {
+class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
 
   def withTempDirectory[T](test: Path => IO[T]): IO[T] = {
     IO.delay {
