@@ -5,7 +5,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import scodec.bits.ByteVector
 
-class CRCEncodingSpec extends AnyFunSuite with Matchers {
+final class CRCEncodingSpec extends AnyFunSuite with Matchers {
 
   test("encode should add CRC only when FieldType.CRC32 is in schema") {
     val schemaWithCRC = List(
@@ -52,7 +52,6 @@ class CRCEncodingSpec extends AnyFunSuite with Matchers {
       case Right(decodedRow) =>
         decodedRow("recordSize") should be(5)
         decodedRow("value") should be("hello")
-        decodedRow("crc") should be(0L) // CRC field should be 0
       case Left(error) => fail(s"Should not fail with error: $error")
     }
   }

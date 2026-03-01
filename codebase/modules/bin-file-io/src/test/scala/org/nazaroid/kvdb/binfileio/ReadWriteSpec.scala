@@ -31,7 +31,8 @@ final class ReadWriteSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
     val schema = List(
       FieldDef("keySize", FieldType.Int32),
       FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
-      FieldDef("offset", FieldType.Int64)
+      FieldDef("offset", FieldType.Int64),
+      FieldDef("crc", FieldType.CRC32)
     )
     val writtenRows: List[Row] = List(
       Map("keySize" -> 4, "key" -> "user", "offset"  -> 1024L),
@@ -44,7 +45,6 @@ final class ReadWriteSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
       _        <- BinFileIO.writeAll[IO](Stream.emits(inputWriteTasks), 2).compile.drain
       _        <- Async[IO].sleep(100 millis)
       readRows <- BinFileIO.readAll[IO](path, schema).map(_._2).compile.toList
-
-    } yield assert(writtenRows == readRows)
+    } yield assert(readRows == writtenRows)
   }
 }

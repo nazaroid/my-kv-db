@@ -5,7 +5,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import scodec.bits.ByteVector
 
-class EncodingErrorHandlingSpec extends AnyFunSuite with Matchers {
+final class EncodingErrorHandlingSpec extends AnyFunSuite with Matchers {
 
   test("decode should handle corrupted data gracefully") {
     val schema = List(
@@ -92,12 +92,11 @@ class EncodingErrorHandlingSpec extends AnyFunSuite with Matchers {
     )
 
     val row = Map(
-      "int32Field"     -> 42,
+      "int32Field"     -> 11,
       "int64Field"     -> 123456789L,
       "stringField"    -> "test string",
       "timestampField" -> System.currentTimeMillis(),
-      "statusField"    -> 1,
-      "crcField"       -> 0L
+      "statusField"    -> 1
     )
 
     val encoded = encode(row, schema)
@@ -106,11 +105,10 @@ class EncodingErrorHandlingSpec extends AnyFunSuite with Matchers {
     decoded shouldBe a[Right[String, Row]]
     decoded match {
       case Right(decodedRow) =>
-        decodedRow("int32Field") should be(42)
+        decodedRow("int32Field") should be(11)
         decodedRow("int64Field") should be(123456789L)
         decodedRow("stringField") should be("test string")
         decodedRow("statusField") should be(1)
-        decodedRow("crcField") should be(0L) // CRC field should be 0
       case Left(error) => fail(s"Should not fail with error: $error")
     }
   }

@@ -24,7 +24,8 @@ def readBinary[F[_]: Async: Files](
                 Pull.output1((currentOffset, row)) >>
                   loop(nextStream, currentOffset + 4 + rowSize)
               case Left(error) =>
-                // Log CRC error and continue
+                // TODO: Log error and continue
+                println(error)
                 Pull.done // Skip corrupted record
             }
           case None =>
