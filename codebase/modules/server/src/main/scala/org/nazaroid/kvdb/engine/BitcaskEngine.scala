@@ -13,7 +13,7 @@ import org.typelevel.log4cats.Logger
 
 object BitcaskEngine {
 
-  def init[F[_]: Async: Files](conf: EngineConfig): Resource[F, Engine[F]] = {
+  def init[F[_]: Async: Files: Logger](conf: EngineConfig): Resource[F, Engine[F]] = {
     // Data files use CRC, segment and table - no
     val dataSchema = List(
       FieldDef("recordSize", FieldType.Int32),
@@ -39,7 +39,7 @@ object BitcaskEngine {
       FieldDef("status", FieldType.RecordStatus)
       // No CRC for table
     )
-    
+
     val storageConfig = StorageConfig(
       folder          = conf.rootDir,
       maxSegmentSize  = conf.maxSegmentSize,
@@ -54,8 +54,7 @@ object BitcaskEngine {
   }
 }
 
-final class BitcaskEngine[F[_]: Async](c: Catalog[F]) extends Engine[F] {
-  given Logger[F] = org.typelevel.log4cats.slf4j.Slf4jFactory.getLogger[F]
+final class BitcaskEngine[F[_]: Async: Logger](c: Catalog[F]) extends Engine[F] {
 
   override def createDbIfNotExists(name: String): F[Unit] = {
     for {
@@ -89,14 +88,14 @@ final class BitcaskEngine[F[_]: Async](c: Catalog[F]) extends Engine[F] {
     value:    String
   ): F[Unit] = {
     for {
-      db  <- c.database(baseName)
-      tbl <- db.table(tblName)
+      db     <- c.database(baseName)
+      tbl    <- db.table(tblName)
       result <- tbl.write(key, value)
       _ <- result match {
         case Right(()) => Async[F].unit
-        case Left(error) => 
+        case Left(error) =>
           Logger[F].error(s"Failed to set key $key in table $tblName: $error") *>
-          Async[F].raiseError(new RuntimeException(s"Write operation failed: $error"))
+            Async[F].raiseError(new RuntimeException(s"Write operation failed: $error"))
       }
     } yield ()
   }

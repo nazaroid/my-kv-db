@@ -1,32 +1,35 @@
 package org.nazaroid.kvdb.bitcask
 
-import cats.effect.unsafe.implicits.global
-import cats.effect.{IO, Ref}
-import cats.implicits.given
-import fs2.Stream
+import cats.effect.IO
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
-import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType, WriteTask}
+import fs2.{Chunk, Stream}
+import org.nazaroid.kvdb.binfileio.*
 import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
+import scodec.bits.ByteVector
 
-import java.nio.file.{Paths, Files as JFiles}
-import scala.concurrent.duration.*
+import java.nio.file.Files as JFiles
 
-class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
+final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
 
   def withTempDirectory[T](test: Path => IO[T]): IO[T] = {
     IO.delay {
       val tempDir = JFiles.createTempDirectory("kvdb-test")
       Path.fromNioPath(tempDir.toAbsolutePath)
-    }.bracket(dir => IO.delay {
-      // Clean up
-      JFiles.walk(dir.toNioPath)
-        .filter(_.toFile.isFile)
-        .forEach(JFiles.deleteIfExists)
-      JFiles.deleteIfExists(dir.toNioPath)
-    })
+    }.bracket(dir => test(dir))(dir =>
+      IO.delay {
+        if (JFiles.exists(dir.toNioPath)) {
+          JFiles
+            .walk(dir.toNioPath)
+            .sorted(java.util.Comparator.reverseOrder()) // Сначала файлы, потом папки
+            .forEach(JFiles.delete(_))
+        }
+      }.handleErrorWith(_ => IO.unit)
+    )
   }
 
   test("StorageManager should handle CRC-enabled data files correctly") {
@@ -38,7 +41,7 @@ class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("status", FieldType.RecordStatus),
         FieldDef("crc", FieldType.CRC32)
       )
-      
+
       val segmentSchema = List(
         FieldDef("keySize", FieldType.Int32),
         FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
@@ -46,7 +49,7 @@ class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("timestamp", FieldType.Timestamp),
         FieldDef("status", FieldType.RecordStatus)
       )
-      
+
       val tableSchema = List(
         FieldDef("keySize", FieldType.Int32),
         FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
@@ -55,25 +58,25 @@ class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("timestamp", FieldType.Timestamp),
         FieldDef("status", FieldType.RecordStatus)
       )
-      
+
       val config = StorageConfig(
-        folder = tempDir.toString,
-        maxSegmentSize = 1024,
+        folder          = tempDir.toString,
+        maxSegmentSize  = 1024,
         maxSegmentCount = 10,
-        dataSchema = dataSchema,
-        segmentSchema = segmentSchema,
-        tableSchema = tableSchema,
-        maxRetries = 3
+        dataSchema      = dataSchema,
+        segmentSchema   = segmentSchema,
+        tableSchema     = tableSchema,
+        maxRetries      = 3
       )
-      
-      val result = (for {
-        queue <- Channel.unbounded[IO, WriteTask[IO]]
-        storageManager <- StorageManager.initialize(config, queue)
-        _ <- storageManager.write("testKey", "testValue")
-        readValue <- storageManager.read("testKey")
-      } yield readValue).unsafeRunSync()
-      
-      result shouldBe Some("testValue")
+
+      for {
+        given Logger[IO] <- Slf4jLogger.create[IO]
+        queue            <- Channel.unbounded[IO, WriteTask[IO]]
+        storageManager   <- StorageManager.initialize(config, queue)
+        _                <- storageManager.write("testKey", "testValue")
+        readValue        <- storageManager.read("testKey")
+
+      } yield readValue shouldBe Some("testValue")
     }
   }
 
@@ -86,7 +89,7 @@ class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("status", FieldType.RecordStatus),
         FieldDef("crc", FieldType.CRC32)
       )
-      
+
       val segmentSchema = List(
         FieldDef("keySize", FieldType.Int32),
         FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
@@ -94,7 +97,7 @@ class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("timestamp", FieldType.Timestamp),
         FieldDef("status", FieldType.RecordStatus)
       )
-      
+
       val tableSchema = List(
         FieldDef("keySize", FieldType.Int32),
         FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
@@ -103,42 +106,40 @@ class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("timestamp", FieldType.Timestamp),
         FieldDef("status", FieldType.RecordStatus)
       )
-      
+
       val config = StorageConfig(
-        folder = tempDir.toString,
-        maxSegmentSize = 1024,
+        folder          = tempDir.toString,
+        maxSegmentSize  = 1024,
         maxSegmentCount = 10,
-        dataSchema = dataSchema,
-        segmentSchema = segmentSchema,
-        tableSchema = tableSchema,
-        maxRetries = 3
+        dataSchema      = dataSchema,
+        segmentSchema   = segmentSchema,
+        tableSchema     = tableSchema,
+        maxRetries      = 3
       )
-      
-      val result = (for {
-        queue <- Channel.unbounded[IO, WriteTask[IO]]
-        storageManager <- StorageManager.initialize(config, queue)
-        
+
+      for {
+        given Logger[IO] <- Slf4jLogger.create[IO]
+        queue            <- Channel.unbounded[IO, WriteTask[IO]]
+        storageManager   <- StorageManager.initialize(config, queue)
+
         // Create corrupted data file manually
-        val dataFile = tempDir / "seg_0.bin"
-        val validRow = Map(
+        dataFile = tempDir / "seg_0.bin"
+        validRow = Map(
           "recordSize" -> 9,
-          "value" -> "testValue",
-          "timestamp" -> System.currentTimeMillis(),
-          "status" -> 1,
-          "crc" -> 0L
+          "value"      -> "testValue",
+          "timestamp"  -> System.currentTimeMillis(),
+          "status"     -> 1,
+          "crc"        -> 0L
         )
-        val validEncoded = encode(validRow, dataSchema)
-        
+        validEncoded = encode(validRow, dataSchema)
+
         // Write corrupted data (wrong CRC)
-        val corruptedData = validEncoded.toByteVector.dropRight(8) ++ ByteVector.fromLong(99999L)
-        Files[IO].writeAll(dataFile).compile.drain
-        
+        corruptedData = validEncoded.toByteVector.dropRight(8) ++ ByteVector.fromLong(99999L)
+        _ <- Stream.emits(corruptedData.toArray).through(Files[IO].writeAll(dataFile)).compile.drain
         // Try to read corrupted data
         readValue <- storageManager.read("testKey")
-      } yield readValue).unsafeRunSync()
-      
-      // Should return None due to CRC validation failure
-      result shouldBe None
+        // Should return None due to CRC validation failure
+      } yield readValue shouldBe None
     }
   }
 
@@ -151,7 +152,7 @@ class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("status", FieldType.RecordStatus),
         FieldDef("crc", FieldType.CRC32)
       )
-      
+
       val segmentSchema = List(
         FieldDef("keySize", FieldType.Int32),
         FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
@@ -160,7 +161,7 @@ class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("status", FieldType.RecordStatus)
         // No CRC for segment
       )
-      
+
       val tableSchema = List(
         FieldDef("keySize", FieldType.Int32),
         FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
@@ -170,25 +171,24 @@ class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("status", FieldType.RecordStatus)
         // No CRC for table
       )
-      
+
       val config = StorageConfig(
-        folder = tempDir.toString,
-        maxSegmentSize = 1024,
+        folder          = tempDir.toString,
+        maxSegmentSize  = 1024,
         maxSegmentCount = 10,
-        dataSchema = dataSchema,
-        segmentSchema = segmentSchema,
-        tableSchema = tableSchema,
-        maxRetries = 3
+        dataSchema      = dataSchema,
+        segmentSchema   = segmentSchema,
+        tableSchema     = tableSchema,
+        maxRetries      = 3
       )
-      
-      val result = (for {
-        queue <- Channel.unbounded[IO, WriteTask[IO]]
-        storageManager <- StorageManager.initialize(config, queue)
-        _ <- storageManager.write("testKey", "testValue")
-        readValue <- storageManager.read("testKey")
-      } yield readValue).unsafeRunSync()
-      
-      result shouldBe Some("testValue")
+
+      for {
+        given Logger[IO] <- Slf4jLogger.create[IO]
+        queue            <- Channel.unbounded[IO, WriteTask[IO]]
+        storageManager   <- StorageManager.initialize(config, queue)
+        _                <- storageManager.write("testKey", "testValue")
+        readValue        <- storageManager.read("testKey")
+      } yield readValue shouldBe Some("testValue")
     }
   }
 
@@ -201,7 +201,7 @@ class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("status", FieldType.RecordStatus),
         FieldDef("crc", FieldType.CRC32)
       )
-      
+
       val segmentSchema = List(
         FieldDef("keySize", FieldType.Int32),
         FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
@@ -209,7 +209,7 @@ class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("timestamp", FieldType.Timestamp),
         FieldDef("status", FieldType.RecordStatus)
       )
-      
+
       val tableSchema = List(
         FieldDef("keySize", FieldType.Int32),
         FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
@@ -218,33 +218,35 @@ class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("timestamp", FieldType.Timestamp),
         FieldDef("status", FieldType.RecordStatus)
       )
-      
+
       val config = StorageConfig(
-        folder = tempDir.toString,
-        maxSegmentSize = 1024,
+        folder          = tempDir.toString,
+        maxSegmentSize  = 1024,
         maxSegmentCount = 10,
-        dataSchema = dataSchema,
-        segmentSchema = segmentSchema,
-        tableSchema = tableSchema,
-        maxRetries = 3
+        dataSchema      = dataSchema,
+        segmentSchema   = segmentSchema,
+        tableSchema     = tableSchema,
+        maxRetries      = 3
       )
-      
-      val result = (for {
-        queue <- Channel.unbounded[IO, WriteTask[IO]]
-        storageManager <- StorageManager.initialize(config, queue)
-        
+
+      for {
+        given Logger[IO] <- Slf4jLogger.create[IO]
+        queue            <- Channel.unbounded[IO, WriteTask[IO]]
+        storageManager   <- StorageManager.initialize(config, queue)
         // Make directory read-only to simulate write failure
-        val dataFile = tempDir / "seg_0.bin"
-        _ <- Files[IO].setPosixPermissions(dataFile, java.nio.file.attribute.PosixFilePermissions.fromString("r--r--r--"))
-        
+        dataFile = tempDir / "seg_0.bin"
+        _ <- Files[IO].setPosixPermissions(
+          dataFile,
+          fs2.io.file.PosixPermissions.fromString("r--r--r--").get
+        )
         writeResult <- storageManager.write("testKey", "testValue")
-      } yield writeResult).unsafeRunSync()
-      
-      // Should fail due to permission error
-      writeResult shouldBe a[Left[String]]
-      writeResult match {
-        case Left(error) => error should include("Write failed")
-        case Right(_) => fail("Should not succeed with read-only directory")
+      } yield {
+        // Should fail due to permission error
+        writeResult shouldBe a[Left[String, Row]]
+        writeResult match {
+          case Left(error) => error should include("Write failed")
+          case Right(_)    => fail("Should not succeed with read-only directory")
+        }
       }
     }
   }
@@ -258,7 +260,7 @@ class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("status", FieldType.RecordStatus),
         FieldDef("crc", FieldType.CRC32)
       )
-      
+
       val segmentSchema = List(
         FieldDef("keySize", FieldType.Int32),
         FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
@@ -266,7 +268,7 @@ class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("timestamp", FieldType.Timestamp),
         FieldDef("status", FieldType.RecordStatus)
       )
-      
+
       val tableSchema = List(
         FieldDef("keySize", FieldType.Int32),
         FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
@@ -275,28 +277,29 @@ class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("timestamp", FieldType.Timestamp),
         FieldDef("status", FieldType.RecordStatus)
       )
-      
+
       val config = StorageConfig(
-        folder = tempDir.toString,
-        maxSegmentSize = 1024,
+        folder          = tempDir.toString,
+        maxSegmentSize  = 1024,
         maxSegmentCount = 10,
-        dataSchema = dataSchema,
-        segmentSchema = segmentSchema,
-        tableSchema = tableSchema,
-        maxRetries = 3
+        dataSchema      = dataSchema,
+        segmentSchema   = segmentSchema,
+        tableSchema     = tableSchema,
+        maxRetries      = 3
       )
-      
-      val result = (for {
-        queue <- Channel.unbounded[IO, WriteTask[IO]]
-        storageManager <- StorageManager.initialize(config, queue)
-        _ <- storageManager.write("testKey", "testValue")
-        readValue1 <- storageManager.read("testKey")
-        _ <- storageManager.delete("testKey")
-        readValue2 <- storageManager.read("testKey")
-      } yield (readValue1, readValue2)).unsafeRunSync()
-      
-      readValue1 shouldBe Some("testValue")
-      readValue2 shouldBe None // Should be None after delete
+
+      for {
+        given Logger[IO] <- Slf4jLogger.create[IO]
+        queue            <- Channel.unbounded[IO, WriteTask[IO]]
+        storageManager   <- StorageManager.initialize(config, queue)
+        _                <- storageManager.write("testKey", "testValue")
+        readValue1       <- storageManager.read("testKey")
+        _                <- storageManager.delete("testKey")
+        readValue2       <- storageManager.read("testKey")
+      } yield {
+        readValue1 shouldBe Some("testValue")
+        readValue2 shouldBe None // Should be None after delete
+      }
     }
   }
 }

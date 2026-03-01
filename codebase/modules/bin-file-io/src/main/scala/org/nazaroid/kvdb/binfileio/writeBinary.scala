@@ -9,7 +9,7 @@ import fs2.io.file.{Files, Flag, Flags, Path}
 def writeBinary[F[_]: Async: Files](
   input:       Stream[F, WriteTask[F]],
   parallelism: Int = 100
-): Stream[F, Either[String, Unit]] = {
+): Stream[F,  Unit] = {
 
   final case class State(
     channels: Map[String, Channel[F, WriteTask[F]]],
@@ -50,23 +50,25 @@ def writeBinary[F[_]: Async: Files](
                             val bytes = encode(t.row, t.schema)
                             val nextOffset = currentOffset + bytes.size
 
-                            // Write the specific row to disk
-                            writeResult <- Stream
-                              .chunk(bytes)
-                              .through(Files[F].writeAll(Path(t.filePath), Flags(Flag.Create, Flag.Append)))
-                              .compile
-                              .drain
-                              .attempt
-                            
-                            result <- writeResult match {
-                              case Right(()) =>
-                                // STRATEGIC MOMENT: notify Storage that the data is persisted on disk
-                                t.callback.traverse(_.complete(currentOffset)) *>
-                                Async[F].pure((nextOffset, Right(())))
-                              case Left(error) =>
-                                t.callback.traverse(_.complete(-1L)) *>
-                                Async[F].pure((nextOffset, Left(error.getMessage)))
-                            }
+                            for {
+                              // Write the specific row to disk
+                              writeResult <- Stream
+                                .chunk(bytes)
+                                .through(Files[F].writeAll(Path(t.filePath), Flags(Flag.Create, Flag.Append)))
+                                .compile
+                                .drain
+                                .attempt
+
+                              result <- writeResult match {
+                                case Right(()) =>
+                                  // STRATEGIC MOMENT: notify Storage that the data is persisted on disk
+                                  t.callback.traverse(_.complete(currentOffset)) *>
+                                    Async[F].pure((nextOffset, Right(())))
+                                case Left(error) =>
+                                  t.callback.traverse(_.complete(-1L)) *>
+                                    Async[F].pure((nextOffset, Left(error.getMessage)))
+                              }
+                            } yield result
                           }
                           .onFinalize {
                             stateRef.update(s =>

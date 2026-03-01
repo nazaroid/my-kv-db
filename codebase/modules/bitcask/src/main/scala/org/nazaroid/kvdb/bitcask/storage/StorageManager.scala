@@ -7,7 +7,8 @@ import fs2.concurrent.Channel
 import fs2.io.file.{Files, Flag, Flags, Path}
 import org.nazaroid.kvdb.binfileio.*
 import org.typelevel.log4cats.Logger
-import scala.concurrent.duration._
+
+import scala.concurrent.duration.*
 
 enum CacheEntry {
   case Pending(row: Row)
@@ -20,13 +21,13 @@ enum CacheEntry {
 }
 
 case class StorageConfig(
-  folder:         String,
-  maxSegmentSize: Long,
+  folder:          String,
+  maxSegmentSize:  Long,
   maxSegmentCount: Int,
-  dataSchema:     List[FieldDef],
-  segmentSchema:  List[FieldDef],
-  tableSchema:    List[FieldDef],
-  maxRetries:     Int = 3)
+  dataSchema:      List[FieldDef],
+  segmentSchema:   List[FieldDef],
+  tableSchema:     List[FieldDef],
+  maxRetries:      Int = 3)
 
 class BaseStorage[F[_]: Async: Files](
   val filePath: String,
@@ -41,7 +42,7 @@ class BaseStorage[F[_]: Async: Files](
     } yield offset
 }
 
-sealed class StorageManager[F[_]: Async: Files](
+sealed class StorageManager[F[_]: Async: Files: Logger](
   val currentData:       Ref[F, BaseStorage[F]],
   val currentSegmentIdx: Ref[F, BaseStorage[F]],
   val tableStorage:      BaseStorage[F],
@@ -53,15 +54,15 @@ sealed class StorageManager[F[_]: Async: Files](
   def write(key: String, value: String): F[Either[String, Unit]] = {
     val timestamp = System.currentTimeMillis()
     val status = 1 // Active status
-    
+
     val dataRow = Map(
       "recordSize" -> value.getBytes("UTF-8").length,
       "value"      -> value,
-      "timestamp"   -> timestamp,
-      "status"      -> status,
-      "crc"         -> 0L // CRC field will be filled during encoding
+      "timestamp"  -> timestamp,
+      "status"     -> status,
+      "crc"        -> 0L // CRC field will be filled during encoding
     )
-    
+
     for {
       _ <- cache.update(_ + (key -> CacheEntry.Pending(dataRow)))
 
@@ -75,11 +76,11 @@ sealed class StorageManager[F[_]: Async: Files](
       // Cascading write operations
       writeResult <- attemptWriteWithRetry(activeDS, key, dataRow)
       offset <- writeResult match {
-        case Right(off) => Async[F].pure(off)
+        case Right(off)  => Async[F].pure(off)
         case Left(error) =>
           // If there is a write error, mark it as failed and continue
           Logger[F].warn(s"Failed to write data for key $key: $error") *>
-          Async[F].pure(-1L) // Use -1 as an error indicator
+            Async[F].pure(-1L) // Use -1 as an error indicator
       }
 
       // Continue writing the segment and table only if the data is written successfully
@@ -90,13 +91,13 @@ sealed class StorageManager[F[_]: Async: Files](
         "timestamp" -> timestamp,
         "status"    -> status
       )
-      
+
       segWriteResult <- attemptWriteWithRetry(activeSS, key, segRow)
       segOffset <- segWriteResult match {
         case Right(off) => Async[F].pure(off)
-        case Left(error) => 
+        case Left(error) =>
           Logger[F].warn(s"Failed to write segment for key $key: $error") *>
-          Async[F].pure(-1L)
+            Async[F].pure(-1L)
       }
 
       segName = Path(activeDS.filePath).fileName.toString.replace(".bin", "")
@@ -108,60 +109,65 @@ sealed class StorageManager[F[_]: Async: Files](
         "timestamp"       -> timestamp,
         "status"          -> status
       )
-      
+
       tableWriteResult <- attemptWriteWithRetry(tableStorage, key, tableRow)
       tableOffset <- tableWriteResult match {
         case Right(off) => Async[F].pure(off)
-        case Left(error) => 
+        case Left(error) =>
           Logger[F].warn(s"Failed to write table for key $key: $error") *>
-          Async[F].pure(-1L)
+            Async[F].pure(-1L)
       }
 
       // Update the cache only if all operations are successful
-      finalResult = if (offset > 0 && segOffset > 0 && tableOffset > 0) {
-        cache.update(_ + (key -> CacheEntry.Persistent(dataRow, segName, offset))).map(_ => Right(()))
-      } else {
-        cache.update(_ - key).map(_ => Left("Write operation failed"))
-      }
-      
+      finalResult <-
+        if (offset > 0 && segOffset > 0 && tableOffset > 0) {
+          cache.update(_ + (key -> CacheEntry.Persistent(dataRow, segName, offset))).map(_ => Right(()))
+        } else {
+          cache.update(_ - key).map(_ => Left("Write operation failed"))
+        }
+
     } yield finalResult
   }
-  
+
   /** READ: Always from cache (O(1)) */
   def read(key: String): F[Option[String]] = {
     cache
       .get
       .map(_.get(key).flatMap {
-        case CacheEntry.Pending(row)          // Check record status
+        case CacheEntry.Pending(row) => // Check record status
           row.get("status") match {
             case Some(1) => row.get("value").map(_.toString) // Active
-            case _ => None // Not active
+            case _       => None                             // Not active
           }
-        case CacheEntry.Persistent(row, _, _) => 
+        case CacheEntry.Persistent(row, _, _) =>
           row.get("status") match {
             case Some(1) => row.get("value").map(_.toString) // Active
-            case _ => None // Not active
+            case _       => None                             // Not active
           }
-        case CacheEntry.Deleted               => None
+        case CacheEntry.Deleted => None
       })
   }
-  
+
   /** Helper method for retry logic */
-  private def attemptWriteWithRetry(storage: BaseStorage[F], key: String, row: Row): F[Either[String, Long]] = {
-    def attempt(attempt: Int): F[Either[String, Long]] = {
+  private def attemptWriteWithRetry(
+    storage: BaseStorage[F],
+    key:     String,
+    row:     Row
+  ): F[Either[String, Long]] = {
+    def attemptWrite(attempt: Int): F[Either[String, Long]] = {
       storage.append(key, row).attempt.flatMap {
         case Right(offset) => Async[F].pure(Right(offset))
         case Left(error) =>
           if (attempt < config.maxRetries) {
             Logger[F].warn(s"Write attempt $attempt failed for key $key, retrying...") *>
-            Async[F].sleep(50.millis * attempt) *> attempt(attempt + 1)
+              Async[F].sleep(50.millis * attempt) *> attemptWrite(attempt + 1)
           } else {
             Logger[F].error(s"Write failed after $config.maxRetries attempts for key $key: $error") *>
-            Async[F].pure(Left(s"Write failed: $error"))
+              Async[F].pure(Left(s"Write failed: $error"))
           }
       }
     }
-    attempt(1)
+    attemptWrite(1)
   }
 
   /** DELETE: Write a Tombstone record */
@@ -292,7 +298,7 @@ object StorageManager {
       .last // Take the most recent offset in this segment
   }
 
-  def initialize[F[_]: Async: Files](
+  def initialize[F[_]: Async: Files: Logger](
     config:     StorageConfig,
     writeQueue: Channel[F, WriteTask[F]]
   ): F[StorageManager[F]] = {

@@ -9,6 +9,8 @@ import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
 import org.scalatest.FutureOutcome
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import java.nio.file.Paths
 import scala.concurrent.duration.DurationInt
@@ -52,6 +54,7 @@ final class StorageManagerOperationSpec extends AsyncFreeSpec with AsyncIOSpec w
 
   // Resource for running the manager in tests
   private val storageResource: Resource[IO, StorageManager[IO]] = for {
+    given Logger[IO] <- Resource.eval(Slf4jLogger.create[IO])
     _     <- Resource.eval(Files[IO].createDirectories(Path(testDir.toString)).handleError(_ => ()))
     queue <- Channel.bounded[IO, WriteTask[IO]](100).toResource
     // Run the background binary write worker
@@ -123,7 +126,9 @@ final class StorageManagerOperationSpec extends AsyncFreeSpec with AsyncIOSpec w
 
   "Segment threshold: compaction should run when segment count exceeds limit" in {
     val compactConfig = config.copy(maxSegmentSize = 200, maxSegmentCount = 1)
+
     val compactResource: Resource[IO, StorageManager[IO]] = for {
+      given Logger[IO] <- Resource.eval(Slf4jLogger.create[IO])
       _     <- Resource.eval(Files[IO].createDirectories(Path(testDir.toString)).handleError(_ => ()))
       queue <- Channel.bounded[IO, WriteTask[IO]](100).toResource
       _       <- writeBinary(queue.stream, parallelism = 1).compile.drain.background

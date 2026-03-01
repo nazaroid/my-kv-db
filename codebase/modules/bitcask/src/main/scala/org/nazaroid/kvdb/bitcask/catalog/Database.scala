@@ -7,8 +7,9 @@ import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.WriteTask
 import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
+import org.typelevel.log4cats.Logger
 
-final class Database[F[_]: Async: Files](
+final class Database[F[_]: Async: Files: Logger](
   val dbName:         String,
   val dbPath:         Path,
   val writeQueue:     Channel[F, WriteTask[F]],

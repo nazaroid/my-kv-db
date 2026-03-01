@@ -7,8 +7,9 @@ import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.{WriteTask, writeBinary}
 import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
+import org.typelevel.log4cats.Logger
 
-final class Catalog[F[_]: Async: Files](
+final class Catalog[F[_]: Async: Files: Logger](
   val rootPath:       Path,
   val writeQueue:     Channel[F, WriteTask[F]],
   val configTemplate: StorageConfig,
@@ -33,7 +34,7 @@ final class Catalog[F[_]: Async: Files](
 
 object Catalog {
 
-  def init[F[_]: Async: Files](
+  def init[F[_]: Async: Files: Logger](
     rootPath:       Path,
     configTemplate: StorageConfig,
     queueSize:      Int = 10000,
@@ -53,12 +54,11 @@ object Catalog {
       // 4. Initialize the registry for open databases
       activeDbs <- Resource.eval(Ref.of(Map.empty[String, Database[F]]))
 
-      catalog = new Catalog[F](
-        rootPath = rootPath,
-        writeQueue = writeQueue,
-        configTemplate = configTemplate,
-        databases = activeDbs
-      )
-    } yield catalog
+    } yield Catalog[F](
+      rootPath       = rootPath,
+      writeQueue     = writeQueue,
+      configTemplate = configTemplate,
+      databases      = activeDbs
+    )
   }
 }
