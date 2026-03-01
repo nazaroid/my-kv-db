@@ -11,7 +11,7 @@ import java.nio.file.{Files, Paths}
 import scala.concurrent.duration.DurationInt
 import scala.reflect.io.Directory
 
-final class ReadWriteSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
+final class BinFileIOSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
   override def withFixture(test: NoArgAsyncTest): FutureOutcome = {
     Files.createDirectories(testDir)
