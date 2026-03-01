@@ -14,7 +14,7 @@ import java.nio.file.Paths
 import scala.concurrent.duration.DurationInt
 import scala.reflect.io.Directory
 
-final class StorageManagerSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
+final class StorageManagerOperationSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
   override def withFixture(test: NoArgAsyncTest): FutureOutcome = {
     java.nio.file.Files.createDirectories(testDir)
