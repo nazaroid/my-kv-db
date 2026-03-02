@@ -35,8 +35,8 @@ final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
   test("StorageManager should handle CRC-enabled data files correctly") {
     withTempDirectory { tempDir =>
       val dataSchema = List(
-        FieldDef("recordSize", FieldType.Int32),
-        FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize")),
+        FieldDef("valueSize", FieldType.Int32),
+        FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize")),
         FieldDef("timestamp", FieldType.Timestamp),
         FieldDef("status", FieldType.RecordStatus),
         FieldDef("crc", FieldType.CRC32)
@@ -83,8 +83,8 @@ final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
   test("StorageManager should handle corrupted data gracefully") {
     withTempDirectory { tempDir =>
       val dataSchema = List(
-        FieldDef("recordSize", FieldType.Int32),
-        FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize")),
+        FieldDef("valueSize", FieldType.Int32),
+        FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize")),
         FieldDef("timestamp", FieldType.Timestamp),
         FieldDef("status", FieldType.RecordStatus),
         FieldDef("crc", FieldType.CRC32)
@@ -125,7 +125,7 @@ final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         // Create corrupted data file manually
         dataFile = tempDir / "seg_0.bin"
         validRow = Map(
-          "recordSize" -> 9,
+          "valueSize" -> 9,
           "value"      -> "testValue",
           "timestamp"  -> System.currentTimeMillis(),
           "status"     -> 1,
@@ -146,8 +146,8 @@ final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
   test("StorageManager should handle segment and table files without CRC") {
     withTempDirectory { tempDir =>
       val dataSchema = List(
-        FieldDef("recordSize", FieldType.Int32),
-        FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize")),
+        FieldDef("valueSize", FieldType.Int32),
+        FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize")),
         FieldDef("timestamp", FieldType.Timestamp),
         FieldDef("status", FieldType.RecordStatus),
         FieldDef("crc", FieldType.CRC32)
@@ -195,8 +195,8 @@ final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
   test("StorageManager should handle write failures with retry logic") {
     withTempDirectory { tempDir =>
       val dataSchema = List(
-        FieldDef("recordSize", FieldType.Int32),
-        FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize")),
+        FieldDef("valueSize", FieldType.Int32),
+        FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize")),
         FieldDef("timestamp", FieldType.Timestamp),
         FieldDef("status", FieldType.RecordStatus),
         FieldDef("crc", FieldType.CRC32)
@@ -254,8 +254,8 @@ final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
   test("StorageManager should handle delete operations correctly") {
     withTempDirectory { tempDir =>
       val dataSchema = List(
-        FieldDef("recordSize", FieldType.Int32),
-        FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize")),
+        FieldDef("valueSize", FieldType.Int32),
+        FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize")),
         FieldDef("timestamp", FieldType.Timestamp),
         FieldDef("status", FieldType.RecordStatus),
         FieldDef("crc", FieldType.CRC32)

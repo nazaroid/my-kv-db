@@ -36,8 +36,8 @@ final class StorageManagerOperationSpec extends AsyncFreeSpec with AsyncIOSpec w
     maxSegmentSize = 1024, // Small size for rotation testing (1KB)
     maxSegmentCount = 10,
     dataSchema = List(
-      FieldDef("recordSize", FieldType.Int32),
-      FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize"))
+      FieldDef("valueSize", FieldType.Int32),
+      FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize"))
     ),
     segmentSchema = List(
       FieldDef("keySize", FieldType.Int32),

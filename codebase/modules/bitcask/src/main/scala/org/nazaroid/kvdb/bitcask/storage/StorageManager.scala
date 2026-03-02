@@ -56,11 +56,11 @@ sealed class StorageManager[F[_]: Async: Files: Logger](
     val status = 1 // Active status
 
     val dataRow = Map(
-      "recordSize" -> value.getBytes("UTF-8").length,
-      "value"      -> value,
-      "timestamp"  -> timestamp,
-      "status"     -> status,
-      "crc"        -> 0L // CRC field will be filled during encoding
+      "valueSize" -> value.getBytes("UTF-8").length,
+      "value"     -> value,
+      "timestamp" -> timestamp,
+      "status"    -> status,
+      "crc"       -> 0L // CRC field will be filled during encoding
     )
 
     for {
@@ -162,7 +162,7 @@ sealed class StorageManager[F[_]: Async: Files: Logger](
             Logger[F].warn(s"Write attempt $attempt failed for key $key, retrying...") *>
               Async[F].sleep(50.millis * attempt) *> attemptWrite(attempt + 1)
           } else {
-            Logger[F].error(s"Write failed after $config.maxRetries attempts for key $key: $error") *>
+            Logger[F].error(s"Write failed after $attempt attempts for key $key: $error") *>
               Async[F].pure(Left(s"Write failed: $error"))
           }
       }

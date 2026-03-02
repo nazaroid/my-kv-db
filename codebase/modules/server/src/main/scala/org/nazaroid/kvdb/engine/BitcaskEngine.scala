@@ -16,8 +16,8 @@ object BitcaskEngine {
   def init[F[_]: Async: Files: Logger](conf: EngineConfig): Resource[F, Engine[F]] = {
     // Data files use CRC, segment and table - no
     val dataSchema = List(
-      FieldDef("recordSize", FieldType.Int32),
-      FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize")),
+      FieldDef("valueSize", FieldType.Int32),
+      FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize")),
       FieldDef("timestamp", FieldType.Timestamp),
       FieldDef("status", FieldType.RecordStatus),
       FieldDef("crc", FieldType.CRC32) // CRC only for data
