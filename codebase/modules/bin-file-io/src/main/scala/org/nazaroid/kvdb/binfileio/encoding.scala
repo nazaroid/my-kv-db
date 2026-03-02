@@ -31,9 +31,7 @@ def encode(row: Row, schema: List[FieldDef]): Chunk[Byte] = {
   } else {
     dataBytes
   }
-
-  val sizeHeader = ByteVector.fromInt(finalBytes.size.toInt)
-  Chunk.byteVector(sizeHeader ++ finalBytes)
+  Chunk.byteVector(finalBytes)
 }
 
 def decode(chunk: Chunk[Byte], schema: List[FieldDef]): Either[String, Row] = {

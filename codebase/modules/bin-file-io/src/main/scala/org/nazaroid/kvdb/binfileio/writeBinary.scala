@@ -2,9 +2,10 @@ package org.nazaroid.kvdb.binfileio
 
 import cats.effect.{Async, Ref}
 import cats.implicits.given
-import fs2.Stream
+import fs2.{Chunk, Stream}
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Flag, Flags, Path}
+import scodec.bits.ByteVector
 
 def writeBinary[F[_]: Async: Files](
   input:       Stream[F, WriteTask[F]],
@@ -47,13 +48,15 @@ def writeBinary[F[_]: Async: Files](
                         newChan
                           .stream
                           .evalMapAccumulate(initialSize) { (currentOffset, t) =>
-                            val bytes = encode(t.row, t.schema)
-                            val nextOffset = currentOffset + bytes.size
+                            val dataBytes = encode(t.row, t.schema)
+                            val sizeHeader = ByteVector.fromInt(dataBytes.size)
+                            val finalBytes = Chunk.byteVector(sizeHeader ++ dataBytes.toByteVector)
+                            val nextOffset = currentOffset + finalBytes.size
 
                             for {
                               // Write the specific row to disk
                               writeResult <- Stream
-                                .chunk(bytes)
+                                .chunk(finalBytes)
                                 .through(Files[F].writeAll(Path(t.filePath), Flags(Flag.Create, Flag.Append)))
                                 .compile
                                 .drain
