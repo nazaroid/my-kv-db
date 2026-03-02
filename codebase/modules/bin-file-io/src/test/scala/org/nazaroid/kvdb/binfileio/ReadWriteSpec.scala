@@ -26,7 +26,6 @@ final class ReadWriteSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
   private val testDir = Paths.get("./testFolder")
 
-  // TODO:  "recordSize" -> value.getBytes("UTF-8").length,
   "should write and read same data" in {
     val path = f"$testDir/segment_1.ix"
     val schema = List(
