@@ -125,7 +125,7 @@ sealed class StorageManager[F[_]: Async: Files: Logger](
         } else {
           cache.update(_ - key).map(_ => Left("Write operation failed"))
         }
-
+      _ <- compactIfNeeded
     } yield finalResult
   }
 
