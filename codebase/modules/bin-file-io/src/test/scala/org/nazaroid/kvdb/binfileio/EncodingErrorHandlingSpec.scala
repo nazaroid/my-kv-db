@@ -9,8 +9,8 @@ final class EncodingErrorHandlingSpec extends AnyFunSuite with Matchers {
 
   test("decode should handle corrupted data gracefully") {
     val schema = List(
-      FieldDef("recordSize", FieldType.Int32),
-      FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize")),
+      FieldDef("valueSize", FieldType.Int32),
+      FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize")),
       FieldDef("crc", FieldType.CRC32)
     )
 
@@ -26,7 +26,7 @@ final class EncodingErrorHandlingSpec extends AnyFunSuite with Matchers {
 
     // Test with corrupted CRC
     val validRow = Map(
-      "recordSize" -> 5,
+      "valueSize" -> 5,
       "value"      -> "hello"
     )
     val validEncoded = encode(validRow, schema)
@@ -43,12 +43,12 @@ final class EncodingErrorHandlingSpec extends AnyFunSuite with Matchers {
 
   test("decode should work without CRC validation when no CRC in schema") {
     val schemaWithoutCRC = List(
-      FieldDef("recordSize", FieldType.Int32),
-      FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize"))
+      FieldDef("valueSize", FieldType.Int32),
+      FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize"))
     )
 
     val row = Map(
-      "recordSize" -> 5,
+      "valueSize" -> 5,
       "value"      -> "hello"
     )
 
@@ -58,7 +58,7 @@ final class EncodingErrorHandlingSpec extends AnyFunSuite with Matchers {
     decoded shouldBe a[Right[String, Row]]
     decoded match {
       case Right(decodedRow) =>
-        decodedRow("recordSize") should be(5)
+        decodedRow("valueSize") should be(5)
         decodedRow("value") should be("hello")
       case Left(error) => fail(s"Should not fail with error: $error")
     }
@@ -66,14 +66,14 @@ final class EncodingErrorHandlingSpec extends AnyFunSuite with Matchers {
 
   test("encode should handle missing fields gracefully") {
     val schema = List(
-      FieldDef("recordSize", FieldType.Int32),
-      FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize")),
+      FieldDef("valueSize", FieldType.Int32),
+      FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize")),
       FieldDef("crc", FieldType.CRC32)
     )
 
     val rowWithoutRequired = Map(
       "value" -> "hello"
-      // Missing "recordSize" field
+      // Missing "valueSize" field
     )
 
     assertThrows[Exception] {

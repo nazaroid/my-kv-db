@@ -9,18 +9,18 @@ final class CRCEncodingSpec extends AnyFunSuite with Matchers {
 
   test("encode should add CRC only when FieldType.CRC32 is in schema") {
     val schemaWithCRC = List(
-      FieldDef("recordSize", FieldType.Int32),
-      FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize")),
+      FieldDef("valueSize", FieldType.Int32),
+      FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize")),
       FieldDef("crc", FieldType.CRC32)
     )
 
     val schemaWithoutCRC = List(
-      FieldDef("recordSize", FieldType.Int32),
-      FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize"))
+      FieldDef("valueSize", FieldType.Int32),
+      FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize"))
     )
 
     val row = Map(
-      "recordSize" -> 5,
+      "valueSize" -> 5,
       "value"      -> "hello"
     )
 
@@ -34,13 +34,13 @@ final class CRCEncodingSpec extends AnyFunSuite with Matchers {
 
   test("decode should verify CRC when FieldType.CRC32 is in schema") {
     val schema = List(
-      FieldDef("recordSize", FieldType.Int32),
-      FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize")),
+      FieldDef("valueSize", FieldType.Int32),
+      FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize")),
       FieldDef("crc", FieldType.CRC32)
     )
 
     val row = Map(
-      "recordSize" -> 5,
+      "valueSize" -> 5,
       "value"      -> "hello"
     )
 
@@ -50,7 +50,7 @@ final class CRCEncodingSpec extends AnyFunSuite with Matchers {
     decoded shouldBe a[Right[String, Row]]
     decoded match {
       case Right(decodedRow) =>
-        decodedRow("recordSize") should be(5)
+        decodedRow("valueSize") should be(5)
         decodedRow("value") should be("hello")
       case Left(error) => fail(s"Should not fail with error: $error")
     }
@@ -58,13 +58,13 @@ final class CRCEncodingSpec extends AnyFunSuite with Matchers {
 
   test("decode should return Left when CRC mismatch") {
     val schema = List(
-      FieldDef("recordSize", FieldType.Int32),
-      FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize")),
+      FieldDef("valueSize", FieldType.Int32),
+      FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize")),
       FieldDef("crc", FieldType.CRC32)
     )
 
     val row = Map(
-      "recordSize" -> 5,
+      "valueSize" -> 5,
       "value"      -> "hello"
     )
 
@@ -84,12 +84,12 @@ final class CRCEncodingSpec extends AnyFunSuite with Matchers {
 
   test("decode should work without CRC when FieldType.CRC32 is not in schema") {
     val schema = List(
-      FieldDef("recordSize", FieldType.Int32),
-      FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize"))
+      FieldDef("valueSize", FieldType.Int32),
+      FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize"))
     )
 
     val row = Map(
-      "recordSize" -> 5,
+      "valueSize" -> 5,
       "value"      -> "hello"
     )
 
@@ -99,7 +99,7 @@ final class CRCEncodingSpec extends AnyFunSuite with Matchers {
     decoded shouldBe a[Right[String, Row]]
     decoded match {
       case Right(decodedRow) =>
-        decodedRow("recordSize") should be(5)
+        decodedRow("valueSize") should be(5)
         decodedRow("value") should be("hello")
       case Left(error) => fail(s"Should not fail with error: $error")
     }
