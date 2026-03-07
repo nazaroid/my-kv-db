@@ -37,18 +37,24 @@ final class StorageManagerOperationSpec extends AsyncFreeSpec with AsyncIOSpec w
     maxSegmentCount = 10,
     dataSchema = List(
       FieldDef("valueSize", FieldType.Int32),
-      FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize"))
+      FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize")),
+      FieldDef("timestamp", FieldType.Timestamp),
+      FieldDef("status", FieldType.RecordStatus)
     ),
     segmentSchema = List(
       FieldDef("keySize", FieldType.Int32),
       FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
-      FieldDef("offset", FieldType.Int64)
+      FieldDef("offset", FieldType.Int64),
+      FieldDef("timestamp", FieldType.Timestamp),
+      FieldDef("status", FieldType.RecordStatus)
     ),
     tableSchema = List(
       FieldDef("keySize", FieldType.Int32),
       FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
       FieldDef("segmentNameSize", FieldType.Int32),
-      FieldDef("segmentName", FieldType.StringUtf8(sizeFromField = "segmentNameSize"))
+      FieldDef("segmentName", FieldType.StringUtf8(sizeFromField = "segmentNameSize")),
+      FieldDef("timestamp", FieldType.Timestamp),
+      FieldDef("status", FieldType.RecordStatus)
     )
   )
 
@@ -165,10 +171,10 @@ final class StorageManagerOperationSpec extends AsyncFreeSpec with AsyncIOSpec w
     // 2. Second session: reopen storage and read
     val session2 = storageResource.use { sm =>
       sm.read(key).map { recoveredValue =>
+        println(f"recoveredValue: $recoveredValue")
         assert(recoveredValue.contains(value), "Data should be recovered from disk indexes")
       }
     }
-
     session1 *> session2
   }
 

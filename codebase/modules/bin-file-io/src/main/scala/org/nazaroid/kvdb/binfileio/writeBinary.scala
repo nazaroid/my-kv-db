@@ -65,7 +65,7 @@ def writeBinary[F[_]: Async: Files](
                               result <- writeResult match {
                                 case Right(()) =>
                                   // STRATEGIC MOMENT: notify Storage that the data is persisted on disk
-                                  t.callback.traverse(_.complete(nextOffset)) *>
+                                  t.callback.traverse(_.complete(currentOffset)) *>
                                     Async[F].pure((nextOffset, Right(())))
                                 case Left(error) =>
                                   t.callback.traverse(_.complete(-1L)) *>
