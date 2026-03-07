@@ -171,7 +171,6 @@ final class StorageManagerOperationSpec extends AsyncFreeSpec with AsyncIOSpec w
     // 2. Second session: reopen storage and read
     val session2 = storageResource.use { sm =>
       sm.read(key).map { recoveredValue =>
-        println(f"recoveredValue: $recoveredValue")
         assert(recoveredValue.contains(value), "Data should be recovered from disk indexes")
       }
     }

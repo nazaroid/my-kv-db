@@ -120,7 +120,7 @@ sealed class StorageManager[F[_]: Async: Files: Logger](
 
       // Update the cache only if all operations are successful
       finalResult <-
-        if (offset > 0 && segOffset > 0 && tableOffset > 0) {
+        if (offset >= 0 && segOffset >= 0 && tableOffset >= 0) {
           cache.update(_ + (key -> CacheEntry.Persistent(dataRow, segName, offset))).map(_ => Right(()))
         } else {
           cache.update(_ - key).map(_ => Left("Write operation failed"))
