@@ -10,6 +10,7 @@ lazy val root = (project in file("."))
     `prometheus`,
     `bin-file-io`,
     `bitcask`,
+    `statistics`,
     `server`
   )
   .settings(
@@ -91,6 +92,24 @@ lazy val `bitcask` = (project in file("codebase/modules/bitcask"))
     inConfig(Integration)(Defaults.testSettings),
     Integration / testOptions += Tests
       .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/bitcask/integration-tests-html-report")
+  )
+
+lazy val `statistics` = (project in file("codebase/modules/statistics"))
+  .dependsOn(`bitcask` % "compile->compile;test->test;it->it")
+  .enablePlugins(DockerPlugin, JavaAppPackaging)
+  .disablePlugins(AssemblyPlugin)
+  .configs(Integration)
+  .settings(
+    commonSettings,
+    name    := "statistics",
+    version := GLOBAL_VERSION,
+    libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Logging.all ++ Testing.all,
+    excludeDependencies -= ExclusionRule("log4j", "log4j"),
+    Test / testOptions += Tests
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/statistics/unit-tests-html-report"),
+    inConfig(Integration)(Defaults.testSettings),
+    Integration / testOptions += Tests
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/statistics/integration-tests-html-report")
   )
 
 lazy val `server` = (project in file("codebase/modules/server"))
