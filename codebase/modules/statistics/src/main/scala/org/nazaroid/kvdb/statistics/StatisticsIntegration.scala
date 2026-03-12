@@ -39,8 +39,21 @@ class StatisticsIntegration[F[_]: Async: Logger](
 
   /** Register statistics metrics with Prometheus collector registry */
   def registerMetrics(collectorRegistry: io.prometheus.client.CollectorRegistry): F[Unit] = {
-    Logger[F].info("Registering statistics metrics with Prometheus collector registry") *>
-    statisticsService.registerMetrics(collectorRegistry)
+    for {
+      prometheusAdapter <- Async[F].delay(
+        MetricsAdapter.createPrometheusAdapter(collectorRegistry)
+      )
+      _ <- statisticsService.setMetricsAdapter(prometheusAdapter)
+      _ <- statisticsService.registerMetrics()
+    } yield ()
+  }
+  
+  /** Register statistics with custom metrics adapter */
+  def registerMetricsWithAdapter(adapter: MetricsAdapter[F]): F[Unit] = {
+    for {
+      _ <- statisticsService.setMetricsAdapter(adapter)
+      _ <- statisticsService.registerMetrics()
+    } yield ()
   }
 
   /** Export statistics for Prometheus (legacy method for compatibility) */

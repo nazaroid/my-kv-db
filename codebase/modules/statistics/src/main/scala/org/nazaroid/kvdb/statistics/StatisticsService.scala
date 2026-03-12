@@ -20,7 +20,8 @@ trait StatisticsService[F[_]] {
   def getDatabases: F[List[DatabaseInfo]]
   def getDatabaseStats(dbName: String): F[Option[DatabaseInfo]]
   def getSegmentStats(dbName: String): F[List[SegmentInfo]]
-  def registerMetrics(collectorRegistry: io.prometheus.client.CollectorRegistry): F[Unit]
+  def setMetricsAdapter(adapter: MetricsAdapter[F]): F[Unit]
+  def registerMetrics(): F[Unit]
 }
 
 case class DatabaseInfo(
@@ -65,58 +66,29 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
   monitoringRef: Ref[F, Boolean]
 ) extends StatisticsService[F] {
 
-  // Store references to registered Prometheus gauges for efficient updates
-  private var dbInfoGauge: Option[io.prometheus.client.Gauge] = None
-  private var tableInfoGauge: Option[io.prometheus.client.Gauge] = None
-  private var segmentInfoGauge: Option[io.prometheus.client.Gauge] = None
+  // Metrics adapter for exporting to different collectors
+  private var metricsAdapter: Option[MetricsAdapter[F]] = None
   
-  override def registerMetrics(collectorRegistry: io.prometheus.client.CollectorRegistry): F[Unit] = {
+  override def setMetricsAdapter(adapter: MetricsAdapter[F]): F[Unit] = {
     for {
-      _ <- Logger[F].info("Registering statistics metrics with Prometheus collector registry")
-      
-      // Register and store references to gauges
-      dbGauge <- Async[F].delay {
-        val gauge = io.prometheus.client.Gauge
-          .build()
-          .name("kvdb_database_info")
-          .help("Database information")
-          .labelNames("database", "type")
-          .create()
-        collectorRegistry.register(gauge)
-      }
+      _ <- Logger[F].info("Setting metrics adapter")
       _ <- Async[F].delay {
-        dbInfoGauge = Some(dbGauge)
+        metricsAdapter = Some(adapter)
       }
-      
-      tableGauge <- Async[F].delay {
-        val gauge = io.prometheus.client.Gauge
-          .build()
-          .name("kvdb_table_info")
-          .help("Table information")
-          .labelNames("database", "table", "type")
-          .create()
-        collectorRegistry.register(gauge)
-      }
-      _ <- Async[F].delay {
-        tableInfoGauge = Some(tableGauge)
-      }
-      
-      segmentGauge <- Async[F].delay {
-        val gauge = io.prometheus.client.Gauge
-          .build()
-          .name("kvdb_segment_info")
-          .help("Segment information")
-          .labelNames("database", "segment", "type")
-          .create()
-        collectorRegistry.register(gauge)
-      }
-      _ <- Async[F].delay {
-        segmentInfoGauge = Some(segmentGauge)
-      }
-      
-      // Initial update with current values
-      _ <- updateRegisteredMetrics()
     } yield ()
+  }
+  
+  override def registerMetrics(): F[Unit] = {
+    metricsAdapter.traverse_ { adapter =>
+      for {
+        _ <- Logger[F].info("Registering metrics with adapter")
+        _ <- adapter.registerDatabaseMetrics()
+        _ <- adapter.registerTableMetrics()
+        _ <- adapter.registerSegmentMetrics()
+        // Initial update with current values
+        _ <- updateAdapterMetrics()
+      } yield ()
+    }
   }
 
   override def startMonitoring(): F[Unit] = {
@@ -180,8 +152,8 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
         }
       }
       
-      // Update all registered Prometheus metrics automatically
-      _ <- updateRegisteredMetrics()
+      // Update metrics through adapter
+      _ <- updateAdapterMetrics()
     } yield ()
   }
 
@@ -328,74 +300,16 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
       entryCount = (fileSize / 100).toInt
     } yield entryCount
   }
-  
-  
-  /** Update all registered metrics */
-  private def updateRegisteredMetrics(): F[Unit] = {
-    // This method updates all registered Prometheus metrics with current values
-    // It's called from collectStatistics() and can also be called manually
-    for {
-      databases <- getDatabases
-      
-      // Update database metrics using stored gauge reference
-      _ <- dbInfoGauge.traverse_ { gauge =>
-        databases.traverse_ { db =>
-          Async[F].delay {
-            try {
-              gauge.labels(db.name, "total_entries").set(db.totalEntries)
-              gauge.labels(db.name, "active_entries").set(db.activeEntries)
-              gauge.labels(db.name, "deleted_entries").set(db.deletedEntries)
-              gauge.labels(db.name, "disk_size_bytes").set(db.totalDiskSize)
-              gauge.labels(db.name, "memory_size_bytes").set(db.totalMemorySize)
-              gauge.labels(db.name, "fragmentation_ratio").set(db.fragmentationRatio)
-            } catch {
-              case _: Exception => 
-                Logger[F].warn(s"Failed to update database metrics for ${db.name}")
-            }
-          }
-        }
-      }
-      
-      // Update table metrics using stored gauge reference
-      _ <- tableInfoGauge.traverse_ { gauge =>
-        databases.traverse_ { db =>
-          db.tables.traverse_ { table =>
-            Async[F].delay {
-              try {
-                gauge.labels(db.name, table.name, "entries").set(table.entryCount)
-                gauge.labels(db.name, table.name, "active_entries").set(table.activeEntryCount)
-                gauge.labels(db.name, table.name, "disk_size_bytes").set(table.diskSize)
-                gauge.labels(db.name, table.name, "memory_size_bytes").set(table.memorySize)
-              } catch {
-                case _: Exception =>
-                  Logger[F].warn(s"Failed to update table metrics for ${db.name}.${table.name}")
-              }
-            }
-          }
-        }
-      }
-      
-      // Update segment metrics using stored gauge reference
-      _ <- segmentInfoGauge.traverse_ { gauge =>
-        databases.traverse_ { db =>
-          getSegmentStats(db.name).flatMap { segments =>
-            segments.traverse_ { segment =>
-              Async[F].delay {
-                try {
-                  gauge.labels(db.name, segment.name, "file_size_bytes").set(segment.fileSize)
-                  gauge.labels(db.name, segment.name, "is_active").set(if (segment.isActive) 1.0 else 0.0)
-                  gauge.labels(db.name, segment.name, "stale_ratio").set(segment.staleDataRatio)
-                  gauge.labels(db.name, segment.name, "entry_count").set(segment.entryCount)
-                } catch {
-                  case _: Exception =>
-                    Logger[F].warn(s"Failed to update segment metrics for ${db.name}.${segment.name}")
-                }
-              }
-            }
-          }
-        }
-      }
-    } yield ()
+  /** Update metrics through adapter */
+  private def updateAdapterMetrics(): F[Unit] = {
+    metricsAdapter.traverse_ { adapter =>
+      for {
+        databases <- getDatabases
+        _ <- adapter.updateDatabaseMetrics(databases)
+        _ <- adapter.updateTableMetrics(databases)
+        _ <- adapter.updateSegmentMetrics(databases)
+      } yield ()
+    }
   }
 }
 
