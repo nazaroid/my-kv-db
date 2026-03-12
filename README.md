@@ -26,10 +26,6 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
   - добавить it:тесты в сервер по получению статистики
   - при создании DbInstance оборачивать storage в StatisticsService, чтобы получать статистику
   - при grpc уметь получать статистику по grpc
-  - (рассмотреть вариант) добавлять метрики в переданную Collection вместо тестовых
-    - чтобы можно было их агрегировать с другими метриками хоста
-    - Сейчас StatisticsService отдает метрики для prometheus через операцию 'case GET -> Root / "api" / "v1" / "stats" / "prometheus"' в StatisticsRoutes, путем вызова exportForPrometheus.
-      Это нужно передалать таким образом чтобы статистики экспортировались в произвольную io.prometheus.client.CollectorRegistry и могли таким образом объединяться с другими метриками микросервиса, в котором запускаются DbInstance и StatisticsService.
 
 - (TODO) добавить метрики по скорости запись/чтение
   экспортер для прометеуса

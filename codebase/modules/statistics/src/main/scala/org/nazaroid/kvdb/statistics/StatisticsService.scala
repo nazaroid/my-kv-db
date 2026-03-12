@@ -20,7 +20,6 @@ trait StatisticsService[F[_]] {
   def getDatabases: F[List[DatabaseInfo]]
   def getDatabaseStats(dbName: String): F[Option[DatabaseInfo]]
   def getSegmentStats(dbName: String): F[List[SegmentInfo]]
-  def setMetricsAdapter(adapter: MetricsAdapter[F]): F[Unit]
   def registerMetrics(): F[Unit]
 }
 
@@ -63,32 +62,19 @@ case class MonitoringConfig(
 class StatisticsServiceImpl[F[_]: Async: Files: Logger](
   storageManager: StorageManager[F],
   config: MonitoringConfig,
-  monitoringRef: Ref[F, Boolean]
+  monitoringRef: Ref[F, Boolean],
+  metricsAdapter: MetricsAdapter[F]  // Injected via constructor, no Option!
 ) extends StatisticsService[F] {
-
-  // Metrics adapter for exporting to different collectors
-  private var metricsAdapter: Option[MetricsAdapter[F]] = None
-  
-  override def setMetricsAdapter(adapter: MetricsAdapter[F]): F[Unit] = {
-    for {
-      _ <- Logger[F].info("Setting metrics adapter")
-      _ <- Async[F].delay {
-        metricsAdapter = Some(adapter)
-      }
-    } yield ()
-  }
   
   override def registerMetrics(): F[Unit] = {
-    metricsAdapter.traverse_ { adapter =>
-      for {
-        _ <- Logger[F].info("Registering metrics with adapter")
-        _ <- adapter.registerDatabaseMetrics()
-        _ <- adapter.registerTableMetrics()
-        _ <- adapter.registerSegmentMetrics()
-        // Initial update with current values
-        _ <- updateAdapterMetrics()
-      } yield ()
-    }
+    for {
+      _ <- Logger[F].info("Registering metrics with adapter")
+      _ <- metricsAdapter.registerDatabaseMetrics()
+      _ <- metricsAdapter.registerTableMetrics()
+      _ <- metricsAdapter.registerSegmentMetrics()
+      // Initial update with current values
+      _ <- updateAdapterMetrics()
+    } yield ()
   }
 
   override def startMonitoring(): F[Unit] = {
@@ -302,14 +288,12 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
   }
   /** Update metrics through adapter */
   private def updateAdapterMetrics(): F[Unit] = {
-    metricsAdapter.traverse_ { adapter =>
-      for {
-        databases <- getDatabases
-        _ <- adapter.updateDatabaseMetrics(databases)
-        _ <- adapter.updateTableMetrics(databases)
-        _ <- adapter.updateSegmentMetrics(databases)
-      } yield ()
-    }
+    for {
+      databases <- getDatabases
+      _ <- metricsAdapter.updateDatabaseMetrics(databases)
+      _ <- metricsAdapter.updateTableMetrics(databases)
+      _ <- metricsAdapter.updateSegmentMetrics(databases)
+    } yield ()
   }
 }
 
@@ -318,9 +302,29 @@ object StatisticsService {
     storageManager: StorageManager[F],
     config: MonitoringConfig = MonitoringConfig()
   ): F[StatisticsService[F]] = {
+    // Create with default Prometheus adapter
+    createWithAdapter(storageManager, config, MetricsAdapter.createNoOpAdapter())
+  }
+  
+  def createWithPrometheus[F[_]: Async: Files: Logger](
+    storageManager: StorageManager[F],
+    config: MonitoringConfig = MonitoringConfig(),
+    collectorRegistry: io.prometheus.client.CollectorRegistry
+  ): F[StatisticsService[F]] = {
+    for {
+      prometheusAdapter = MetricsAdapter.createPrometheusAdapter(collectorRegistry)
+      service <- createWithAdapter(storageManager, config, prometheusAdapter)
+    } yield service
+  }
+  
+  def createWithAdapter[F[_]: Async: Files: Logger](
+    storageManager: StorageManager[F],
+    config: MonitoringConfig,
+    metricsAdapter: MetricsAdapter[F]
+  ): F[StatisticsService[F]] = {
     for {
       monitoringRef <- Ref.of[F, Boolean](false)
-      service = new StatisticsServiceImpl(storageManager, config, monitoringRef)
+      service = new StatisticsServiceImpl(storageManager, config, monitoringRef, metricsAdapter)
     } yield service
   }
 }

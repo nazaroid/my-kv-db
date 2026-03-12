@@ -18,17 +18,19 @@ class AdapterIntegrationExample[F[_]: Async: Files: Logger](
   /** Example 1: Using Prometheus adapter */
   def setupWithPrometheus(): Resource[F, Unit] = {
     for {
-      statisticsService <- Resource.eval(StatisticsService.create(storageManager, MonitoringConfig()))
-      statisticsIntegration <- Resource.eval(StatisticsIntegration.create(storageManager, MonitoringConfig()))
-      
       // Create shared Prometheus collector registry
       collectorRegistry <- Resource.make(
         Async[F].delay(new CollectorRegistry())
       )(registry => Async[F].delay(registry.clear()))
       
-      // Register with Prometheus adapter
+      // Create integration with Prometheus adapter
+      statisticsIntegration <- Resource.eval(
+        StatisticsIntegration.createWithPrometheus(storageManager, MonitoringConfig(), collectorRegistry)
+      )
+      
+      // Register metrics
       _ <- Resource.eval(
-        statisticsIntegration.registerMetrics(collectorRegistry)
+        statisticsIntegration.getAllDatabases().flatMap(_ => Async[F].unit) // Force registration
       )
       
       // Start monitoring
@@ -42,20 +44,19 @@ class AdapterIntegrationExample[F[_]: Async: Files: Logger](
   /** Example 2: Using custom metrics adapter */
   def setupWithCustomAdapter(): Resource[F, Unit] = {
     for {
-      statisticsService <- Resource.eval(StatisticsService.create(storageManager, MonitoringConfig()))
-      
       // Create custom adapter (e.g., for InfluxDB, Datadog, etc.)
       customAdapter <- Resource.eval(Async[F].delay(
         new CustomMetricsAdapter[F]() // Would be implemented separately
       ))
       
-      // Register with custom adapter
-      _ <- Resource.eval(
-        statisticsService.setMetricsAdapter(customAdapter)
+      // Create integration with custom adapter
+      statisticsIntegration <- Resource.eval(
+        StatisticsIntegration.createWithAdapter(storageManager, MonitoringConfig(), customAdapter)
       )
       
+      // Register metrics
       _ <- Resource.eval(
-        statisticsService.registerMetrics()
+        statisticsIntegration.getAllDatabases().flatMap(_ => Async[F].unit) // Force registration
       )
       
     } yield ()
@@ -64,19 +65,14 @@ class AdapterIntegrationExample[F[_]: Async: Files: Logger](
   /** Example 3: Using no-op adapter for testing */
   def setupForTesting(): Resource[F, Unit] = {
     for {
-      statisticsService <- Resource.eval(StatisticsService.create(storageManager, MonitoringConfig()))
-      
-      // Use no-op adapter for unit tests
-      noOpAdapter <- Resource.eval(Async[F].delay(
-        MetricsAdapter.createNoOpAdapter[F]()
-      ))
-      
-      _ <- Resource.eval(
-        statisticsService.setMetricsAdapter(noOpAdapter)
+      // Use default create (uses NoOp adapter)
+      statisticsIntegration <- Resource.eval(
+        StatisticsIntegration.create(storageManager, MonitoringConfig())
       )
       
+      // Register metrics (no-op will do nothing)
       _ <- Resource.eval(
-        statisticsService.registerMetrics()
+        statisticsIntegration.getAllDatabases().flatMap(_ => Async[F].unit)
       )
       
     } yield ()
@@ -85,18 +81,16 @@ class AdapterIntegrationExample[F[_]: Async: Files: Logger](
   /** Example 4: Dynamic adapter switching */
   def setupWithDynamicSwitching(): F[Unit] = {
     for {
-      statisticsService <- StatisticsService.create(storageManager, MonitoringConfig())
-      
-      // Start with no-op adapter
-      noOpAdapter = MetricsAdapter.createNoOpAdapter[F]()
-      _ <- statisticsService.setMetricsAdapter(noOpAdapter)
-      _ <- statisticsService.registerMetrics()
+      // Start with NoOp adapter
+      noOpIntegration <- StatisticsIntegration.create(storageManager, MonitoringConfig())
+      _ <- noOpIntegration.getAllDatabases().flatMap(_ => Async[F].unit)
       
       // Later switch to Prometheus
       collectorRegistry <- Async[F].delay(new CollectorRegistry())
-      prometheusAdapter = MetricsAdapter.createPrometheusAdapter(collectorRegistry)
-      _ <- statisticsService.setMetricsAdapter(prometheusAdapter)
-      _ <- statisticsService.registerMetrics()
+      prometheusIntegration <- StatisticsIntegration.createWithPrometheus(
+        storageManager, MonitoringConfig(), collectorRegistry
+      )
+      _ <- prometheusIntegration.getAllDatabases().flatMap(_ => Async[F].unit)
       
       _ <- Logger[F].info("Switched from no-op to Prometheus adapter")
       
@@ -160,12 +154,13 @@ object AdapterIntegrationExample {
     adapterType: String = "prometheus"
   ): Resource[F, Unit] = {
     
-    val example = new AdapterIntegrationExample(storageManager)
-    
     adapterType.toLowerCase match {
-      case "prometheus" => example.setupWithPrometheus()
-      case "custom" => example.setupWithCustomAdapter()
-      case "test" => example.setupForTesting()
+      case "prometheus" => 
+        new AdapterIntegrationExample(storageManager).setupWithPrometheus()
+      case "custom" => 
+        new AdapterIntegrationExample(storageManager).setupWithCustomAdapter()
+      case "test" => 
+        new AdapterIntegrationExample(storageManager).setupForTesting()
       case _ => 
         Resource.raiseError(new IllegalArgumentException(s"Unknown adapter type: $adapterType"))
     }
@@ -184,9 +179,12 @@ object AdapterIntegrationExample {
           case Some(registry) => MetricsAdapter.createPrometheusAdapter(registry)
           case None => throw new IllegalArgumentException("Collector registry required for Prometheus adapter")
         }
-      case "noop" => MetricsAdapter.createNoOpAdapter()
-      case "custom" => new CustomMetricsAdapter()
-      case _ => throw new IllegalArgumentException(s"Unknown adapter type: $adapterType")
+      case "noop" => 
+        MetricsAdapter.createNoOpAdapter[F]()
+      case "custom" => 
+        new CustomMetricsAdapter[F]()
+      case _ => 
+        throw new IllegalArgumentException(s"Unknown adapter type: $adapterType")
     }
   }
 }
