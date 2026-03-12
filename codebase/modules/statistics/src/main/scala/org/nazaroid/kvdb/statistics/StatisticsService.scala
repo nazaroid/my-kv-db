@@ -20,7 +20,7 @@ trait StatisticsService[F[_]] {
   def getDatabases: F[List[DatabaseInfo]]
   def getDatabaseStats(dbName: String): F[Option[DatabaseInfo]]
   def getSegmentStats(dbName: String): F[List[SegmentInfo]]
-  def exportForPrometheus: F[String]
+  def registerMetrics(collectorRegistry: io.prometheus.client.CollectorRegistry): F[Unit]
 }
 
 case class DatabaseInfo(
@@ -65,6 +65,60 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
   monitoringRef: Ref[F, Boolean]
 ) extends StatisticsService[F] {
 
+  // Store references to registered Prometheus gauges for efficient updates
+  private var dbInfoGauge: Option[io.prometheus.client.Gauge] = None
+  private var tableInfoGauge: Option[io.prometheus.client.Gauge] = None
+  private var segmentInfoGauge: Option[io.prometheus.client.Gauge] = None
+  
+  override def registerMetrics(collectorRegistry: io.prometheus.client.CollectorRegistry): F[Unit] = {
+    for {
+      _ <- Logger[F].info("Registering statistics metrics with Prometheus collector registry")
+      
+      // Register and store references to gauges
+      dbGauge <- Async[F].delay {
+        val gauge = io.prometheus.client.Gauge
+          .build()
+          .name("kvdb_database_info")
+          .help("Database information")
+          .labelNames("database", "type")
+          .create()
+        collectorRegistry.register(gauge)
+      }
+      _ <- Async[F].delay {
+        dbInfoGauge = Some(dbGauge)
+      }
+      
+      tableGauge <- Async[F].delay {
+        val gauge = io.prometheus.client.Gauge
+          .build()
+          .name("kvdb_table_info")
+          .help("Table information")
+          .labelNames("database", "table", "type")
+          .create()
+        collectorRegistry.register(gauge)
+      }
+      _ <- Async[F].delay {
+        tableInfoGauge = Some(tableGauge)
+      }
+      
+      segmentGauge <- Async[F].delay {
+        val gauge = io.prometheus.client.Gauge
+          .build()
+          .name("kvdb_segment_info")
+          .help("Segment information")
+          .labelNames("database", "segment", "type")
+          .create()
+        collectorRegistry.register(gauge)
+      }
+      _ <- Async[F].delay {
+        segmentInfoGauge = Some(segmentGauge)
+      }
+      
+      // Initial update with current values
+      _ <- updateRegisteredMetrics()
+    } yield ()
+  }
+
   override def startMonitoring(): F[Unit] = {
     if (config.enableBackgroundMonitoring) {
       Logger[F].info("Starting statistics monitoring service")
@@ -107,52 +161,7 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
       segments <- collectSegmentInfo(dbPath)
     } yield segments
   }
-
-  override def exportForPrometheus: F[String] = {
-    for {
-      databases <- getDatabases
-      prometheusLines = databases.flatMap { db =>
-        val dbLines = List(
-          s"# HELP kvdb_database_info Database information",
-          s"# TYPE kvdb_database_info gauge",
-          s"kvdb_database_info{database=\"${db.name}\",type=\"total_entries\"} ${db.totalEntries}",
-          s"kvdb_database_info{database=\"${db.name}\",type=\"active_entries\"} ${db.activeEntries}",
-          s"kvdb_database_info{database=\"${db.name}\",type=\"deleted_entries\"} ${db.deletedEntries}",
-          s"kvdb_database_info{database=\"${db.name}\",type=\"disk_size_bytes\"} ${db.totalDiskSize}",
-          s"kvdb_database_info{database=\"${db.name}\",type=\"memory_size_bytes\"} ${db.totalMemorySize}",
-          s"kvdb_database_info{database=\"${db.name}\",type=\"fragmentation_ratio\"} ${db.fragmentationRatio}"
-        )
-        
-        val tableLines = db.tables.flatMap { table =>
-          List(
-            s"kvdb_table_info{database=\"${db.name}\",table=\"${table.name}\",type=\"entries\"} ${table.entryCount}",
-            s"kvdb_table_info{database=\"${db.name}\",table=\"${table.name}\",type=\"active_entries\"} ${table.activeEntryCount}",
-            s"kvdb_table_info{database=\"${db.name}\",table=\"${table.name}\",type=\"disk_size_bytes\"} ${table.diskSize}",
-            s"kvdb_table_info{database=\"${db.name}\",table=\"${table.name}\",type=\"memory_size_bytes\"} ${table.memorySize}"
-          )
-        }
-        
-        dbLines ++ tableLines
-      }
-      
-      segmentLines <- databases.traverse { db =>
-        getSegmentStats(db.name).map { segments =>
-          segments.flatMap { segment =>
-            List(
-              s"kvdb_segment_info{database=\"${db.name}\",segment=\"${segment.name}\",type=\"file_size_bytes\"} ${segment.fileSize}",
-              s"kvdb_segment_info{database=\"${db.name}\",segment=\"${segment.name}\",type=\"is_active\"} ${if (segment.isActive) 1 else 0}",
-              s"kvdb_segment_info{database=\"${db.name}\",segment=\"${segment.name}\",type=\"stale_ratio\"} ${segment.staleDataRatio}",
-              s"kvdb_segment_info{database=\"${db.name}\",segment=\"${segment.name}\",type=\"entry_count\"} ${segment.entryCount}"
-            )
-          }
-        }
-      }.map(_.flatten)
-      
-      allLines = prometheusLines ++ segmentLines
-      
-    } yield allLines.mkString("\n")
-  }
-
+  
   /** Collect statistics for all databases */
   private def collectStatistics(): F[Unit] = {
     for {
@@ -170,6 +179,9 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
           }
         }
       }
+      
+      // Update all registered Prometheus metrics automatically
+      _ <- updateRegisteredMetrics()
     } yield ()
   }
 
@@ -315,6 +327,75 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
       // Assume average entry size of 100 bytes
       entryCount = (fileSize / 100).toInt
     } yield entryCount
+  }
+  
+  
+  /** Update all registered metrics */
+  private def updateRegisteredMetrics(): F[Unit] = {
+    // This method updates all registered Prometheus metrics with current values
+    // It's called from collectStatistics() and can also be called manually
+    for {
+      databases <- getDatabases
+      
+      // Update database metrics using stored gauge reference
+      _ <- dbInfoGauge.traverse_ { gauge =>
+        databases.traverse_ { db =>
+          Async[F].delay {
+            try {
+              gauge.labels(db.name, "total_entries").set(db.totalEntries)
+              gauge.labels(db.name, "active_entries").set(db.activeEntries)
+              gauge.labels(db.name, "deleted_entries").set(db.deletedEntries)
+              gauge.labels(db.name, "disk_size_bytes").set(db.totalDiskSize)
+              gauge.labels(db.name, "memory_size_bytes").set(db.totalMemorySize)
+              gauge.labels(db.name, "fragmentation_ratio").set(db.fragmentationRatio)
+            } catch {
+              case _: Exception => 
+                Logger[F].warn(s"Failed to update database metrics for ${db.name}")
+            }
+          }
+        }
+      }
+      
+      // Update table metrics using stored gauge reference
+      _ <- tableInfoGauge.traverse_ { gauge =>
+        databases.traverse_ { db =>
+          db.tables.traverse_ { table =>
+            Async[F].delay {
+              try {
+                gauge.labels(db.name, table.name, "entries").set(table.entryCount)
+                gauge.labels(db.name, table.name, "active_entries").set(table.activeEntryCount)
+                gauge.labels(db.name, table.name, "disk_size_bytes").set(table.diskSize)
+                gauge.labels(db.name, table.name, "memory_size_bytes").set(table.memorySize)
+              } catch {
+                case _: Exception =>
+                  Logger[F].warn(s"Failed to update table metrics for ${db.name}.${table.name}")
+              }
+            }
+          }
+        }
+      }
+      
+      // Update segment metrics using stored gauge reference
+      _ <- segmentInfoGauge.traverse_ { gauge =>
+        databases.traverse_ { db =>
+          getSegmentStats(db.name).flatMap { segments =>
+            segments.traverse_ { segment =>
+              Async[F].delay {
+                try {
+                  gauge.labels(db.name, segment.name, "file_size_bytes").set(segment.fileSize)
+                  gauge.labels(db.name, segment.name, "is_active").set(if (segment.isActive) 1.0 else 0.0)
+                  gauge.labels(db.name, segment.name, "stale_ratio").set(segment.staleDataRatio)
+                  gauge.labels(db.name, segment.name, "entry_count").set(segment.entryCount)
+                } catch {
+                  case _: Exception =>
+                    Logger[F].warn(s"Failed to update segment metrics for ${db.name}.${segment.name}")
+                }
+              }
+            }
+          }
+        }
+      }
+    } yield ()
   }
 }
 

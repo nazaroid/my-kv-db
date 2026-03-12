@@ -63,6 +63,14 @@ class StatisticsRoutes[F[_]: Async](
         )
         response <- Ok(summary.asJson)
       } yield response
+    
+    case POST -> Root / "api" / "v1" / "stats" / "register-metrics" =>
+      for {
+        // This endpoint allows registering metrics with an external collector registry
+        // In a real implementation, this would accept collector registry configuration
+        // and register the statistics metrics with it
+        response <- Ok("Metrics registration endpoint. Use registerMetrics method programmatically.")
+      } yield response
   }
 }
 
