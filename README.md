@@ -19,28 +19,51 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
 (cv CrudSpec)
 
 
-- (TODO) добавить операции по статистике:
+- (IN PROGRESS) добавить операции по статистике:
   список баз/таблиц/размер(диск, озу)/кол-во записей
   статистику по сегментам: кол-во, фрагментация (Коэффициент фрагментации (Stale Data Ratio): Отношение объема неактуальных данных (старых версий ключей) к общему размеру файлов)
   экспортировать для прометеуса
+  - добавить it:тесты в сервер по получению статистики
+  - при создании DbInstance оборачивать storage в StatisticsService, чтобы получать статистику
+  - при grpc уметь получать статистику по grpc
+  - (рассмотреть вариант) добавлять метрики в переданную Collection вместо тестовых
+    - чтобы можно было их агрегировать с другими метриками хоста
+    - Сечас StatisticsService отдает метрики для prometheus через операцию 'case GET -> Root / "api" / "v1" / "stats" / "prometheus"' в StatisticsRoutes, путем вызова exportForPrometheus.
+      Это нужно передалать таким образом чтобы статистики экспортировались в произвольную io.prometheus.client.CollectorRegistry и могли таким образом объединяться с другими метриками микросервиса, в котором запускаются DbInstance и StatisticsService.
 
 - (TODO) добавить метрики по скорости запись/чтение
   экспортер для прометеуса
-- 
   набросок в AI:
   https://www.google.com/search?sourceid=chrome&udm=50&aep=42&q=%D0%AF+%D1%80%D0%B0%D0%B7%D1%80%D0%B0%D0%B1%D0%B0%D1%82%D1%8B%D0%B2%D0%B0%D1%8E+%D0%BF%D1%80%D0%BE%D1%81%D1%82%D0%B5%D0%BD%D1%8C%D0%BA%D1%83%D1%8E+kv-%D0%B1%D0%B0%D0%B7%D1%83+%D0%B4%D0%B0%D0%BD%D1%8B%D1%85+%D1%81+%D0%B4%D0%B2%D0%B8%D0%B6%D0%BA%D0%BE%D0%BC+bitcask.%0A%D0%A3+%D0%BC%D0%B5%D0%BD%D1%8F+%D0%BE%D0%BF%D0%B5%D1%80%D0%B0%D1%86%D0%B8%D0%B8+%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B8+%D0%B8+%D1%87%D1%82%D0%B5%D0%BD%D0%B8%D1%8F%2C+%D0%BD%D0%BE+%D0%BD%D0%B5%D1%82+%D0%BD%D0%B8%D0%BA%D0%B0%D0%BA%D0%BE%D0%B9+%D1%81%D1%82%D0%B0%D1%82%D0%B8%D1%81%D1%82%D0%B8%D0%BA%D0%B8.+%D0%9F%D1%80%D0%B5%D0%B4%D0%BB%D0%BE%D0%B6%D0%B8+%D0%BA%D0%B0%D0%BA+%D0%B8%D1%81%D0%BF%D1%80%D0%B0%D0%B2%D0%B8%D1%82%D1%8C+%D1%81%D0%B8%D1%82%D1%83%D0%B0%D1%86%D0%B8%D1%8E&mstk=AUtExfBFmzELB1g_0ahRd1paz1U43w31fV6fGYPUJbiKTcJNgHlD191coevSJ0LcKsdnD8NJPjYuZGxg1Xha6mUpQWXk2mg3RQ2sgLx52ePnmCcf5BeTtd8g_8SpskKt3LQ0KDTCkQLg4BFd-2xyCkcYDwveSWNwTMoaqJEj4ERSZtuLT4IDp0ed8vmMwcrnR7s0wmVupLg3NvIKFZS3_kcuO85FwL14TSD2xs8rpjt5Rmc0GBcehnZYwKyLAw&csuir=1
+
+- (TODO) нужно лучше декомпозировать проект на модули
+  - выделить два основных компонента и слои: 
+    - storage:
+      - server
+      - engine
+      - statistics
+    - shared
+      - utils
+    - node
+  - разделить утилиты: для инстанса DB не нужен [metrics](codebase/modules/utils/metrics)
+  - нужен только для http-сервера: [prometheus](codebase/modules/utils/third_party/prometheus)
+
 - (TODO) оптимизировать: size <- Files[F].size(Path(ds.filePath)).handleError(_ => 0L)
   - вроде уже оптимизировано
+
 - (TODO) проработать результаты CODE_REVIEW (особенно исправить баг по длинне ключей)
   - конкуретная запись на уровне сегментов
   - избавиться от `encoding` бросает `throw`
   - ввести конфиг `durability: Relaxed | FsyncPerSegment | FsyncPerBatchвести конфиг `durability: Relaxed | FsyncPerSegment | FsyncPerBatch
   - длины ключей считаются в символах, а не в байтах UTF-8
+
 - (TODO) рефакторинг: 
   - В операции write не используется схема данных StorageConfig.dataSchema. 
     Схема данных используется косвенно из-за чего возможно расхождение.
     Попробуй произвести рефакторинг, чтобы все операции в StorageManager использовали свою схему данных
+
 - (TODO) подготовить для OpenSource
+
 - (TODO) MVP: попробовать переделать на DSL + Free (можно только AppL и ServiceL)
   (AppL (run),
   ServiceL (startEndpoint httpCfg | grpcCfg)

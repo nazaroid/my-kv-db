@@ -1,4 +1,4 @@
-package org.nazaroid.kvdb.bitcask
+package org.nazaroid.kvdb.bitcask.storage
 
 import cats.effect.IO
 import fs2.concurrent.Channel
@@ -25,7 +25,7 @@ final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         if (JFiles.exists(dir.toNioPath)) {
           JFiles
             .walk(dir.toNioPath)
-            .sorted(java.util.Comparator.reverseOrder()) // Сначала файлы, потом папки
+            .sorted(java.util.Comparator.reverseOrder())
             .forEach(JFiles.delete(_))
         }
       }.handleErrorWith(_ => IO.unit)

@@ -1,4 +1,4 @@
-package org.nazaroid.kvdb.bitcask
+package org.nazaroid.kvdb.bitcask.storage
 
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.effect.{IO, Resource}
