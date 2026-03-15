@@ -100,7 +100,7 @@ object StatisticsIntegration {
     config: MonitoringConfig = MonitoringConfig(),
     collectorRegistry: io.prometheus.client.CollectorRegistry
   ): F[StatisticsIntegration[F]] = {
-    prometheusAdapter = MetricsAdapter.createPrometheusAdapter(collectorRegistry)
+    val prometheusAdapter = MetricsAdapter.createPrometheusAdapter(collectorRegistry)
     for {
       integration <- createWithAdapter(storageManager, config, prometheusAdapter)
     } yield integration

@@ -36,6 +36,7 @@ class PrometheusMetricsAdapter[F[_]: Async: Logger](
           .labelNames("database", "type")
           .create()
         collectorRegistry.register(gauge)
+        gauge
       }
       _ <- Async[F].delay {
         dbInfoGauge = Some(dbGauge)
@@ -55,6 +56,7 @@ class PrometheusMetricsAdapter[F[_]: Async: Logger](
           .labelNames("database", "table", "type")
           .create()
         collectorRegistry.register(gauge)
+        gauge
       }
       _ <- Async[F].delay {
         tableInfoGauge = Some(tableGauge)
@@ -74,6 +76,7 @@ class PrometheusMetricsAdapter[F[_]: Async: Logger](
           .labelNames("database", "segment", "type")
           .create()
         collectorRegistry.register(gauge)
+        gauge
       }
       _ <- Async[F].delay {
         segmentInfoGauge = Some(segmentGauge)

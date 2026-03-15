@@ -319,8 +319,8 @@ object StatisticsService {
     config: MonitoringConfig = MonitoringConfig(),
     collectorRegistry: io.prometheus.client.CollectorRegistry
   ): F[StatisticsService[F]] = {
+    val prometheusAdapter = MetricsAdapter.createPrometheusAdapter(collectorRegistry)
     for {
-      prometheusAdapter = MetricsAdapter.createPrometheusAdapter(collectorRegistry)
       service <- createWithAdapter(storageManager, config, prometheusAdapter)
     } yield service
   }

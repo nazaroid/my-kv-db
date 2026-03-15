@@ -379,7 +379,7 @@ sealed class StorageManager[F[_]: Async: Files: Logger](
       }.toList
 
       segmentStats <- getSegmentStats
-
+      
       // Final result (removed yield () and val keywords)
     } yield DatabaseStats(
       totalTables    = tableStats.size,

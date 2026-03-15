@@ -3,8 +3,11 @@ package org.nazaroid.kvdb.statistics
 import cats.effect.Async
 import cats.implicits.given
 import org.http4s.HttpRoutes
+import org.http4s.dsl.Http4sDsl
 import org.http4s.circe.*
 import org.http4s.dsl.Http4sDsl
+import io.circe.generic.auto._
+import io.circe.syntax.*
 
 class StatisticsRoutes[F[_]: Async](
   statisticsIntegration: StatisticsIntegration[F]
