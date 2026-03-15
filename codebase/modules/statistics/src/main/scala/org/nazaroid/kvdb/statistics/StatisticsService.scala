@@ -1,74 +1,70 @@
 package org.nazaroid.kvdb.statistics
 
 import cats.effect.implicits.given
-import cats.effect.syntax.all.given
-import cats.effect.{Async, Deferred, Ref}
+import cats.effect.{Async, Ref}
 import cats.implicits.given
-import cats.syntax.all.given
 import fs2.Stream
-import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
+import io.circe.*
 import org.nazaroid.kvdb.bitcask.storage.StorageManager
 import org.typelevel.log4cats.Logger
 
-import java.nio.file.Files as JFiles
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.*
 
 /** Background process for monitoring segments and fragmentation */
 trait StatisticsService[F[_]] {
-  def startMonitoring(): F[Unit]
-  def stopMonitoring(): F[Unit]
-  def getDatabases: F[List[DatabaseInfo]]
+  def startMonitoring():                F[Unit]
+  def stopMonitoring():                 F[Unit]
+  def getDatabases:                     F[List[DatabaseInfo]]
   def getDatabaseStats(dbName: String): F[Option[DatabaseInfo]]
-  def getSegmentStats(dbName: String): F[List[SegmentInfo]]
-  def getStats: F[org.nazaroid.kvdb.bitcask.storage.DatabaseStats]  // Delegate to storageManager
-  def registerMetrics(): F[Unit]
+  def getSegmentStats(dbName: String):  F[List[SegmentInfo]]
+  def getStats:                         F[org.nazaroid.kvdb.bitcask.storage.DatabaseStats] // Delegate to storageManager
+  def registerMetrics():                F[Unit]
 }
 
 case class DatabaseInfo(
-  name: String,
-  tables: List[TableInfo],
-  totalEntries: Int,
-  activeEntries: Int,
-  deletedEntries: Int,
-  totalDiskSize: Long,
-  totalMemorySize: Long,
-  fragmentationRatio: Double
-)
+  name:               String,
+  tables:             List[TableInfo],
+  totalEntries:       Int,
+  activeEntries:      Int,
+  deletedEntries:     Int,
+  totalDiskSize:      Long,
+  totalMemorySize:    Long,
+  fragmentationRatio: Double)
+    derives Codec.AsObject
 
 case class TableInfo(
-  name: String,
-  entryCount: Int,
+  name:             String,
+  entryCount:       Int,
   activeEntryCount: Int,
-  diskSize: Long,
-  memorySize: Long
-)
+  diskSize:         Long,
+  memorySize:       Long)
+    derives Codec.AsObject
 
 case class SegmentInfo(
-  name: String,
-  filePath: String,
-  fileSize: Long,
-  isActive: Boolean,
+  name:           String,
+  filePath:       String,
+  fileSize:       Long,
+  isActive:       Boolean,
   staleDataRatio: Double,
-  entryCount: Int,
-  lastModified: Long
-)
+  entryCount:     Int,
+  lastModified:   Long)
+    derives Codec.AsObject
 
 case class MonitoringConfig(
-  checkInterval: FiniteDuration = 30.seconds,
+  checkInterval:              FiniteDuration = 30.seconds,
   enableBackgroundMonitoring: Boolean = true,
-  maxStaleRatio: Double = 0.3,
-  compactionThreshold: Double = 0.5
-)
+  maxStaleRatio:              Double = 0.3,
+  compactionThreshold:        Double = 0.5)
 
 class StatisticsServiceImpl[F[_]: Async: Files: Logger](
   storageManager: StorageManager[F],
-  config: MonitoringConfig,
-  monitoringRef: Ref[F, Boolean],
-  metricsAdapter: MetricsAdapter[F]  // Injected via constructor, no Option!
+  config:         MonitoringConfig,
+  monitoringRef:  Ref[F, Boolean],
+  metricsAdapter: MetricsAdapter[F] // Injected via constructor, no Option!
 ) extends StatisticsService[F] {
-  
+
   override def registerMetrics(): F[Unit] = {
     for {
       _ <- Logger[F].info("Registering metrics with adapter")
@@ -79,7 +75,7 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
       _ <- updateAdapterMetrics()
     } yield ()
   }
-  
+
   override def getStats: F[org.nazaroid.kvdb.bitcask.storage.DatabaseStats] = {
     storageManager.getStats
   }
@@ -110,7 +106,6 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
     }
   }
 
-
   override def stopMonitoring(): F[Unit] = {
     Logger[F].info("Stopping statistics monitoring service")
     monitoringRef.set(false)
@@ -119,7 +114,7 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
   override def getDatabases: F[List[DatabaseInfo]] = {
     for {
       dbFolders <- getAllDatabaseFolders
-      dbInfos <- dbFolders.traverse(collectDatabaseInfo)
+      dbInfos   <- dbFolders.traverse(collectDatabaseInfo)
     } yield dbInfos.flatten
   }
 
@@ -129,20 +124,21 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
 
   override def getSegmentStats(dbName: String): F[List[SegmentInfo]] = {
     for {
-      dbPath <- getDatabasePath(dbName)
+      dbPath   <- getDatabasePath(dbName)
       segments <- collectSegmentInfo(dbPath)
     } yield segments
   }
-  
+
   /** Collect statistics for all databases */
   private def collectStatistics(): F[Unit] = {
     for {
       databases <- getDatabases
       _ <- databases.traverse_ { db =>
         for {
-          _ <- if (db.fragmentationRatio > config.maxStaleRatio) {
-            Logger[F].warn(s"Database ${db.name} has high fragmentation: ${db.fragmentationRatio}")
-          } else ().pure[F]
+          _ <-
+            if (db.fragmentationRatio > config.maxStaleRatio) {
+              Logger[F].warn(s"Database ${db.name} has high fragmentation: ${db.fragmentationRatio}")
+            } else ().pure[F]
 
           segments <- getSegmentStats(db.name)
           _ <- segments.traverse_ { segment =>
@@ -159,7 +155,8 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
   /** Get all database folders */
   private def getAllDatabaseFolders: F[List[Path]] = {
     // Assuming databases are in subdirectories of the main folder
-    Files[F].list(Path(storageManager.config.folder))
+    Files[F]
+      .list(Path(storageManager.config.folder))
       .filter(_.fileName.toString.endsWith(".db"))
       .compile
       .toList
@@ -185,66 +182,67 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
 
           // Вспомогательные расчеты
           totalDiskSize = segments.map(_.fileSize).sum
-          totalEntries  = segments.map(_.entryCount).sum
+          totalEntries = segments.map(_.entryCount).sum
           activeEntries = segments.filter(_.isActive).map(_.entryCount).sum
 
           // Исправлен расчет fragmentationRatio (избегаем дублирования суммы)
-          fragmentationRatio = if (totalDiskSize > 0) {
-            segments.map(s => s.staleDataRatio * s.fileSize).sum / totalDiskSize
-          } else 0.0
+          fragmentationRatio =
+            if (totalDiskSize > 0) {
+              segments.map(s => s.staleDataRatio * s.fileSize).sum / totalDiskSize
+            } else 0.0
 
           dbInfo = DatabaseInfo(
-            name = dbName,
-            tables = tables,
-            totalEntries = totalEntries,
-            activeEntries = activeEntries,
-            deletedEntries = totalEntries - activeEntries,
-            totalDiskSize = totalDiskSize,
-            totalMemorySize = storageStats.totalDataSize,
+            name               = dbName,
+            tables             = tables,
+            totalEntries       = totalEntries,
+            activeEntries      = activeEntries,
+            deletedEntries     = totalEntries - activeEntries,
+            totalDiskSize      = totalDiskSize,
+            totalMemorySize    = storageStats.totalDataSize,
             fragmentationRatio = fragmentationRatio
           )
         } yield Some(dbInfo)
     }
   }
 
-
   /** Collect segment information from disk files */
   private def collectSegmentInfo(dbPath: Path): F[List[SegmentInfo]] = {
     for {
-      segmentFiles <- Files[F].list(dbPath)
+      segmentFiles <- Files[F]
+        .list(dbPath)
         .filter(_.fileName.toString.endsWith(".bin"))
         .filter(_.fileName.toString.startsWith("seg_"))
         .compile
         .toList
-      
+
       // Get active segments from storage manager
       storageStats <- storageManager.getStats
       activeSegmentNames = storageStats.segmentStats.filter(_.isActive).map(_.name).toSet
-      
+
       segmentInfos <- segmentFiles.traverse { segmentFile =>
         val segmentName = segmentFile.fileName.toString.replace(".bin", "")
-        
+
         for {
-          fileSize <- Files[F].size(segmentFile)
-          lastModified <- Files[F].getLastModifiedTime(segmentFile).map(_.to(TimeUnit.MILLISECONDS))
-          
+          fileSize     <- Files[F].size(segmentFile)
+          lastModified <- Files[F].getLastModifiedTime(segmentFile).map(_.toUnit(TimeUnit.MILLISECONDS).toLong)
+
           // Calculate stale data ratio by analyzing segment content
           staleRatio <- calculateStaleDataRatio(segmentFile)
-          
+
           // Count entries (simplified - would need actual parsing)
           entryCount <- countSegmentEntries(segmentFile)
-          
+
         } yield SegmentInfo(
-          name = segmentName,
-          filePath = segmentFile.toString,
-          fileSize = fileSize,
-          isActive = activeSegmentNames.contains(segmentName),
+          name           = segmentName,
+          filePath       = segmentFile.toString,
+          fileSize       = fileSize,
+          isActive       = activeSegmentNames.contains(segmentName),
           staleDataRatio = staleRatio,
-          entryCount = entryCount,
-          lastModified = lastModified
+          entryCount     = entryCount,
+          lastModified   = lastModified
         )
       }
-      
+
     } yield segmentInfos
   }
 
@@ -256,23 +254,25 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
       // For now, we'll use a simplified approach
       List("default_table") // Placeholder
     }.distinct
-    
-    tableNames.map { tableName =>
-      // Calculate table statistics from segments
-      val tableSegments = segments.filter(_.name.contains(tableName))
-      val entryCount = tableSegments.map(_.entryCount).sum
-      val activeEntryCount = tableSegments.filter(_.isActive).map(_.entryCount).sum
-      val diskSize = tableSegments.map(_.fileSize).sum
-      val memorySize = entryCount * 100L // Estimate (100 bytes per entry)
-        
-      TableInfo(
-        name = tableName,
-        entryCount = entryCount,
-        activeEntryCount = activeEntryCount,
-        diskSize = diskSize,
-        memorySize = memorySize
-      )
-    }.pure[F]
+
+    tableNames
+      .map { tableName =>
+        // Calculate table statistics from segments
+        val tableSegments = segments.filter(_.name.contains(tableName))
+        val entryCount = tableSegments.map(_.entryCount).sum
+        val activeEntryCount = tableSegments.filter(_.isActive).map(_.entryCount).sum
+        val diskSize = tableSegments.map(_.fileSize).sum
+        val memorySize = entryCount * 100L // Estimate (100 bytes per entry)
+
+        TableInfo(
+          name             = tableName,
+          entryCount       = entryCount,
+          activeEntryCount = activeEntryCount,
+          diskSize         = diskSize,
+          memorySize       = memorySize
+        )
+      }
+      .pure[F]
   }
 
   /** Calculate stale data ratio for a segment */
@@ -295,28 +295,30 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
       entryCount = (fileSize / 100).toInt
     } yield entryCount
   }
+
   /** Update metrics through adapter */
   private def updateAdapterMetrics(): F[Unit] = {
     for {
       databases <- getDatabases
-      _ <- metricsAdapter.updateDatabaseMetrics(databases)
-      _ <- metricsAdapter.updateTableMetrics(databases)
-      _ <- metricsAdapter.updateSegmentMetrics(databases)
+      _         <- metricsAdapter.updateDatabaseMetrics(databases)
+      _         <- metricsAdapter.updateTableMetrics(databases)
+      _         <- metricsAdapter.updateSegmentMetrics(databases)
     } yield ()
   }
 }
 
 object StatisticsService {
+
   def create[F[_]: Async: Files: Logger](
     storageManager: StorageManager[F],
-    config: MonitoringConfig = MonitoringConfig()
+    config:         MonitoringConfig = MonitoringConfig()
   ): F[StatisticsService[F]] = {
     createWithAdapter(storageManager, config, MetricsAdapter.createNoOpAdapter())
   }
-  
+
   def createWithPrometheus[F[_]: Async: Files: Logger](
-    storageManager: StorageManager[F],
-    config: MonitoringConfig = MonitoringConfig(),
+    storageManager:    StorageManager[F],
+    config:            MonitoringConfig = MonitoringConfig(),
     collectorRegistry: io.prometheus.client.CollectorRegistry
   ): F[StatisticsService[F]] = {
     val prometheusAdapter = MetricsAdapter.createPrometheusAdapter(collectorRegistry)
@@ -324,10 +326,10 @@ object StatisticsService {
       service <- createWithAdapter(storageManager, config, prometheusAdapter)
     } yield service
   }
-  
+
   def createWithAdapter[F[_]: Async: Files: Logger](
     storageManager: StorageManager[F],
-    config: MonitoringConfig,
+    config:         MonitoringConfig,
     metricsAdapter: MetricsAdapter[F]
   ): F[StatisticsService[F]] = {
     for {

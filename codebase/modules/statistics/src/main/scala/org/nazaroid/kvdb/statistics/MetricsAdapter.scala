@@ -92,8 +92,8 @@ class PrometheusMetricsAdapter[F[_]: Async: Logger](
             gauge.labels(db.name, "total_entries").set(db.totalEntries)
             gauge.labels(db.name, "active_entries").set(db.activeEntries)
             gauge.labels(db.name, "deleted_entries").set(db.deletedEntries)
-            gauge.labels(db.name, "disk_size_bytes").set(db.totalDiskSize)
-            gauge.labels(db.name, "memory_size_bytes").set(db.totalMemorySize)
+            gauge.labels(db.name, "disk_size_bytes").set(db.totalDiskSize.toDouble)
+            gauge.labels(db.name, "memory_size_bytes").set(db.totalMemorySize.toDouble)
             gauge.labels(db.name, "fragmentation_ratio").set(db.fragmentationRatio)
           } catch {
             case _: Exception => 
@@ -112,8 +112,8 @@ class PrometheusMetricsAdapter[F[_]: Async: Logger](
             try {
               gauge.labels(db.name, table.name, "entries").set(table.entryCount)
               gauge.labels(db.name, table.name, "active_entries").set(table.activeEntryCount)
-              gauge.labels(db.name, table.name, "disk_size_bytes").set(table.diskSize)
-              gauge.labels(db.name, table.name, "memory_size_bytes").set(table.memorySize)
+              gauge.labels(db.name, table.name, "disk_size_bytes").set(table.diskSize.toDouble)
+              gauge.labels(db.name, table.name, "memory_size_bytes").set(table.memorySize.toDouble)
             } catch {
               case _: Exception =>
                 Logger[F].warn(s"Failed to update table metrics for ${db.name}.${table.name}")
