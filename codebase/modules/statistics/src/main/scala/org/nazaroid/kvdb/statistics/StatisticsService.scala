@@ -313,7 +313,7 @@ object StatisticsService {
     storageManager: StorageManager[F],
     config:         MonitoringConfig = MonitoringConfig()
   ): F[StatisticsService[F]] = {
-    createWithAdapter(storageManager, config, MetricsAdapter.createNoOpAdapter())
+    createWithAdapter(storageManager, config, MetricsAdapter.createNoOpAdapter(using summon[Async[F]]))
   }
 
   def createWithPrometheus[F[_]: Async: Files: Logger](

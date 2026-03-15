@@ -95,7 +95,7 @@ object StatisticsIntegration {
     config:         MonitoringConfig = MonitoringConfig()
   ): F[StatisticsIntegration[F]] = {
     // Create with default NoOp adapter
-    createWithAdapter(storageManager, config, MetricsAdapter.createNoOpAdapter()(using summon[Async[F]]))
+    createWithAdapter(storageManager, config, MetricsAdapter.createNoOpAdapter(using summon[Async[F]]))
   }
 
   def createWithPrometheus[F[_]: Async: Logger: Files](
