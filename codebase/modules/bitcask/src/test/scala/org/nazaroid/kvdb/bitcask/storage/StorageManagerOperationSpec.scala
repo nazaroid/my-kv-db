@@ -5,7 +5,6 @@ import cats.effect.{IO, Resource}
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType, WriteTask, writeBinary}
-import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
 import org.scalatest.FutureOutcome
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers

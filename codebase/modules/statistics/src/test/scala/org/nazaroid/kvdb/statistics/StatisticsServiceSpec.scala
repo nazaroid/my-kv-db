@@ -5,29 +5,31 @@ import cats.effect.unsafe.implicits.global
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
-import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType}
+import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType, WriteTask}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
+import org.typelevel.log4cats.SelfAwareStructuredLogger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-import java.nio.file.{Files => JFiles, Paths}
+import java.nio.file.{Paths, Files as JFiles}
 import scala.concurrent.duration.*
 
 class StatisticsServiceSpec extends AnyFunSuite with Matchers {
 
-  implicit val logger = Slf4jLogger.create[IO]
-
   def withTempDirectory[T](test: Path => IO[T]): IO[T] = {
     IO.delay {
-      val tempDir = JFiles.createTempDirectory("kvdb-stats-test")
+      val tempDir = JFiles.createTempDirectory("kvdb-test")
       Path.fromNioPath(tempDir.toAbsolutePath)
-    }.bracket(dir => IO.delay {
-      // Clean up
-      JFiles.walk(dir.toNioPath)
-        .filter(_.toFile.isFile)
-        .forEach(JFiles.deleteIfExists)
-      JFiles.deleteIfExists(dir.toNioPath)
-    })
+    }.bracket(dir => test(dir))(dir =>
+      IO.delay {
+        if (JFiles.exists(dir.toNioPath)) {
+          JFiles
+            .walk(dir.toNioPath)
+            .sorted(java.util.Comparator.reverseOrder())
+            .forEach(JFiles.delete(_))
+        }
+      }.handleErrorWith(_ => IO.unit)
+    )
   }
 
   test("StatisticsService should collect database information") {
@@ -73,8 +75,7 @@ class StatisticsServiceSpec extends AnyFunSuite with Matchers {
         maxStaleRatio = 0.3,
         compactionThreshold = 0.5
       )
-      
-      val result = (for {
+      for {
         queue <- Channel.unbounded[IO, WriteTask[IO]]
         storageManager <- StorageManager.initialize(storageConfig, queue)
         statisticsService <- StatisticsService.create(storageManager, monitoringConfig)
@@ -86,27 +87,27 @@ class StatisticsServiceSpec extends AnyFunSuite with Matchers {
         _ <- storageManager.delete("test_table/key3") // Delete one entry
         
         // Collect statistics
-        databases <- statisticsService.getDatabases
+        result <- statisticsService.getDatabases
         
-      } yield databases).unsafeRunSync()
-      
-      result should have size 1
-      val dbInfo = result.head
-      dbInfo.name should include("test")
-      dbInfo.totalEntries should be(3) // 3 entries total
-      dbInfo.activeEntries should be(2) // 2 active (one deleted)
-      dbInfo.deletedEntries should be(1) // 1 deleted
-      dbInfo.totalDiskSize should be > 0L
-      dbInfo.totalMemorySize should be > 0L
-      dbInfo.fragmentationRatio should be >= 0.0
-      dbInfo.tables should have size 1
-      
-      val tableInfo = dbInfo.tables.head
-      tableInfo.name should be("test_table")
-      tableInfo.entryCount should be(3)
-      tableInfo.activeEntryCount should be(2)
-      tableInfo.diskSize should be > 0L
-      tableInfo.memorySize should be > 0L
+      } yield {
+        result should have size 1
+        val dbInfo = result.head
+        dbInfo.name should include("test")
+        dbInfo.totalEntries should be(3) // 3 entries total
+        dbInfo.activeEntries should be(2) // 2 active (one deleted)
+        dbInfo.deletedEntries should be(1) // 1 deleted
+        dbInfo.totalDiskSize should be > 0L
+        dbInfo.totalMemorySize should be > 0L
+        dbInfo.fragmentationRatio should be >= 0.0
+        dbInfo.tables should have size 1
+
+        val tableInfo = dbInfo.tables.head
+        tableInfo.name should be("test_table")
+        tableInfo.entryCount should be(3)
+        tableInfo.activeEntryCount should be(2)
+        tableInfo.diskSize should be > 0L
+        tableInfo.memorySize should be > 0L
+      }
     }
   }
 
@@ -151,7 +152,7 @@ class StatisticsServiceSpec extends AnyFunSuite with Matchers {
         enableBackgroundMonitoring = false
       )
       
-      val result = (for {
+      for {
         queue <- Channel.unbounded[IO, WriteTask[IO]]
         storageManager <- StorageManager.initialize(storageConfig, queue)
         statisticsService <- StatisticsService.create(storageManager, monitoringConfig)
@@ -161,34 +162,35 @@ class StatisticsServiceSpec extends AnyFunSuite with Matchers {
         _ <- storageManager.write("test_table/key2", "value2")
         
         // Export Prometheus format
-        prometheusExport <- statisticsService.exportForPrometheus()
+        result <- statisticsService.exportForPrometheus()
         
-      } yield prometheusExport).unsafeRunSync()
+      } yield {
+        // Check Prometheus format
+        result should include("# HELP kvdb_database_info")
+        result should include("# TYPE kvdb_database_info gauge")
+        result should include("kvdb_database_info{database=")
+        result should include("type=\"total_entries\"}")
+        result should include("type=\"active_entries\"}")
+        result should include("type=\"deleted_entries\"}")
+        result should include("type=\"disk_size_bytes\"}")
+        result should include("type=\"memory_size_bytes\"}")
+        result should include("type=\"fragmentation_ratio\"}")
+
+        result should include("# HELP kvdb_table_info")
+        result should include("# TYPE kvdb_table_info gauge")
+        result should include("kvdb_table_info{database=")
+        result should include("table=\"test_table\"}")
+
+        result should include("# HELP kvdb_segment_info")
+        result should include("# TYPE kvdb_segment_info gauge")
+        result should include("kvdb_segment_info{database=")
+        result should include("segment=")
+        result should include("type=\"file_size_bytes\"}")
+        result should include("type=\"is_active\"}")
+        result should include("type=\"stale_ratio\"}")
+        result should include("type=\"entry_count\"}")
+      }
       
-      // Check Prometheus format
-      result should include("# HELP kvdb_database_info")
-      result should include("# TYPE kvdb_database_info gauge")
-      result should include("kvdb_database_info{database=")
-      result should include("type=\"total_entries\"}")
-      result should include("type=\"active_entries\"}")
-      result should include("type=\"deleted_entries\"}")
-      result should include("type=\"disk_size_bytes\"}")
-      result should include("type=\"memory_size_bytes\"}")
-      result should include("type=\"fragmentation_ratio\"}")
-      
-      result should include("# HELP kvdb_table_info")
-      result should include("# TYPE kvdb_table_info gauge")
-      result should include("kvdb_table_info{database=")
-      result should include("table=\"test_table\"}")
-      
-      result should include("# HELP kvdb_segment_info")
-      result should include("# TYPE kvdb_segment_info gauge")
-      result should include("kvdb_segment_info{database=")
-      result should include("segment=")
-      result should include("type=\"file_size_bytes\"}")
-      result should include("type=\"is_active\"}")
-      result should include("type=\"stale_ratio\"}")
-      result should include("type=\"entry_count\"}")
     }
   }
 
@@ -233,7 +235,7 @@ class StatisticsServiceSpec extends AnyFunSuite with Matchers {
         enableBackgroundMonitoring = false
       )
       
-      val result = (for {
+      for {
         queue <- Channel.unbounded[IO, WriteTask[IO]]
         storageManager <- StorageManager.initialize(storageConfig, queue)
         statisticsIntegration <- StatisticsIntegration.create(storageManager, monitoringConfig)
@@ -243,15 +245,15 @@ class StatisticsServiceSpec extends AnyFunSuite with Matchers {
         _ <- storageManager.write("test_table/key2", "value2")
         
         // Get health check
-        healthStatus <- statisticsIntegration.getHealthCheck
+        result <- statisticsIntegration.getHealthCheck
         
-      } yield healthStatus).unsafeRunSync()
-      
-      result.totalDatabases should be(1)
-      result.healthyDatabases should be(1)
-      result.averageFragmentation should be >= 0.0
-      result.timestamp should be > 0L
-      result.status should be(HealthStatus.Healthy)
+      } yield {
+        result.totalDatabases should be(1)
+        result.healthyDatabases should be(1)
+        result.averageFragmentation should be >= 0.0
+        result.timestamp should be > 0L
+        result.status should be(HealthStatus.Healthy)
+      }
     }
   }
 
