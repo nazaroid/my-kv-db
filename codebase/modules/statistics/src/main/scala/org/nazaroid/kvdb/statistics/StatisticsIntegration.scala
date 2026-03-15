@@ -3,6 +3,7 @@ package org.nazaroid.kvdb.statistics
 import cats.effect.{Async, Resource}
 import cats.implicits.given
 import org.nazaroid.kvdb.bitcask.storage.StorageManager
+import org.nazaroid.kvdb.bitcask.storage.StorageManager
 import org.typelevel.log4cats.Logger
 
 /** Integration layer for statistics with BitcaskEngine */
@@ -23,7 +24,7 @@ class StatisticsIntegration[F[_]: Async: Logger](
   }
 
   /** Get all databases with their statistics */
-  def getAllDatabases(): F[List[DatabaseInfo]] = {
+  def getAllDatabases: F[List[DatabaseInfo]] = {
     statisticsService.getDatabases
   }
 
@@ -36,9 +37,14 @@ class StatisticsIntegration[F[_]: Async: Logger](
   def getSegmentStats(dbName: String): F[List[SegmentInfo]] = {
     statisticsService.getSegmentStats(dbName)
   }
+  
+  /** Get storage statistics (delegates to storageManager) */
+  def getStats: F[org.nazaroid.kvdb.bitcask.storage.DatabaseStats] = {
+    statisticsService.getStats
+  }
 
   /** Get health check information */
-  def getHealthCheck(): F[HealthStatus] = {
+  def getHealthCheck: F[HealthStatus] = {
     for {
       databases <- statisticsService.getDatabases
       totalDbs = databases.size
@@ -94,8 +100,8 @@ object StatisticsIntegration {
     config: MonitoringConfig = MonitoringConfig(),
     collectorRegistry: io.prometheus.client.CollectorRegistry
   ): F[StatisticsIntegration[F]] = {
+    prometheusAdapter = MetricsAdapter.createPrometheusAdapter(collectorRegistry)
     for {
-      prometheusAdapter = MetricsAdapter.createPrometheusAdapter(collectorRegistry)
       integration <- createWithAdapter(storageManager, config, prometheusAdapter)
     } yield integration
   }

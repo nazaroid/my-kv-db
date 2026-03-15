@@ -1,17 +1,19 @@
 package org.nazaroid.kvdb.statistics
 
-import cats.effect.{Async, Ref, Resource}
-import cats.effect.kernel.Outcome
+import cats.effect.implicits.given
+import cats.effect.syntax.all.given
+import cats.effect.{Async, Deferred, Ref}
 import cats.implicits.given
+import cats.syntax.all.given
 import fs2.Stream
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
-import org.nazaroid.kvdb.bitcask.storage.{StorageManager, Statistics}
+import org.nazaroid.kvdb.bitcask.storage.StorageManager
 import org.typelevel.log4cats.Logger
-import scala.concurrent.duration.*
 
-import java.nio.file.{Files => JFiles}
+import java.nio.file.Files as JFiles
 import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.*
 
 /** Background process for monitoring segments and fragmentation */
 trait StatisticsService[F[_]] {
@@ -20,6 +22,7 @@ trait StatisticsService[F[_]] {
   def getDatabases: F[List[DatabaseInfo]]
   def getDatabaseStats(dbName: String): F[Option[DatabaseInfo]]
   def getSegmentStats(dbName: String): F[List[SegmentInfo]]
+  def getStats: F[org.nazaroid.kvdb.bitcask.storage.DatabaseStats]  // Delegate to storageManager
   def registerMetrics(): F[Unit]
 }
 
@@ -76,26 +79,37 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
       _ <- updateAdapterMetrics()
     } yield ()
   }
+  
+  override def getStats: F[org.nazaroid.kvdb.bitcask.storage.DatabaseStats] = {
+    storageManager.getStats
+  }
 
   override def startMonitoring(): F[Unit] = {
     if (config.enableBackgroundMonitoring) {
-      Logger[F].info("Starting statistics monitoring service")
-      
-      val monitoringStream = Stream
+      // Define the monitoring stream recursively to ensure it restarts after errors
+      lazy val monitoringStream: Stream[F, Unit] = Stream
         .fixedRate[F](config.checkInterval)
         .evalMap(_ => collectStatistics())
-        .handleErrorWith(error => 
-          Logger[F].error(s"Error in monitoring stream: $error") *> 
-          Async[F].sleep(5.seconds) // Back off on error
-        )
-      
-      monitoringRef.set(true) *>
-      monitoringStream.compile.drain.attempt.void
+        .handleErrorWith { error =>
+          // Log the error, wait for backoff, and restart the stream
+          val recovery = Stream.eval(
+            Logger[F].error(s"Error in monitoring stream: $error") *>
+              Async[F].sleep(5.seconds)
+          )
+          recovery >> monitoringStream
+        }
+
+      for {
+        _ <- Logger[F].info("Starting statistics monitoring service")
+        _ <- monitoringRef.set(true)
+        // .start runs the stream in a background Fiber to prevent blocking the startup
+        _ <- monitoringStream.compile.drain.start.void
+      } yield ()
     } else {
       Logger[F].info("Background monitoring disabled")
-      Async[F].unit
     }
   }
+
 
   override def stopMonitoring(): F[Unit] = {
     Logger[F].info("Stopping statistics monitoring service")
@@ -104,7 +118,7 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
 
   override def getDatabases: F[List[DatabaseInfo]] = {
     for {
-      dbFolders <- getAllDatabaseFolders()
+      dbFolders <- getAllDatabaseFolders
       dbInfos <- dbFolders.traverse(collectDatabaseInfo)
     } yield dbInfos.flatten
   }
@@ -125,26 +139,25 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
     for {
       databases <- getDatabases
       _ <- databases.traverse_ { db =>
-        if (db.fragmentationRatio > config.maxStaleRatio) {
-          Logger[F].warn(s"Database ${db.name} has high fragmentation: ${db.fragmentationRatio}")
-        }
-        
-        // Check segments that need compaction
-        segments <- getSegmentStats(db.name)
-        _ <- segments.traverse_ { segment =>
-          if (!segment.isActive && segment.staleDataRatio > config.compactionThreshold) {
-            Logger[F].info(s"Segment ${segment.name} in database ${db.name} needs compaction (stale ratio: ${segment.staleDataRatio})")
+        for {
+          _ <- if (db.fragmentationRatio > config.maxStaleRatio) {
+            Logger[F].warn(s"Database ${db.name} has high fragmentation: ${db.fragmentationRatio}")
+          } else ().pure[F]
+
+          segments <- getSegmentStats(db.name)
+          _ <- segments.traverse_ { segment =>
+            if (!segment.isActive && segment.staleDataRatio > config.compactionThreshold) {
+              Logger[F].info(s"Segment ${segment.name} in database ${db.name} needs compaction")
+            } else ().pure[F]
           }
-        }
+        } yield ()
       }
-      
-      // Update metrics through adapter
       _ <- updateAdapterMetrics()
     } yield ()
   }
 
   /** Get all database folders */
-  private def getAllDatabaseFolders(): F[List[Path]] = {
+  private def getAllDatabaseFolders: F[List[Path]] = {
     // Assuming databases are in subdirectories of the main folder
     Files[F].list(Path(storageManager.config.folder))
       .filter(_.fileName.toString.endsWith(".db"))
@@ -160,43 +173,40 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
   /** Collect database information from disk and memory */
   private def collectDatabaseInfo(dbPath: Path): F[Option[DatabaseInfo]] = {
     val dbName = dbPath.fileName.toString.replace(".db", "")
-    
-    for {
-      exists <- Files[F].exists(dbPath)
-      _ <- if (!exists) Async[F].pure(None) else Async[F].unit
-      
-      // Get storage manager stats for active data
-      storageStats <- storageManager.getStats
-      
-      // Collect segment information from disk
-      segments <- collectSegmentInfo(dbPath)
-      
-      // Collect table information
-      tables <- collectTableInfo(dbPath, segments)
-      
-      // Calculate totals
-      totalEntries = segments.map(_.entryCount).sum
-      activeEntries = segments.filter(_.isActive).map(_.entryCount).sum
-      deletedEntries = totalEntries - activeEntries
-      totalDiskSize = segments.map(_.fileSize).sum
-      totalMemorySize = storageStats.totalDataSize
-      fragmentationRatio = if (totalDiskSize > 0) {
-        segments.map(_.staleDataRatio * segments.map(_.fileSize).sum).sum / totalDiskSize
-      } else 0.0
-      
-      dbInfo = DatabaseInfo(
-        name = dbName,
-        tables = tables,
-        totalEntries = totalEntries,
-        activeEntries = activeEntries,
-        deletedEntries = deletedEntries,
-        totalDiskSize = totalDiskSize,
-        totalMemorySize = totalMemorySize,
-        fragmentationRatio = fragmentationRatio
-      )
-      
-    } yield Some(dbInfo)
+
+    Files[F].exists(dbPath).flatMap {
+      case false =>
+        Async[F].pure(None)
+      case true =>
+        for {
+          storageStats <- storageManager.getStats
+          segments     <- collectSegmentInfo(dbPath)
+          tables       <- collectTableInfo(dbPath, segments)
+
+          // Вспомогательные расчеты
+          totalDiskSize = segments.map(_.fileSize).sum
+          totalEntries  = segments.map(_.entryCount).sum
+          activeEntries = segments.filter(_.isActive).map(_.entryCount).sum
+
+          // Исправлен расчет fragmentationRatio (избегаем дублирования суммы)
+          fragmentationRatio = if (totalDiskSize > 0) {
+            segments.map(s => s.staleDataRatio * s.fileSize).sum / totalDiskSize
+          } else 0.0
+
+          dbInfo = DatabaseInfo(
+            name = dbName,
+            tables = tables,
+            totalEntries = totalEntries,
+            activeEntries = activeEntries,
+            deletedEntries = totalEntries - activeEntries,
+            totalDiskSize = totalDiskSize,
+            totalMemorySize = storageStats.totalDataSize,
+            fragmentationRatio = fragmentationRatio
+          )
+        } yield Some(dbInfo)
+    }
   }
+
 
   /** Collect segment information from disk files */
   private def collectSegmentInfo(dbPath: Path): F[List[SegmentInfo]] = {
@@ -247,23 +257,22 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
       List("default_table") // Placeholder
     }.distinct
     
-    tableNames.traverse { tableName =>
-      for {
-        // Calculate table statistics from segments
-        tableSegments = segments.filter(_.name.contains(tableName))
-        entryCount = tableSegments.map(_.entryCount).sum
-        activeEntryCount = tableSegments.filter(_.isActive).map(_.entryCount).sum
-        diskSize = tableSegments.map(_.fileSize).sum
-        memorySize = entryCount * 100L // Estimate (100 bytes per entry)
+    tableNames.map { tableName =>
+      // Calculate table statistics from segments
+      val tableSegments = segments.filter(_.name.contains(tableName))
+      val entryCount = tableSegments.map(_.entryCount).sum
+      val activeEntryCount = tableSegments.filter(_.isActive).map(_.entryCount).sum
+      val diskSize = tableSegments.map(_.fileSize).sum
+      val memorySize = entryCount * 100L // Estimate (100 bytes per entry)
         
-      } yield TableInfo(
+      TableInfo(
         name = tableName,
         entryCount = entryCount,
         activeEntryCount = activeEntryCount,
         diskSize = diskSize,
         memorySize = memorySize
       )
-    }
+    }.pure[F]
   }
 
   /** Calculate stale data ratio for a segment */
@@ -302,7 +311,6 @@ object StatisticsService {
     storageManager: StorageManager[F],
     config: MonitoringConfig = MonitoringConfig()
   ): F[StatisticsService[F]] = {
-    // Create with default Prometheus adapter
     createWithAdapter(storageManager, config, MetricsAdapter.createNoOpAdapter())
   }
   

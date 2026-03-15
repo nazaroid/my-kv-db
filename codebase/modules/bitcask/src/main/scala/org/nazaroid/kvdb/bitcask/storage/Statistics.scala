@@ -21,5 +21,6 @@ case class SegmentStats(
   name: String,
   fileSize: Long,
   isActive: Boolean,
-  staleDataRatio: Double
+  staleDataRatio: Double,
+  entryCount: Int
 )

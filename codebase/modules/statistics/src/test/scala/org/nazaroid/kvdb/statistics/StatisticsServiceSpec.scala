@@ -243,7 +243,7 @@ class StatisticsServiceSpec extends AnyFunSuite with Matchers {
         _ <- storageManager.write("test_table/key2", "value2")
         
         // Get health check
-        healthStatus <- statisticsIntegration.getHealthCheck()
+        healthStatus <- statisticsIntegration.getHealthCheck
         
       } yield healthStatus).unsafeRunSync()
       

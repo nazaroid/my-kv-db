@@ -3,10 +3,8 @@ package org.nazaroid.kvdb.statistics
 import cats.effect.Async
 import cats.implicits.given
 import org.http4s.HttpRoutes
-import org.http4s.circe._
+import org.http4s.circe.*
 import org.http4s.dsl.Http4sDsl
-import io.circe.generic.auto._
-import io.circe.syntax._
 
 class StatisticsRoutes[F[_]: Async](
   statisticsIntegration: StatisticsIntegration[F]
@@ -15,7 +13,7 @@ class StatisticsRoutes[F[_]: Async](
   val routes: HttpRoutes[F] = HttpRoutes.of[F] {
     case GET -> Root / "api" / "v1" / "stats" / "databases" =>
       for {
-        databases <- statisticsIntegration.getAllDatabases()
+        databases <- statisticsIntegration.getAllDatabases
         response <- Ok(databases.asJson)
       } yield response
 
@@ -42,13 +40,13 @@ class StatisticsRoutes[F[_]: Async](
 
     case GET -> Root / "api" / "v1" / "health" =>
       for {
-        health <- statisticsIntegration.getHealthCheck()
+        health <- statisticsIntegration.getHealthCheck
         response <- Ok(health.asJson)
       } yield response
 
     case GET -> Root / "api" / "v1" / "stats" / "summary" =>
       for {
-        databases <- statisticsIntegration.getAllDatabases()
+        databases <- statisticsIntegration.getAllDatabases
         summary = DatabaseSummary(
           totalDatabases = databases.size,
           totalTables = databases.map(_.tables.size).sum,

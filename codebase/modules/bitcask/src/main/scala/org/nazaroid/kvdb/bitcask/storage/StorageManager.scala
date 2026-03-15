@@ -282,6 +282,115 @@ sealed class StorageManager[F[_]: Async: Files: Logger](
     segmentCount.flatMap { count =>
       Async[F].whenA(count > config.maxSegmentCount)(compact())
     }
+  
+  /** Get segment statistics */
+  private def getSegmentStats: F[List[SegmentStats]] = {
+    for {
+      files <- Files[F].list(Path(config.folder))
+        .map(_.fileName.toString)
+        .filter(_.endsWith(".bin"))
+        .compile
+        .toList
+      
+      segmentStats <- files.traverse { fileName =>
+        val segmentName = fileName.replace(".bin", "")
+        val filePath = Path(s"${config.folder}/$fileName")
+        
+        for {
+          fileSize <- Files[F].size(filePath)
+          isActive <- currentData.get.map(_.filePath == filePath.toString)
+          
+          // Calculate stale data ratio (simplified)
+          staleRatio <- if (isActive) {
+            Async[F].pure(0.0) // Active segments have no stale data
+          } else {
+            // For inactive segments, estimate stale ratio based on file age
+            Async[F].delay {
+              val fileAge = System.currentTimeMillis() - segmentName.split("_").lastOption.flatMap(_.toLongOption).getOrElse(0L)
+              val maxAge = 24 * 60 * 60 * 1000 // 24 hours
+              math.min(fileAge.toDouble / maxAge, 1.0)
+            }
+          }
+          
+          // Count entries in segment (simplified)
+          entryCount <- countSegmentEntries(filePath)
+          
+        } yield SegmentStats(
+          name = segmentName,
+          fileSize = fileSize,
+          isActive = isActive,
+          staleDataRatio = staleRatio,
+          entryCount = entryCount
+        )
+      }
+      
+    } yield segmentStats
+  }
+  
+  /** Count entries in a segment file */
+  private def countSegmentEntries(segmentFile: Path): F[Int] = {
+    // Simplified implementation - would need to parse binary format
+    for {
+      fileSize <- Files[F].size(segmentFile)
+      // Assume average entry size of 100 bytes
+      entryCount = (fileSize / 100).toInt
+    } yield entryCount
+  }
+
+  /** Get storage statistics */
+  def getStats: F[DatabaseStats] = {
+    for {
+      cacheSnapshot <- cache.get
+
+      // Single pass to calculate entries and data size
+      (activeEntries, deletedEntries, totalDataSize) = cacheSnapshot.values.foldLeft((0, 0, 0)) {
+        case ((active, deleted, size), entry) =>
+          entry match {
+            case CacheEntry.Pending(row) =>
+              val rowSize = row.get("recordSize").collect { case i: Int => i }.getOrElse(0)
+              (active + 1, deleted, size + rowSize)
+
+            case CacheEntry.Persistent(row, _, _) =>
+              val rowSize = row.get("recordSize").collect { case i: Int => i }.getOrElse(0)
+              (active + 1, deleted, size + rowSize)
+
+            case CacheEntry.Deleted =>
+              (active, deleted + 1, size)
+          }
+      }
+
+      // Group keys by table name
+      tables = cacheSnapshot.keys.groupBy(_.split("/").headOption.getOrElse("default"))
+
+      tableStats = tables.map { case (tableName, keys) =>
+        val tableKeysCount = keys.size
+        val tableActiveCount = keys.count { key =>
+          cacheSnapshot.get(key).exists {
+            case CacheEntry.Pending(_) | CacheEntry.Persistent(_, _, _) => true
+            case CacheEntry.Deleted                                     => false
+          }
+        }
+
+        TableStats(
+          name             = tableName,
+          entryCount       = tableKeysCount,
+          activeEntryCount = tableActiveCount
+        )
+      }.toList
+
+      segmentStats <- getSegmentStats
+
+      // Final result (removed yield () and val keywords)
+    } yield DatabaseStats(
+      totalTables    = tableStats.size,
+      totalEntries   = cacheSnapshot.size,
+      activeEntries  = activeEntries,
+      deletedEntries = deletedEntries,
+      totalDataSize  = totalDataSize,
+      tableStats     = tableStats,
+      segmentStats   = segmentStats
+    )
+  }
 }
 
 object StorageManager {

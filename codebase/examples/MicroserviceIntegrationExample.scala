@@ -123,7 +123,7 @@ object MicroserviceIntegrationExample {
       statisticsIntegration <- StatisticsIntegration.create(storageManager, MonitoringConfig())
       
       // Get all databases
-      databases <- statisticsIntegration.getAllDatabases()
+      databases <- statisticsIntegration.getAllDatabases
       _ <- Logger[F].info(s"Found ${databases.size} databases")
       
       // Get specific database stats
@@ -140,7 +140,7 @@ object MicroserviceIntegrationExample {
       _ <- Logger[F].info(s"Found ${segmentStats.size} segments")
       
       // Get health check
-      health <- statisticsIntegration.getHealthCheck()
+      health <- statisticsIntegration.getHealthCheck
       _ <- Logger[F].info(s"Health status: ${health.status}")
       
     } yield ()

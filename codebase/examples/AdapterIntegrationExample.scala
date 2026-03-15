@@ -30,7 +30,7 @@ class AdapterIntegrationExample[F[_]: Async: Files: Logger](
       
       // Register metrics
       _ <- Resource.eval(
-        statisticsIntegration.getAllDatabases().flatMap(_ => Async[F].unit) // Force registration
+        statisticsIntegration.getAllDatabases.flatMap(_ => Async[F].unit) // Force registration
       )
       
       // Start monitoring
@@ -56,7 +56,7 @@ class AdapterIntegrationExample[F[_]: Async: Files: Logger](
       
       // Register metrics
       _ <- Resource.eval(
-        statisticsIntegration.getAllDatabases().flatMap(_ => Async[F].unit) // Force registration
+        statisticsIntegration.getAllDatabases.flatMap(_ => Async[F].unit) // Force registration
       )
       
     } yield ()
@@ -72,7 +72,7 @@ class AdapterIntegrationExample[F[_]: Async: Files: Logger](
       
       // Register metrics (no-op will do nothing)
       _ <- Resource.eval(
-        statisticsIntegration.getAllDatabases().flatMap(_ => Async[F].unit)
+        statisticsIntegration.getAllDatabases.flatMap(_ => Async[F].unit)
       )
       
     } yield ()
@@ -83,14 +83,14 @@ class AdapterIntegrationExample[F[_]: Async: Files: Logger](
     for {
       // Start with NoOp adapter
       noOpIntegration <- StatisticsIntegration.create(storageManager, MonitoringConfig())
-      _ <- noOpIntegration.getAllDatabases().flatMap(_ => Async[F].unit)
+      _ <- noOpIntegration.getAllDatabases.flatMap(_ => Async[F].unit)
       
       // Later switch to Prometheus
       collectorRegistry <- Async[F].delay(new CollectorRegistry())
       prometheusIntegration <- StatisticsIntegration.createWithPrometheus(
         storageManager, MonitoringConfig(), collectorRegistry
       )
-      _ <- prometheusIntegration.getAllDatabases().flatMap(_ => Async[F].unit)
+      _ <- prometheusIntegration.getAllDatabases.flatMap(_ => Async[F].unit)
       
       _ <- Logger[F].info("Switched from no-op to Prometheus adapter")
       
