@@ -9,14 +9,14 @@ import org.nazaroid.kvdb.binfileio.WriteTask
 import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
 import org.typelevel.log4cats.Logger
 
-final class Database[F[_]: Async: Files: Logger](
+final class BitcaskDatabase[F[_]: Async: Files: Logger](
   val dbName:         String,
   val dbPath:         Path,
   val writeQueue:     Channel[F, WriteTask[F]],
   val configTemplate: StorageConfig,
-  val tables:         Ref[F, Map[String, Table[F]]]) {
+  val tables:         Ref[F, Map[String, BitcaskTable[F]]]) {
 
-  def table(tableName: String): F[Table[F]] = {
+  def table(tableName: String): F[BitcaskTable[F]] = {
     tables.get.flatMap { activeTables =>
       activeTables.get(tableName) match {
         case Some(sm) => Async[F].pure(sm)

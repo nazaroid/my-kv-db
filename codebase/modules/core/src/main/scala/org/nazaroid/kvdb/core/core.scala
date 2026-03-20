@@ -24,7 +24,7 @@ trait DatabaseManager[F[_]] {
   */
 trait Database[F[_]] {
   def name:                      String
-  def createTable(name: String): F[Unit]
+  def createTable(name: String): F[Table[F]]
   def getTable(name: String):    F[Option[Table[F]]]
   def listTables:                F[List[String]]
   def deleteTable(name: String): F[Unit]

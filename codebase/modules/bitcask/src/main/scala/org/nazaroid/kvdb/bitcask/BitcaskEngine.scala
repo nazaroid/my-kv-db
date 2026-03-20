@@ -93,8 +93,7 @@ final class BitcaskEngine[F[_]: Async: Logger](
     for {
       db <- OptionT(databaseManager.getDatabase(baseName))
         .getOrElseF(databaseManager.createDatabase(baseName))
-      tbl <- OptionT(db.getTable(tblName))
-        .getOrElseF(db.createTable(tblName))
+      tbl <- OptionT(db.getTable(tblName)).getOrElseF(db.createTable(tblName))
       _ <- tbl.set(key, value)
     } yield ()
   }

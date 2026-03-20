@@ -4,8 +4,8 @@ import cats.effect.{Async, Resource}
 import cats.implicits.given
 import fs2.io.file.{Files, Path}
 import io.circe.syntax.*
-import org.nazaroid.kvdb.bitcask.catalog.{Catalog, Database as BitcaskDatabase}
-import org.nazaroid.kvdb.bitcask.storage.{StorageManager, Statistics as BitcaskStatistics}
+import org.nazaroid.kvdb.bitcask.catalog.{BitcaskDatabase, BitcaskTable, Catalog}
+import org.nazaroid.kvdb.bitcask.storage.StorageManager
 import org.nazaroid.kvdb.core.{Database, DatabaseManager, DatabaseStats}
 import org.typelevel.log4cats.Logger
 
@@ -21,26 +21,8 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
 
   override def createDatabase(name: String): F[Database[F]] = {
     for {
-      _ <- Logger[F].info(s"Creating database: $name")
-      dbPath = Path(s"$rootPath/$name")
-      _ <- Files[F].createDirectories(dbPath)
-
-      storageConfig = org
-        .nazaroid
-        .kvdb
-        .bitcask
-        .storage
-        .StorageConfig(
-          folder          = dbPath.toString,
-          maxSegmentSize  = 1024 * 1024, // 1MB
-          maxSegmentCount = 10,
-          dataSchema      = createDataSchema(),
-          segmentSchema   = createSegmentSchema(),
-          tableSchema     = createTableSchema()
-        )
-
-      db = new BitcaskDatabase[F](name, catalog)
-
+      _  <- Logger[F].info(s"Creating database: $name")
+      db <- catalog.database(name)
       _ <- Async[F].delay {
         databases(name) = db
       }
@@ -56,23 +38,9 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
 
   override def listDatabases: F[List[String]] = {
     for {
-      _             <- Logger[F].debug(s"Listing databases in: $rootPath")
-      rootDirExists <- Files[F].exists(Path(rootPath))
-
-      result <-
-        if (rootDirExists) {
-          for {
-            entries <- Files[F]
-              .list(Path(rootPath))
-              .filter(Files[F].isDirectory)
-              .evalMap(entry => Files[F].fileName(entry))
-              .compile
-              .toList
-          } yield entries
-        } else {
-          Async[F].pure(List.empty)
-        }
-    } yield result
+      _       <- Logger[F].debug(s"Listing databases in: ${catalog.rootPath}")
+      dbNames <- catalog.database(name)
+    } yield dbNames
   }
 
   override def deleteDatabase(name: String): F[Unit] = {
@@ -194,11 +162,11 @@ class DatabaseWrapper[F[_]: Async: Files: Logger](
 
   override def name: String = bitcaskDb.name
 
-  override def createTable(name: String): F[Unit] = {
-    bitcaskDb.table(name)
+  override def createTable(name: String): F[BitcaskTable[F]] = {
+    bitcaskDb.table(name).map(new TableWrapper(_))
   }
 
-  override def getTable(name: String): F[Option[Table[F]]] = {
+  override def getTable(name: String): F[Option[BitcaskTable[F]]] = {
     bitcaskDb.table(name).map(new TableWrapper(_))
   }
 
@@ -214,8 +182,8 @@ class DatabaseWrapper[F[_]: Async: Files: Logger](
 /** Wrapper to adapt BitcaskTable to Table interface
   */
 class TableWrapper[F[_]: Async: Files: Logger](
-  bitcaskTable: org.nazaroid.kvdb.bitcask.catalog.Table[F])
-    extends Table[F] {
+  bitcaskTable: org.nazaroid.kvdb.bitcask.catalog.BitcaskTable[F])
+    extends BitcaskTable[F] {
 
   override def name: String = bitcaskTable.name
 

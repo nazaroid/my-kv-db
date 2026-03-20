@@ -13,9 +13,9 @@ final class Catalog[F[_]: Async: Files: Logger](
   val rootPath:       Path,
   val writeQueue:     Channel[F, WriteTask[F]],
   val configTemplate: StorageConfig,
-  val databases:      Ref[F, Map[String, Database[F]]]) {
+  val databases:      Ref[F, Map[String, BitcaskDatabase[F]]]) {
 
-  def database(dbName: String): F[Database[F]] = {
+  def database(dbName: String): F[BitcaskDatabase[F]] = {
     databases.get.flatMap { activeDbs =>
       activeDbs.get(dbName) match {
         case Some(db) => Async[F].pure(db)
@@ -24,11 +24,30 @@ final class Catalog[F[_]: Async: Files: Logger](
           for {
             _         <- Files[F].createDirectories(dbPath).handleError(_ => ())
             tablesRef <- Ref.of[F, Map[String, StorageManager[F]]](Map.empty)
-            db = new Database(dbName, dbPath, writeQueue, configTemplate, tablesRef)
+            db = new BitcaskDatabase(dbName, dbPath, writeQueue, configTemplate, tablesRef)
             _ <- databases.update(_ + (dbName -> db))
           } yield db
       }
     }
+  }
+
+  override def listDatabases: F[List[String]] = {
+    for {
+      rootDirExists <- Files[F].exists(Path(rootPath))
+      result <-
+        if (rootDirExists) {
+          for {
+            entries <- Files[F]
+              .list(Path(rootPath))
+              .filter(Files[F].isDirectory)
+              .evalMap(entry => Files[F].fileName(entry))
+              .compile
+              .toList
+          } yield entries
+        } else {
+          Async[F].pure(List.empty)
+        }
+    } yield result
   }
 }
 
@@ -52,7 +71,7 @@ object Catalog {
       _ <- writeBinary(writeQueue.stream, parallelism = 1).compile.drain.background
 
       // 4. Initialize the registry for open databases
-      activeDbs <- Ref.of(Map.empty[String, Database[F]])
+      activeDbs <- Ref.of(Map.empty[String, BitcaskDatabase[F]])
 
     } yield Catalog[F](
       rootPath       = rootPath,
