@@ -112,7 +112,36 @@ final class BitcaskEngine[F[_]: Async: Logger](c: Catalog[F]) extends Engine[F] 
     } yield ()
   }
 
-  override def getStats: F[org.nazaroid.kvdb.bitcask.storage.DatabaseStats] = {
-    c.getStats
+  override def getStats: F[org.nazaroid.kvdb.algebra.DatabaseStats] = {
+    c.getStats.map { concreteStats =>
+      org.nazaroid.kvdb.algebra.DatabaseStats(
+        totalTables = concreteStats.totalTables,
+        totalEntries = concreteStats.totalEntries,
+        activeEntries = concreteStats.activeEntries,
+        deletedEntries = concreteStats.deletedEntries,
+        totalDataSize = concreteStats.totalDataSize,
+        details = Map(
+          "engine_type" -> "bitcask".asJson,
+          "table_stats" -> concreteStats.tableStats.map { table =>
+            Map(
+              "name" -> table.name.asJson,
+              "entry_count" -> table.entryCount.asJson,
+              "active_entry_count" -> table.activeEntryCount.asJson
+            ).asJson
+          }.asJson,
+          "segment_stats" -> concreteStats.segmentStats.map { segment =>
+            Map(
+              "name" -> segment.name.asJson,
+              "file_size" -> segment.fileSize.asJson,
+              "is_active" -> segment.isActive.asJson,
+              "stale_data_ratio" -> segment.staleDataRatio.asJson,
+              "entry_count" -> segment.entryCount.asJson
+            ).asJson
+          }.asJson,
+          "segment_count" -> concreteStats.segmentStats.size.asJson,
+          "active_segment_count" -> concreteStats.segmentStats.count(_.isActive).asJson
+        )
+      )
+    }
   }
 }

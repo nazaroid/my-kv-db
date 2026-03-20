@@ -11,7 +11,7 @@ import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.Uri
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import org.nazaroid.kvdb.bitcask.storage.DatabaseStats
+import org.nazaroid.kvdb.algebra.{DatabaseStats, DatabaseInfo, SegmentInfo}
 import org.nazaroid.kvdb.statistics.{StatisticsIntegration, MonitoringConfig}
 
 /**

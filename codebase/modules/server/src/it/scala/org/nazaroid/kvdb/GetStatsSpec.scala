@@ -3,7 +3,7 @@ package org.nazaroid.kvdb
 import cats.effect.{Async, IO}
 import cats.effect.testing.ResourceSpec
 import cats.implicits.given
-import org.nazaroid.kvdb.bitcask.storage.DatabaseStats
+import org.nazaroid.kvdb.algebra.DatabaseStats
 import org.nazaroid.kvdb.statistics.{StatisticsIntegration, MonitoringConfig}
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 

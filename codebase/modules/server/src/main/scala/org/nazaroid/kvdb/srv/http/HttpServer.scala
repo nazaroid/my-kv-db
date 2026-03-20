@@ -138,20 +138,50 @@ final class HttpServer[F[_]: Async: Logger: Network](conf: ServerConfig.Http, en
         // Get all databases stats
         case GET -> Root / "databases" =>
           statisticsService.getDatabases.flatMap { databases =>
-            Ok(databases.asJson)
+            Ok(databases.map { db =>
+              org.nazaroid.kvdb.algebra.DatabaseInfo(
+                name = db.name,
+                totalEntries = db.totalEntries,
+                activeEntries = db.activeEntries,
+                deletedEntries = db.deletedEntries,
+                totalDataSize = db.totalDataSize,
+                details = Map(
+                  "engine_specific" -> db.details.asJson
+                )
+              )
+            }.asJson)
           }
           
         // Get specific database stats
         case GET -> Root / "database" / dbName =>
           statisticsService.getDatabaseStats(dbName).flatMap {
-            case Some(dbStats) => Ok(dbStats.asJson)
+            case Some(dbStats) => Ok(org.nazaroid.kvdb.algebra.DatabaseInfo(
+              name = dbStats.name,
+              totalEntries = dbStats.totalEntries,
+              activeEntries = dbStats.activeEntries,
+              deletedEntries = dbStats.deletedEntries,
+              totalDataSize = dbStats.totalDataSize,
+              details = Map(
+                "engine_specific" -> dbStats.details.asJson
+              )
+            ).asJson)
             case None         => NotFound(s"Database $dbName not found")
           }
           
         // Get segment stats
         case GET -> Root / "segments" / dbName =>
           statisticsService.getSegmentStats(dbName).flatMap { segments =>
-            Ok(segments.asJson)
+            Ok(segments.map { segment =>
+              org.nazaroid.kvdb.algebra.SegmentInfo(
+                name = segment.name,
+                fileSize = segment.fileSize,
+                isActive = segment.isActive,
+                entryCount = segment.entryCount,
+                details = Map(
+                  "engine_specific" -> segment.details.asJson
+                )
+              )
+            }.asJson)
           }
           
         // Get storage stats
