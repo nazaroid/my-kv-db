@@ -6,7 +6,7 @@ import cats.implicits.given
 import fs2.Stream
 import fs2.io.file.{Files, Path}
 import io.circe.*
-import org.nazaroid.kvdb.DatabaseManager
+import org.nazaroid.kvdb.database.{DatabaseManager, DatabaseInfo, TableInfo, SegmentInfo, DatabaseStats}
 import org.typelevel.log4cats.Logger
 
 import java.util.concurrent.TimeUnit
@@ -22,35 +22,6 @@ trait StatisticsService[F[_]] {
   def getStats:                         F[DatabaseStats]  // Delegate to databaseManager
   def registerMetrics():                F[Unit]
 }
-
-case class DatabaseInfo(
-  name:               String,
-  tables:             List[TableInfo],
-  totalEntries:       Int,
-  activeEntries:      Int,
-  deletedEntries:     Int,
-  totalDiskSize:      Long,
-  totalMemorySize:    Long,
-  fragmentationRatio: Double)
-    derives Codec.AsObject
-
-case class TableInfo(
-  name:             String,
-  entryCount:       Int,
-  activeEntryCount: Int,
-  diskSize:         Long,
-  memorySize:       Long)
-    derives Codec.AsObject
-
-case class SegmentInfo(
-  name:           String,
-  filePath:       String,
-  fileSize:       Long,
-  isActive:       Boolean,
-  staleDataRatio: Double,
-  entryCount:     Int,
-  lastModified:   Long)
-    derives Codec.AsObject
 
 case class MonitoringConfig(
   checkInterval:              FiniteDuration = 30.seconds,

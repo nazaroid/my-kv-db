@@ -17,6 +17,7 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 import org.nazaroid.kvdb.ServerConfig
 import org.nazaroid.kvdb.algebra.{Engine, Server}
+import org.nazaroid.kvdb.database.{DatabaseStats, DatabaseInfo, SegmentInfo}
 import org.nazaroid.kvdb.srv.http.middlewares.Err
 import org.nazaroid.kvdb.statistics.{StatisticsService, StatisticsIntegration, MonitoringConfig}
 import org.typelevel.log4cats.Logger
