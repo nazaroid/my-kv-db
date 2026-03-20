@@ -7,6 +7,7 @@ import cats.effect.testing.scalatest.AsyncIOSpec
 import org.http4s.Method.{DELETE, GET, POST}
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.{EntityDecoder, Request, Status, Uri}
+import org.nazaroid.kvdb.srv.{DbInstance, DbInstanceConfig, ServerConfig}
 import org.scalatest.FutureOutcome
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers

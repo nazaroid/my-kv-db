@@ -1,4 +1,4 @@
-package org.nazaroid.kvdb
+package org.nazaroid.kvdb.srv
 
 import cats.Parallel
 import cats.effect.kernel.{Deferred, Spawn}
@@ -10,6 +10,7 @@ import com.comcast.ip4s.{Host, Port, SocketAddress}
 import fs2.io.file.Files
 import fs2.io.net.Network
 import org.nazaroid.kvdb.srv.composition.DiContainer
+import org.nazaroid.kvdb.{DbHandle, DbInstanceConfig}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 

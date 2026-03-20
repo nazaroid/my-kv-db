@@ -3,16 +3,17 @@ package org.nazaroid.kvdb
 import cats.effect.{Async, IO}
 import cats.effect.testing.ResourceSpec
 import cats.implicits.given
-import io.circe.syntax._
-import org.http4s.circe.CirceEntityCodec._
+import io.circe.syntax.*
+import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.Uri
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import org.nazaroid.kvdb.algebra.{DatabaseStats, DatabaseInfo, SegmentInfo}
-import org.nazaroid.kvdb.statistics.{StatisticsIntegration, MonitoringConfig}
+import org.nazaroid.kvdb.algebra.{DatabaseInfo, DatabaseStats, SegmentInfo}
+import org.nazaroid.kvdb.srv.{DbInstanceConfig, EngineConfig, ServerConfig}
+import org.nazaroid.kvdb.statistics.{MonitoringConfig, StatisticsIntegration}
 
 /**
  * Integration tests for statistics endpoints
@@ -184,13 +185,13 @@ class StatisticsIntegrationSpec extends ResourceSpec[IO] {
       
       // Create test server
       server <- DbInstance.resource(DbInstanceConfig(
-        server = org.nazaroid.kvdb.ServerConfig.Http(
+        server = ServerConfig.Http(
           host = "localhost",
           port = 0, // Let system choose port
           idleTimeout = scala.concurrent.duration.Duration(30, "s"),
           maxConnections = 100
         ),
-        engine = org.nazaroid.kvdb.EngineConfig(
+        engine = EngineConfig(
           rootDir = "/tmp/test-kvdb-stats",
           maxSegmentSize = 1024 * 1024,
           maxSegmentCount = 10,

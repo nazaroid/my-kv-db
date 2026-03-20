@@ -15,9 +15,9 @@ import org.http4s.{HttpRoutes, Request, Response, Status, Uri}
 import org.http4s.circe.CirceEntityCodec._
 import io.circe.generic.auto._
 import io.circe.syntax._
-import org.nazaroid.kvdb.ServerConfig
 import org.nazaroid.kvdb.algebra.{Engine, Server}
-import org.nazaroid.kvdb.database.{DatabaseStats, DatabaseInfo, SegmentInfo}
+import org.nazaroid.kvdb.core.{DatabaseStats, DatabaseInfo, SegmentInfo}
+import org.nazaroid.kvdb.srv.ServerConfig
 import org.nazaroid.kvdb.srv.http.middlewares.Err
 import org.nazaroid.kvdb.statistics.{StatisticsService, StatisticsIntegration, MonitoringConfig}
 import org.typelevel.log4cats.Logger

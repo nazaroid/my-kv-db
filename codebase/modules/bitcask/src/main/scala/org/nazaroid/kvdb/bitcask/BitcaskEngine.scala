@@ -1,4 +1,4 @@
-package org.nazaroid.kvdb.engine
+package org.nazaroid.kvdb.bitcask
 
 import cats.effect.Async
 import cats.effect.kernel.Resource

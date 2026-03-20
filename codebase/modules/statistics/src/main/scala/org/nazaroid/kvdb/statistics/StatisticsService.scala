@@ -6,7 +6,7 @@ import cats.implicits.given
 import fs2.Stream
 import fs2.io.file.{Files, Path}
 import io.circe.*
-import org.nazaroid.kvdb.database.{DatabaseManager, DatabaseInfo, TableInfo, SegmentInfo, DatabaseStats}
+import org.nazaroid.kvdb.core.{DatabaseManager, DatabaseInfo, TableInfo, SegmentInfo, DatabaseStats}
 import org.typelevel.log4cats.Logger
 
 import java.util.concurrent.TimeUnit

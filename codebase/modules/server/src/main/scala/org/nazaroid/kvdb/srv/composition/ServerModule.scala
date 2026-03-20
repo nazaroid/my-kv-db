@@ -5,9 +5,9 @@ import cats.effect.Async
 import cats.effect.kernel.Resource
 import fs2.io.file.Files
 import fs2.io.net.Network
-import org.nazaroid.kvdb.ServerConfig
 import org.nazaroid.kvdb.algebra.Server
-import org.nazaroid.kvdb.database.{Engine, BitcaskEngine, BitcaskDatabaseManager}
+import org.nazaroid.kvdb.core.{Engine, BitcaskEngine, BitcaskDatabaseManager}
+import org.nazaroid.kvdb.srv.ServerConfig
 import org.nazaroid.kvdb.srv.http.HttpServer
 import org.typelevel.log4cats.Logger
 

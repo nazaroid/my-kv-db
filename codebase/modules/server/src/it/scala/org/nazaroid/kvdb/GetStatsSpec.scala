@@ -4,7 +4,8 @@ import cats.effect.{Async, IO}
 import cats.effect.testing.ResourceSpec
 import cats.implicits.given
 import org.nazaroid.kvdb.algebra.DatabaseStats
-import org.nazaroid.kvdb.statistics.{StatisticsIntegration, MonitoringConfig}
+import org.nazaroid.kvdb.srv.EngineConfig
+import org.nazaroid.kvdb.statistics.{MonitoringConfig, StatisticsIntegration}
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 /**
@@ -107,7 +108,7 @@ class GetStatsSpec extends ResourceSpec[IO] {
       given Logger[IO] <- IO(Slf4jLogger.create[IO])
       
       // Create test engine
-      engine <- org.nazaroid.kvdb.engine.BitcaskEngine.init[IO](org.nazaroid.kvdb.EngineConfig(
+      engine <- org.nazaroid.kvdb.engine.BitcaskEngine.init[IO](EngineConfig(
         rootDir = "/tmp/test-kvdb-getstats",
         maxSegmentSize = 1024 * 1024,
         maxSegmentCount = 10,

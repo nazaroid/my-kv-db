@@ -2,7 +2,7 @@ package org.nazaroid.kvdb.srv.composition
 
 import cats.effect.Async
 import cats.effect.std.Dispatcher
-import org.nazaroid.kvdb.DbInstanceConfig
+import org.nazaroid.kvdb.srv.DbInstanceConfig
 
 final class CommonModule[F[_]: Async](
   c: DbInstanceConfig,
