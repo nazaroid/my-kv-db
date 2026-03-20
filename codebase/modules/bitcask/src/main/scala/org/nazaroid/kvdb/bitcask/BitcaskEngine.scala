@@ -5,7 +5,7 @@ import cats.effect.kernel.Resource
 import cats.implicits.given
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.EngineConfig
-import org.nazaroid.kvdb.algebra.Engine
+import org.nazaroid.kvdb.core.Engine
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType}
 import org.nazaroid.kvdb.bitcask.catalog.Catalog
 import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
@@ -115,7 +115,7 @@ final class BitcaskEngine[F[_]: Async: Logger](
     }
   }
   
-  override def getStats: F[org.nazaroid.kvdb.DatabaseStats] = {
-    databaseManager.getStats
+  override def getStats: F[org.nazaroid.kvdb.core.DatabaseStats] = {
+     databaseManager.getStats
   }
 }

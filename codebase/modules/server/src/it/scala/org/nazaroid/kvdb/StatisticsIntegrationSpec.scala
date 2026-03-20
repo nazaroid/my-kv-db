@@ -12,7 +12,7 @@ import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.Uri
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import org.nazaroid.kvdb.algebra.{DatabaseInfo, DatabaseStats, SegmentInfo}
-import org.nazaroid.kvdb.srv.{DbInstanceConfig, EngineConfig, ServerConfig}
+import org.nazaroid.kvdb.srv.{DbInstanceConfig, BitcaskEngineConfig, ServerConfig}
 import org.nazaroid.kvdb.statistics.{MonitoringConfig, StatisticsIntegration}
 
 /**
@@ -191,7 +191,7 @@ class StatisticsIntegrationSpec extends ResourceSpec[IO] {
           idleTimeout = scala.concurrent.duration.Duration(30, "s"),
           maxConnections = 100
         ),
-        engine = EngineConfig(
+        engine = BitcaskEngineConfig(
           rootDir = "/tmp/test-kvdb-stats",
           maxSegmentSize = 1024 * 1024,
           maxSegmentCount = 10,

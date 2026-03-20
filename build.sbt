@@ -102,7 +102,7 @@ lazy val `core` = (project in file("codebase/modules/core"))
   .configs(Integration)
   .settings(
     commonSettings,
-    name    := "database",
+    name    := "core",
     version := GLOBAL_VERSION,
     libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Logging.all ++ Testing.all,
     excludeDependencies -= ExclusionRule("log4j", "log4j"),
