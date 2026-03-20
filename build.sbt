@@ -10,7 +10,7 @@ lazy val root = (project in file("."))
     `prometheus`,
     `bin-file-io`,
     `bitcask`,
-    `database`,
+    `core`,
     `statistics`,
     `server`
   )
@@ -95,7 +95,7 @@ lazy val `bitcask` = (project in file("codebase/modules/bitcask"))
       .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/bitcask/integration-tests-html-report")
   )
 
-lazy val `database` = (project in file("codebase/modules/database"))
+lazy val `core` = (project in file("codebase/modules/core"))
   .dependsOn(`bitcask` % "compile->compile;test->test;it->it")
   .enablePlugins(DockerPlugin, JavaAppPackaging)
   .disablePlugins(AssemblyPlugin)
@@ -114,7 +114,7 @@ lazy val `database` = (project in file("codebase/modules/database"))
   )
 
 lazy val `statistics` = (project in file("codebase/modules/statistics"))
-  .dependsOn(`database` % "compile->compile;test->test;it->it")
+  .dependsOn(`core` % "compile->compile;test->test;it->it")
   .enablePlugins(DockerPlugin, JavaAppPackaging)
   .disablePlugins(AssemblyPlugin)
   .configs(Integration)
@@ -134,7 +134,7 @@ lazy val `statistics` = (project in file("codebase/modules/statistics"))
 lazy val `server` = (project in file("codebase/modules/server"))
   .dependsOn(`metrics` % "compile->compile;test->test;it->it")
   .dependsOn(`statistics` % "compile->compile;test->test;it->it")
-  .dependsOn(`database` % "compile->compile;test->test;it->it")
+  .dependsOn(`core` % "compile->compile;test->test;it->it")
   .enablePlugins(DockerPlugin, JavaAppPackaging)
   .disablePlugins(AssemblyPlugin)
   .configs(Integration)
