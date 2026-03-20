@@ -6,7 +6,7 @@ import cats.implicits.given
 import fs2.Stream
 import fs2.io.file.{Files, Path}
 import io.circe.*
-import org.nazaroid.kvdb.bitcask.storage.StorageManager
+import org.nazaroid.kvdb.DatabaseManager
 import org.typelevel.log4cats.Logger
 
 import java.util.concurrent.TimeUnit
@@ -19,7 +19,7 @@ trait StatisticsService[F[_]] {
   def getDatabases:                     F[List[DatabaseInfo]]
   def getDatabaseStats(dbName: String): F[Option[DatabaseInfo]]
   def getSegmentStats(dbName: String):  F[List[SegmentInfo]]
-  def getStats:                         F[org.nazaroid.kvdb.bitcask.storage.DatabaseStats] // Delegate to storageManager
+  def getStats:                         F[DatabaseStats]  // Delegate to databaseManager
   def registerMetrics():                F[Unit]
 }
 
@@ -59,7 +59,7 @@ case class MonitoringConfig(
   compactionThreshold:        Double = 0.5)
 
 class StatisticsServiceImpl[F[_]: Async: Files: Logger](
-  storageManager: StorageManager[F],
+  databaseManager: DatabaseManager[F],  // ✅ Работаем с базами, не с таблицами
   config:         MonitoringConfig,
   monitoringRef:  Ref[F, Boolean],
   metricsAdapter: MetricsAdapter[F] // Injected via constructor, no Option!
@@ -76,8 +76,8 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
     } yield ()
   }
 
-  override def getStats: F[org.nazaroid.kvdb.bitcask.storage.DatabaseStats] = {
-    storageManager.getStats
+  override def getStats: F[DatabaseStats] = {
+    databaseManager.getStats
   }
 
   override def startMonitoring(): F[Unit] = {
@@ -113,13 +113,16 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
 
   override def getDatabases: F[List[DatabaseInfo]] = {
     for {
-      dbFolders <- getAllDatabaseFolders
-      dbInfos   <- dbFolders.traverse(collectDatabaseInfo)
+      dbNames <- databaseManager.listDatabases
+      dbInfos   <- dbNames.traverse(collectDatabaseInfo)
     } yield dbInfos.flatten
   }
 
   override def getDatabaseStats(dbName: String): F[Option[DatabaseInfo]] = {
-    getDatabases.map(_.find(_.name == dbName))
+    for {
+      db <- databaseManager.getDatabase(dbName)
+      dbInfo <- db.traverse(collectDatabaseInfo)
+    } yield dbInfo.flatten.headOption
   }
 
   override def getSegmentStats(dbName: String): F[List[SegmentInfo]] = {
@@ -310,31 +313,31 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
 object StatisticsService {
 
   def create[F[_]: Async: Files: Logger](
-    storageManager: StorageManager[F],
+    databaseManager: DatabaseManager[F],
     config:         MonitoringConfig = MonitoringConfig()
   ): F[StatisticsService[F]] = {
-    createWithAdapter(storageManager, config, MetricsAdapter.createNoOpAdapter(using summon[Async[F]]))
+    createWithAdapter(databaseManager, config, MetricsAdapter.createNoOpAdapter(using summon[Async[F]]))
   }
 
   def createWithPrometheus[F[_]: Async: Files: Logger](
-    storageManager:    StorageManager[F],
+    databaseManager: DatabaseManager[F],
     config:            MonitoringConfig = MonitoringConfig(),
     collectorRegistry: io.prometheus.client.CollectorRegistry
   ): F[StatisticsService[F]] = {
     val prometheusAdapter = MetricsAdapter.createPrometheusAdapter(collectorRegistry)
     for {
-      service <- createWithAdapter(storageManager, config, prometheusAdapter)
+      service <- createWithAdapter(databaseManager, config, prometheusAdapter)
     } yield service
   }
 
   def createWithAdapter[F[_]: Async: Files: Logger](
-    storageManager: StorageManager[F],
+    databaseManager: DatabaseManager[F],
     config:         MonitoringConfig,
     metricsAdapter: MetricsAdapter[F]
   ): F[StatisticsService[F]] = {
     for {
       monitoringRef <- Ref.of[F, Boolean](false)
-      service = new StatisticsServiceImpl(storageManager, config, monitoringRef, metricsAdapter)
+      service = new StatisticsServiceImpl(databaseManager, config, monitoringRef, metricsAdapter)
     } yield service
   }
 }

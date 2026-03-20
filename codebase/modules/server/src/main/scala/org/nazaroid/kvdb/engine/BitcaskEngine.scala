@@ -48,24 +48,30 @@ object BitcaskEngine {
       segmentSchema   = segmentSchema,
       tableSchema     = tableSchema
     )
+    
     for {
-      c <- Catalog.init(Path(conf.rootDir), storageConfig, conf.fileWriteBufferSize, conf.fileWriteParallelism)
-    } yield BitcaskEngine(c)
+      databaseManager <- BitcaskDatabaseManager.create[F](conf.rootDir)
+    } yield BitcaskEngine(databaseManager)
   }
 }
 
-final class BitcaskEngine[F[_]: Async: Logger](c: Catalog[F]) extends Engine[F] {
+final class BitcaskEngine[F[_]: Async: Logger](
+  databaseManager: BitcaskDatabaseManager[F]
+) extends Engine[F] {
 
   override def createDbIfNotExists(name: String): F[Unit] = {
-    for {
-      _ <- c.database(name)
-    } yield ()
+    databaseManager.createDatabase(name).void
   }
 
   override def createTableIfNotExists(baseName: String, tblName: String): F[Unit] = {
     for {
-      db <- c.database(baseName)
-      _  <- db.table(tblName)
+      db <- databaseManager.getDatabase(baseName)
+      _ <- db match {
+        case Some(database) => database.createTable(tblName)
+        case None => 
+          databaseManager.createDatabase(baseName) *>
+          databaseManager.getDatabase(baseName).flatMap(_.createTable(tblName))
+      }
     } yield ()
   }
 
@@ -74,74 +80,42 @@ final class BitcaskEngine[F[_]: Async: Logger](c: Catalog[F]) extends Engine[F] 
     tblName:  String,
     key:      String
   ): F[Option[String]] = {
-    for {
-      db   <- c.database(baseName)
-      tbl  <- db.table(tblName)
-      vOpt <- tbl.read(key)
-    } yield vOpt
+    databaseManager.getDatabase(baseName).flatMap {
+      case Some(database) => 
+        database.getTable(tblName).flatMap(_.get(key))
+      case None => Async[F].pure(None)
+    }
   }
 
   override def set(
     baseName: String,
-    tblName:  String,
+    tblName: String,
     key:      String,
     value:    String
   ): F[Unit] = {
-    for {
-      db     <- c.database(baseName)
-      tbl    <- db.table(tblName)
-      result <- tbl.write(key, value)
-      _ <- result match {
-        case Right(()) => Async[F].unit
-        case Left(error) =>
-          Logger[F].error(s"Failed to set key $key in table $tblName: $error") *>
-            Async[F].raiseError(new RuntimeException(s"Write operation failed: $error"))
+    databaseManager.getDatabase(baseName).flatMap {
+      case Some(database) => 
+        database.getTable(tblName).flatMap(_.set(key, value))
+      case None => 
+        databaseManager.createDatabase(baseName) *>
+          databaseManager.getDatabase(baseName).flatMap(_.getTable(tblName).flatMap(_.set(key, value)))
       }
     } yield ()
   }
 
   override def delete(
     baseName: String,
-    tblName:  String,
+    tblName: String,
     key:      String
   ): F[Unit] = {
-    for {
-      db  <- c.database(baseName)
-      tbl <- db.table(tblName)
-      _   <- tbl.delete(key)
-    } yield ()
-  }
-
-  override def getStats: F[org.nazaroid.kvdb.algebra.DatabaseStats] = {
-    c.getStats.map { concreteStats =>
-      org.nazaroid.kvdb.algebra.DatabaseStats(
-        totalTables = concreteStats.totalTables,
-        totalEntries = concreteStats.totalEntries,
-        activeEntries = concreteStats.activeEntries,
-        deletedEntries = concreteStats.deletedEntries,
-        totalDataSize = concreteStats.totalDataSize,
-        details = Map(
-          "engine_type" -> "bitcask".asJson,
-          "table_stats" -> concreteStats.tableStats.map { table =>
-            Map(
-              "name" -> table.name.asJson,
-              "entry_count" -> table.entryCount.asJson,
-              "active_entry_count" -> table.activeEntryCount.asJson
-            ).asJson
-          }.asJson,
-          "segment_stats" -> concreteStats.segmentStats.map { segment =>
-            Map(
-              "name" -> segment.name.asJson,
-              "file_size" -> segment.fileSize.asJson,
-              "is_active" -> segment.isActive.asJson,
-              "stale_data_ratio" -> segment.staleDataRatio.asJson,
-              "entry_count" -> segment.entryCount.asJson
-            ).asJson
-          }.asJson,
-          "segment_count" -> concreteStats.segmentStats.size.asJson,
-          "active_segment_count" -> concreteStats.segmentStats.count(_.isActive).asJson
-        )
-      )
+    databaseManager.getDatabase(baseName).flatMap {
+      case Some(database) => 
+        database.getTable(tblName).flatMap(_.delete(key))
+      case None => Async[F].unit
     }
+  }
+  
+  override def getStats: F[org.nazaroid.kvdb.DatabaseStats] = {
+    databaseManager.getStats
   }
 }

@@ -16,9 +16,10 @@ final class ServerModule[F[_]: Async: Files: Logger: Parallel: Network](commonMo
 
   def resolve: Resource[F, Server[F]] = {
     for {
-      engine <- BitcaskEngine.init[F](config.engine)
+      databaseManager <- BitcaskDatabaseManager.create[F](config.engine.rootDir)
+      engine = new BitcaskEngine[F](databaseManager)
       statisticsService <- org.nazaroid.kvdb.statistics.StatisticsService.createWithPrometheus(
-        engine.catalog.storageManager,
+        databaseManager,
         org.nazaroid.kvdb.statistics.MonitoringConfig(),
         new io.prometheus.client.CollectorRegistry()
       )
