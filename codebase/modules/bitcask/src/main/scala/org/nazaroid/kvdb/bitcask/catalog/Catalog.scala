@@ -39,10 +39,10 @@ object Catalog {
     configTemplate: StorageConfig,
     queueSize:      Int = 10000,
     parallelism:    Int = 10
-  ): Resource[F, Catalog[F]] = {
+  ): F[Catalog[F]] = {
     for {
       // 1. Create root directory if it doesn't exist
-      _ <- Resource.eval(Files[F].createDirectories(rootPath).handleError(_ => ()))
+      _ <- Files[F].createDirectories(rootPath).handleError(_ => ())
 
       // 2. Create a unified write queue for the entire catalog
       writeQueue <- Channel.bounded[F, WriteTask[F]](queueSize).toResource
@@ -52,7 +52,7 @@ object Catalog {
       _ <- writeBinary(writeQueue.stream, parallelism = 1).compile.drain.background
 
       // 4. Initialize the registry for open databases
-      activeDbs <- Resource.eval(Ref.of(Map.empty[String, Database[F]]))
+      activeDbs <- Ref.of(Map.empty[String, Database[F]])
 
     } yield Catalog[F](
       rootPath       = rootPath,
