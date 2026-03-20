@@ -111,4 +111,8 @@ final class BitcaskEngine[F[_]: Async: Logger](c: Catalog[F]) extends Engine[F] 
       _   <- tbl.delete(key)
     } yield ()
   }
+
+  override def getStats: F[org.nazaroid.kvdb.bitcask.storage.DatabaseStats] = {
+    c.getStats
+  }
 }

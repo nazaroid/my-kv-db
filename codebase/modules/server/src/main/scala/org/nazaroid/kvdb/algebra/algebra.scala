@@ -30,4 +30,6 @@ trait Engine[F[_]] {
     tblName: String,
     key: String
   ): F[Unit]
+  
+  def getStats: F[org.nazaroid.kvdb.bitcask.storage.DatabaseStats]
 }

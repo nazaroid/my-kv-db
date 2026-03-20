@@ -12,12 +12,16 @@ import org.http4s.metrics.prometheus.Prometheus
 import org.http4s.server.Router
 import org.http4s.server.middleware.Metrics
 import org.http4s.{HttpRoutes, Request, Response, Status, Uri}
+import org.http4s.circe.CirceEntityCodec._
+import io.circe.generic.auto._
+import io.circe.syntax._
 import org.nazaroid.kvdb.ServerConfig
 import org.nazaroid.kvdb.algebra.{Engine, Server}
 import org.nazaroid.kvdb.srv.http.middlewares.Err
+import org.nazaroid.kvdb.statistics.{StatisticsService, StatisticsIntegration, MonitoringConfig}
 import org.typelevel.log4cats.Logger
 
-final class HttpServer[F[_]: Async: Logger: Network](conf: ServerConfig.Http, engine: Engine[F])
+final class HttpServer[F[_]: Async: Logger: Network](conf: ServerConfig.Http, engine: Engine[F], statisticsService: StatisticsService[F])
     extends Server[F]
     with Err[F] {
 
@@ -49,9 +53,11 @@ final class HttpServer[F[_]: Async: Logger: Network](conf: ServerConfig.Http, en
     for {
       data   <- DataController(engine)
       health <- HealthController()
+      stats  <- StatisticsController(statisticsService)
     } yield Router(
       "/data"   -> data,
-      "/health" -> health
+      "/health" -> health,
+      "/stats"  -> stats
     )
 
   // noinspection ScalaStyle
@@ -121,6 +127,58 @@ final class HttpServer[F[_]: Async: Logger: Network](conf: ServerConfig.Http, en
         healthServiceMetrics <- Prometheus
           .metricsOps[F](CollectorRegistry.defaultRegistry, "health")
       } yield Metrics[F](healthServiceMetrics)(withErrorLogging(healthService))
+    }
+  }
+  
+  private object StatisticsController {
+    
+    def apply(statisticsService: StatisticsService[F]): Resource[F, HttpRoutes[F]] = {
+      val statsService: HttpRoutes[F] = HttpRoutes.of[F] {
+        
+        // Get all databases stats
+        case GET -> Root / "databases" =>
+          statisticsService.getDatabases.flatMap { databases =>
+            Ok(databases.asJson)
+          }
+          
+        // Get specific database stats
+        case GET -> Root / "database" / dbName =>
+          statisticsService.getDatabaseStats(dbName).flatMap {
+            case Some(dbStats) => Ok(dbStats.asJson)
+            case None         => NotFound(s"Database $dbName not found")
+          }
+          
+        // Get segment stats
+        case GET -> Root / "segments" / dbName =>
+          statisticsService.getSegmentStats(dbName).flatMap { segments =>
+            Ok(segments.asJson)
+          }
+          
+        // Get storage stats
+        case GET -> Root / "storage" =>
+          statisticsService.getStats.flatMap { stats =>
+            Ok(stats.asJson)
+          }
+          
+        // Get Prometheus export
+        case GET -> Root / "prometheus" =>
+          val integration = StatisticsIntegration(statisticsService)
+          integration.exportForPrometheus().flatMap { prometheusData =>
+            Ok(prometheusData)
+          }
+          
+        // Start/stop monitoring
+        case POST -> Root / "monitoring" / "start" =>
+          statisticsService.startMonitoring().flatMap(_ => Ok("Monitoring started"))
+          
+        case POST -> Root / "monitoring" / "stop" =>
+          statisticsService.stopMonitoring().flatMap(_ => Ok("Monitoring stopped"))
+          
+      }
+      for {
+        statsServiceMetrics <- Prometheus
+          .metricsOps[F](CollectorRegistry.defaultRegistry, "stats")
+      } yield Metrics[F](statsServiceMetrics)(withErrorLogging(statsService))
     }
   }
 }

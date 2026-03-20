@@ -17,9 +17,15 @@ final class ServerModule[F[_]: Async: Files: Logger: Parallel: Network](commonMo
   def resolve: Resource[F, Server[F]] = {
     for {
       engine <- BitcaskEngine.init[F](config.engine)
+      statisticsService <- org.nazaroid.kvdb.statistics.StatisticsService.createWithPrometheus(
+        engine.catalog.storageManager,
+        org.nazaroid.kvdb.statistics.MonitoringConfig(),
+        new io.prometheus.client.CollectorRegistry()
+      )
     } yield {
       config.server match {
-        case httpConf: ServerConfig.Http => HttpServer[F](httpConf, engine)
+        case httpConf: ServerConfig.Http => 
+          new org.nazaroid.kvdb.srv.http.HttpServer[F](httpConf, engine, statisticsService)
         case _: ServerConfig.Grpc        => throw NotImplementedError(f"'GRPC' - server not supported yet")
       }
     }
