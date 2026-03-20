@@ -4,7 +4,7 @@ import cats.effect.Async
 import cats.effect.kernel.Resource
 import cats.implicits.given
 import fs2.io.file.{Files, Path}
-import org.nazaroid.kvdb.EngineConfig
+import org.nazaroid.kvdb.bitcask.BitcaskEngineConfig
 import org.nazaroid.kvdb.core.Engine
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType}
 import org.nazaroid.kvdb.bitcask.catalog.Catalog
@@ -13,7 +13,7 @@ import org.typelevel.log4cats.Logger
 
 object BitcaskEngine {
 
-  def init[F[_]: Async: Files: Logger](conf: EngineConfig): Resource[F, Engine[F]] = {
+  def init[F[_]: Async: Files: Logger](conf: BitcaskEngineConfig): Resource[F, Engine[F]] = {
     // Data files use CRC, segment and table - no
     val dataSchema = List(
       FieldDef("valueSize", FieldType.Int32),
@@ -100,7 +100,7 @@ final class BitcaskEngine[F[_]: Async: Logger](
         databaseManager.createDatabase(baseName) *>
           databaseManager.getDatabase(baseName).flatMap(_.getTable(tblName).flatMap(_.set(key, value)))
       }
-    } yield ()
+    }
   }
 
   override def delete(

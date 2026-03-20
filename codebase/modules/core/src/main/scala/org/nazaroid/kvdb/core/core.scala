@@ -1,108 +1,93 @@
 package org.nazaroid.kvdb.core
 
-import cats.effect.Async
-import org.typelevel.log4cats.Logger
+import cats.effect.Resource
 import io.circe.Json
-
 
 trait Server[F[_]] {
   def run(): Resource[F, Unit]
 }
 
-/**
- * Abstract database manager that handles multiple databases
- * This module breaks circular dependencies between server and statistics
- */
+/** Abstract database manager that handles multiple databases This module breaks circular dependencies between server
+  * and statistics
+  */
 trait DatabaseManager[F[_]] {
-  
+
   def createDatabase(name: String): F[Database[F]]
-  def getDatabase(name: String): F[Option[Database[F]]]
-  def listDatabases: F[List[String]]
+  def getDatabase(name: String):    F[Option[Database[F]]]
+  def listDatabases:                F[List[String]]
   def deleteDatabase(name: String): F[Unit]
-  
+
   def getStats: F[DatabaseStats]
 }
 
-/**
- * Abstract database interface
- */
+/** Abstract database interface
+  */
 trait Database[F[_]] {
-  def name: String
+  def name:                      String
   def createTable(name: String): F[Unit]
-  def getTable(name: String): F[Option[Table[F]]]
-  def listTables: F[List[String]]
+  def getTable(name: String):    F[Option[Table[F]]]
+  def listTables:                F[List[String]]
   def deleteTable(name: String): F[Unit]
 }
 
-/**
- * Abstract table interface
- */
+/** Abstract table interface
+  */
 trait Table[F[_]] {
-  def name: String
-  def get(key: String): F[Option[String]]
+  def name:                            String
+  def get(key: String):                F[Option[String]]
   def set(key: String, value: String): F[Unit]
-  def delete(key: String): F[Unit]
-  def listKeys: F[List[String]]
+  def delete(key: String):             F[Unit]
+  def listKeys:                        F[List[String]]
 }
 
-/**
- * Database statistics for multiple databases
- */
+/** Database statistics for multiple databases
+  */
 case class DatabaseStats(
   totalDatabases: Int,
-  totalTables: Int,
-  totalEntries: Int,
-  activeEntries: Int,
+  totalTables:    Int,
+  totalEntries:   Int,
+  activeEntries:  Int,
   deletedEntries: Int,
-  totalDataSize: Long,
+  totalDataSize:  Long,
   // Heterogeneous collection for engine-specific details
-  details: Map[String, Json] = Map.empty
-)
+  details: Map[String, Json] = Map.empty)
 
-/**
- * Database information for single database
- */
+/** Database information for single database
+  */
 case class DatabaseInfo(
-  name: String,
-  totalTables: Int,
-  totalEntries: Int,
-  activeEntries: Int,
+  name:           String,
+  totalTables:    Int,
+  totalEntries:   Int,
+  activeEntries:  Int,
   deletedEntries: Int,
-  totalDataSize: Long,
+  totalDataSize:  Long,
   // Engine-specific details
-  details: Map[String, Json] = Map.empty
-)
+  details: Map[String, Json] = Map.empty)
 
-/**
- * Table information
- */
+/** Table information
+  */
 case class TableInfo(
-  name: String,
-  entryCount: Int,
-  activeEntryCount: Int,
+  name:              String,
+  entryCount:        Int,
+  activeEntryCount:  Int,
   deletedEntryCount: Int,
-  totalDataSize: Long,
+  totalDataSize:     Long,
   // Engine-specific details
-  details: Map[String, Json] = Map.empty
-)
+  details: Map[String, Json] = Map.empty)
 
-/**
- * Segment information (for storage-like engines)
- */
+/** Segment information (for storage-like engines)
+  */
 case class SegmentInfo(
-  name: String,
-  fileSize: Long,
-  isActive: Boolean,
+  name:       String,
+  fileSize:   Long,
+  isActive:   Boolean,
   entryCount: Int,
   // Engine-specific details
-  details: Map[String, Json] = Map.empty
-)
+  details: Map[String, Json] = Map.empty)
 
-/**
- * Abstract engine interface that works with DatabaseManager
- * This breaks circular dependency - engine depends on database module,
- * not on server module
- */
+/** Abstract engine interface that works with DatabaseManager This breaks circular dependency - engine depends on
+  * database module, not on server module
+  */
 trait Engine[F[_]] {
 
   def createDbIfNotExists(name: String): F[Unit]
@@ -110,23 +95,23 @@ trait Engine[F[_]] {
   def createTableIfNotExists(baseName: String, tblName: String): F[Unit]
 
   def get(
-           baseName: String,
-           tblName:  String,
-           key:      String
-         ): F[Option[String]]
+    baseName: String,
+    tblName: String,
+    key: String
+  ): F[Option[String]]
 
   def set(
-           baseName: String,
-           tblName: String,
-           key:      String,
-           value:    String
-         ): F[Unit]
+    baseName: String,
+    tblName: String,
+    key: String,
+    value: String
+  ): F[Unit]
 
   def delete(
-              baseName: String,
-              tblName: String,
-              key:      String
-            ): F[Unit]
+    baseName: String,
+    tblName: String,
+    key: String
+  ): F[Unit]
 
   def getStats: F[DatabaseStats]
 }
