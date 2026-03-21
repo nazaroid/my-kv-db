@@ -35,7 +35,13 @@ final class BitcaskDatabase[F[_]: Async: Files: Logger](
   }
 
   /** List all tables (physical directories within the database) */
-  def listTables(): Stream[F, String] = Files[F].list(dbPath).filter(_.extName == "").map(_.fileName.toString)
+  def listTables(): F[List[String]] =
+    Files[F]
+      .list(dbPath)
+      .filter(_.extName == "")
+      .map(_.fileName.toString)
+      .compile
+      .toList
 
   /** Delete a table */
   def dropTable(tableName: String): F[Unit] =

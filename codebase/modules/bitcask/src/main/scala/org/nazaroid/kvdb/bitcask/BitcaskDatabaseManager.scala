@@ -63,7 +63,7 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
       allDbStats <- dbNames.traverse { dbName =>
         databases.get(dbName).traverse { db =>
           for {
-            tableNames <- db.listTables().compile.toList
+            tableNames <- db.listTables()
             allTableStats <- tableNames.traverse { tableName =>
               for {
                 tbl        <- db.table(tableName)
