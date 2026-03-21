@@ -33,12 +33,12 @@ final class Catalog[F[_]: Async: Files: Logger](
 
   override def listDatabases: F[List[String]] = {
     for {
-      rootDirExists <- Files[F].exists(Path(rootPath))
+      rootDirExists <- Files[F].exists(rootPath)
       result <-
         if (rootDirExists) {
           for {
             entries <- Files[F]
-              .list(Path(rootPath))
+              .list(rootPath)
               .filter(Files[F].isDirectory)
               .evalMap(entry => Files[F].fileName(entry))
               .compile

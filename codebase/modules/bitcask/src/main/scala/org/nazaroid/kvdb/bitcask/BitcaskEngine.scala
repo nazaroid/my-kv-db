@@ -52,7 +52,7 @@ object BitcaskEngine {
     )
 
     for {
-      databaseManager <- BitcaskDatabaseManager.create[F](conf.rootDir)
+      databaseManager <- BitcaskDatabaseManager.create[F](conf.rootDir, storageConfig)
     } yield BitcaskEngine(databaseManager)
   }
 }
@@ -69,7 +69,7 @@ final class BitcaskEngine[F[_]: Async: Logger](
     for {
       db <- OptionT(databaseManager.getDatabase(baseName))
         .getOrElseF(databaseManager.createDatabase(baseName))
-      _ <- OptionT.liftF(db.createTable(tblName))
+      _ <- OptionT(db.getTable(tblName)).getOrElseF(db.createTable(tblName))
     } yield ()
   }
 
@@ -94,7 +94,7 @@ final class BitcaskEngine[F[_]: Async: Logger](
       db <- OptionT(databaseManager.getDatabase(baseName))
         .getOrElseF(databaseManager.createDatabase(baseName))
       tbl <- OptionT(db.getTable(tblName)).getOrElseF(db.createTable(tblName))
-      _ <- tbl.set(key, value)
+      _   <- tbl.set(key, value)
     } yield ()
   }
 
@@ -106,8 +106,7 @@ final class BitcaskEngine[F[_]: Async: Logger](
     for {
       db  <- OptionT(databaseManager.getDatabase(baseName))
       tbl <- OptionT(db.getTable(tblName))
-      _   <- tbl.delete(key)
-    } yield ()
+    } yield tbl.delete(key)
   }
 
   override def getStats: F[org.nazaroid.kvdb.core.DatabaseStats] = {

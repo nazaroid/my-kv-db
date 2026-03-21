@@ -5,8 +5,8 @@ import cats.implicits.given
 import fs2.io.file.{Files, Path}
 import io.circe.syntax.*
 import org.nazaroid.kvdb.bitcask.catalog.{BitcaskDatabase, BitcaskTable, Catalog}
-import org.nazaroid.kvdb.bitcask.storage.StorageManager
-import org.nazaroid.kvdb.core.{Database, DatabaseManager, DatabaseStats}
+import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
+import org.nazaroid.kvdb.core.*
 import org.typelevel.log4cats.Logger
 
 import scala.collection.mutable
@@ -39,24 +39,17 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
   override def listDatabases: F[List[String]] = {
     for {
       _       <- Logger[F].debug(s"Listing databases in: ${catalog.rootPath}")
-      dbNames <- catalog.database(name)
+      dbNames <- catalog.listDatabases
     } yield dbNames
   }
 
   override def deleteDatabase(name: String): F[Unit] = {
     for {
       _ <- Logger[F].info(s"Deleting database: $name")
-      dbPath = Path(s"$rootPath/$name")
-
-      _ <- databases.get(name).traverse_ { db =>
-        // Close catalog resources
-        db.catalog.stop()
-      }
-
       _ <- Async[F].delay {
         databases.remove(name)
       }
-
+      dbPath = Path(s"${catalog.rootPath}/$name")
       _ <- Files[F].deleteIfExists(dbPath)
 
     } yield ()
@@ -69,12 +62,42 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
 
       allDbStats <- dbNames.traverse { dbName =>
         databases.get(dbName).traverse { db =>
-          db.catalog.storageManager.getStats.map { stats =>
-            dbName -> stats
-          }
+          for {
+            tableNames <- db.listTables().compile.toList
+            allTableStats <- tableNames.traverse { tableName =>
+              for {
+                tbl        <- db.table(tableName)
+                tableStats <- getTableStats(table)
+              } yield tableName -> tableStats
+            }
+            tableStatsMap = allTableStats.flatten.toMap
+
+            totalEntries = tableStatsMap.values.map(_.totalEntries).sum
+            activeEntries = tableStatsMap.values.map(_.activeEntries).sum
+            deletedEntries = tableStatsMap.values.map(_.deletedEntries).sum
+            totalDataSize = tableStatsMap.values.map(_.totalDataSize).sum
+
+          } yield DatabaseInfo(
+            name           = dbName,
+            totalTables    = tableStatsMap.size,
+            totalEntries   = totalEntries,
+            activeEntries  = activeEntries,
+            deletedEntries = deletedEntries,
+            totalDataSize  = totalDataSize,
+            details = Map(
+              "tables" -> tableStatsMap.map { case (name, stats) =>
+                Map(
+                  "name"            -> name.asJson,
+                  "total_entries"   -> stats.totalEntries.asJson,
+                  "active_entries"  -> stats.activeEntries.asJson,
+                  "deleted_entries" -> stats.deletedEntries.asJson,
+                  "total_data_size" -> stats.totalDataSize.asJson
+                ).asJson
+              }.asJson
+            )
+          )
         }
       }
-
       dbStatsMap = allDbStats.flatten.toMap
 
       totalDatabases = dbStatsMap.size
@@ -84,9 +107,6 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
       deletedEntries = dbStatsMap.values.map(_.deletedEntries).sum
       totalDataSize = dbStatsMap.values.map(_.totalDataSize).sum
 
-      totalSegments = dbStatsMap.values.map(_.segmentStats.size).sum
-      activeSegments = dbStatsMap.values.map(_.segmentStats.count(_.isActive)).sum
-
     } yield DatabaseStats(
       totalDatabases = totalDatabases,
       totalTables    = totalTables,
@@ -95,11 +115,9 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
       deletedEntries = deletedEntries,
       totalDataSize  = totalDataSize,
       details = Map(
-        "engine_type"     -> "bitcask".asJson,
-        "root_path"       -> rootPath.asJson,
-        "database_count"  -> totalDatabases.asJson,
-        "total_segments"  -> totalSegments.asJson,
-        "active_segments" -> activeSegments.asJson,
+        "engine_type"    -> "bitcask".asJson,
+        "root_path"      -> rootPath.asJson,
+        "database_count" -> totalDatabases.asJson,
         "databases" -> dbStatsMap.map { case (name, stats) =>
           Map(
             "name"            -> name.asJson,
@@ -108,8 +126,7 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
             "active_entries"  -> stats.activeEntries.asJson,
             "deleted_entries" -> stats.deletedEntries.asJson,
             "total_data_size" -> stats.totalDataSize.asJson,
-            "segment_count"   -> stats.segmentStats.size.asJson,
-            "active_segments" -> stats.segmentStats.count(_.isActive).asJson
+            "tables"          -> stats.details("tables")
           ).asJson
         }.asJson,
         "compression"       -> "none".asJson,
@@ -117,6 +134,20 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
         "max_segment_count" -> 10.asJson
       )
     )
+  }
+
+  /** Get statistics for a single table through its StorageManager */
+  private def getTableStats(bitcaskTable: BitcaskTable[F]): F[TableInfo] = {
+    bitcaskTable.getStats.map { stats =>
+      TableInfo(
+        name           = Path(bitcaskTable.tableStorage.filePath).fileName,
+        totalEntries   = stats.totalEntries,
+        activeEntries  = stats.activeEntries,
+        deletedEntries = stats.deletedEntries,
+        totalDataSize  = stats.totalDataSize,
+        details        = stats.details
+      )
+    }
   }
 
   private def createDataSchema() = {
@@ -183,7 +214,7 @@ class DatabaseWrapper[F[_]: Async: Files: Logger](
   */
 class TableWrapper[F[_]: Async: Files: Logger](
   bitcaskTable: org.nazaroid.kvdb.bitcask.catalog.BitcaskTable[F])
-    extends BitcaskTable[F] {
+    extends Table[F] {
 
   override def name: String = bitcaskTable.name
 
@@ -206,9 +237,9 @@ class TableWrapper[F[_]: Async: Files: Logger](
 
 object BitcaskDatabaseManager {
 
-  def create[F[_]: Async: Files: Logger](rootPath: String): DatabaseManager[F] = {
+  def create[F[_]: Async: Files: Logger](rootPath: String, configTemplate: StorageConfig): DatabaseManager[F] = {
     for {
-      c <- Catalog.init(dbPath, storageConfig, 1024, 2)
+      c <- Catalog.init(rootPath, storageConfig, 1024, 2)
     } yield new BitcaskDatabaseManager[F](c)
   }
 }

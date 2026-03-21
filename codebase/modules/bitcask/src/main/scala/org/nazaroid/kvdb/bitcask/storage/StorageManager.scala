@@ -337,8 +337,8 @@ sealed class StorageManager[F[_]: Async: Files: Logger](
     } yield entryCount
   }
 
-  /** Get storage statistics */
-  def getStats: F[DatabaseStats] = {
+  /** Get table statistics (StorageManager manages ONE table) */
+  def getStats: F[TableStats] = {
     for {
       cacheSnapshot <- cache.get
 
@@ -359,36 +359,37 @@ sealed class StorageManager[F[_]: Async: Files: Logger](
           }
       }
 
-      // Group keys by table name
-      tables = cacheSnapshot.keys.groupBy(_.split("/").headOption.getOrElse("default"))
-
-      tableStats = tables.map { case (tableName, keys) =>
-        val tableKeysCount = keys.size
-        val tableActiveCount = keys.count { key =>
-          cacheSnapshot.get(key).exists {
-            case CacheEntry.Pending(_) | CacheEntry.Persistent(_, _, _) => true
-            case CacheEntry.Deleted                                     => false
-          }
+      // Group keys by table name (for this single table)
+      tableKeys = cacheSnapshot.keys.toList
+      tableKeysCount = tableKeys.size
+      tableActiveCount = tableKeys.count { key =>
+        cacheSnapshot.get(key).exists {
+          case CacheEntry.Pending(_) | CacheEntry.Persistent(_, _, _) => true
+          case CacheEntry.Deleted                                     => false
         }
-
-        TableStats(
-          name             = tableName,
-          entryCount       = tableKeysCount,
-          activeEntryCount = tableActiveCount
-        )
-      }.toList
+      }
 
       segmentStats <- getSegmentStats
       
-      // Final result (removed yield () and val keywords)
-    } yield DatabaseStats(
-      totalTables    = tableStats.size,
-      totalEntries   = cacheSnapshot.size,
-      activeEntries  = activeEntries,
+    } yield TableStats(
+      name = Path(tableStorage.falePath).
+      totalEntries = tableKeysCount,
+      activeEntries = tableActiveCount,
       deletedEntries = deletedEntries,
-      totalDataSize  = totalDataSize,
-      tableStats     = tableStats,
-      segmentStats   = segmentStats
+      totalDataSize = totalDataSize,
+      details = Map(
+        "segments" -> segmentStats.map { segment =>
+          Map(
+            "name" -> segment.name.asJson,
+            "file_size" -> segment.fileSize.asJson,
+            "is_active" -> segment.isActive.asJson,
+            "stale_data_ratio" -> segment.staleDataRatio.asJson,
+            "entry_count" -> segment.entryCount.asJson
+          ).asJson
+        }.asJson,
+        "segment_count" -> segmentStats.size.asJson,
+        "active_segments" -> segmentStats.count(_.isActive).asJson
+      )
     )
   }
 }
