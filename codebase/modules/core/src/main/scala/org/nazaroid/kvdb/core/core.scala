@@ -38,7 +38,6 @@ trait Table[F[_]] {
   def get(key: String):                F[Option[String]]
   def set(key: String, value: String): F[Unit]
   def delete(key: String):             F[Unit]
-  def listKeys:                        F[List[String]]
 }
 
 /** Database statistics for multiple databases

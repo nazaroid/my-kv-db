@@ -9,8 +9,8 @@ import org.nazaroid.kvdb.binfileio.WriteTask
 import org.typelevel.log4cats.Logger
 
 final class BitcaskDatabase[F[_]: Async: Files: Logger](
-  val dbName:         String,
-  val dbPath:         Path,
+  val name:           String,
+  val path:           Path,
   val writeQueue:     Channel[F, WriteTask[F]],
   val configTemplate: BitcaskTableConfig,
   val tables:         Ref[F, Map[String, BitcaskTable[F]]]) {
@@ -20,7 +20,7 @@ final class BitcaskDatabase[F[_]: Async: Files: Logger](
       activeTables.get(tableName) match {
         case Some(sm) => Async[F].pure(sm)
         case None =>
-          val tablePath = dbPath / tableName
+          val tablePath = path / tableName
           for {
             _ <- Files[F].createDirectories(tablePath).handleError(_ => ())
             // Configure storage settings specifically for this table's directory
@@ -36,16 +36,16 @@ final class BitcaskDatabase[F[_]: Async: Files: Logger](
   /** List all tables (physical directories within the database) */
   def listTables(): F[List[String]] =
     Files[F]
-      .list(dbPath)
+      .list(path)
       .filter(_.extName == "")
       .map(_.fileName.toString)
       .compile
       .toList
 
   /** Delete a table */
-  def dropTable(tableName: String): F[Unit] =
-    tables.update(_ - tableName) *> Files[F].deleteRecursively(dbPath / tableName)
-  
+  def deleteTable(tableName: String): F[Unit] =
+    tables.update(_ - tableName) *> Files[F].deleteRecursively(path / tableName)
+
   /** Get database statistics by aggregating all table statistics */
   def getStats: F[BitcaskDatabaseStats] = {
     for {
@@ -53,7 +53,7 @@ final class BitcaskDatabase[F[_]: Async: Files: Logger](
       allTableStats <- tableNames.traverse { tableName =>
         table(tableName).flatMap(_.getStats)
       }
-      
+
       // Aggregate statistics from all tables
       totalTables = allTableStats.size
       totalEntries = allTableStats.map(_.totalEntries).sum
@@ -62,17 +62,17 @@ final class BitcaskDatabase[F[_]: Async: Files: Logger](
       totalDataSize = allTableStats.map(_.totalDataSize).sum
       totalSegments = allTableStats.map(_.segmentCount).sum
       activeSegments = allTableStats.map(_.activeSegmentCount).sum
-      
+
     } yield BitcaskDatabaseStats(
-      name = dbName,
-      totalTables = totalTables,
-      totalEntries = totalEntries,
-      activeEntries = activeEntries,
+      name           = name,
+      totalTables    = totalTables,
+      totalEntries   = totalEntries,
+      activeEntries  = activeEntries,
       deletedEntries = deletedEntries,
-      totalDataSize = totalDataSize,
-      totalSegments = totalSegments,
+      totalDataSize  = totalDataSize,
+      totalSegments  = totalSegments,
       activeSegments = activeSegments,
-      tableStats = allTableStats
+      tableStats     = allTableStats
     )
   }
 }

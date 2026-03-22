@@ -40,7 +40,7 @@ object BitcaskEngine {
       // No CRC for table
     )
 
-    val storageConfig = BitcaskTableConfig(
+    val tableConfig = BitcaskTableConfig(
       folder          = conf.rootDir,
       maxSegmentSize  = conf.maxSegmentSize,
       maxSegmentCount = conf.maxSegmentCount,
@@ -50,7 +50,7 @@ object BitcaskEngine {
     )
 
     for {
-      databaseManager <- BitcaskDatabaseManager.create[F](conf.rootDir, storageConfig)
+      databaseManager <- BitcaskDatabaseManager.create[F](conf.rootDir, tableConfig)
     } yield BitcaskEngine(databaseManager)
   }
 }
@@ -76,10 +76,11 @@ final class BitcaskEngine[F[_]: Async: Logger](
     tblName:  String,
     key:      String
   ): F[Option[String]] = {
-    for {
+    (for {
       db  <- OptionT(databaseManager.getDatabase(baseName))
       tbl <- OptionT(db.getTable(tblName))
-    } yield tbl.get(key)
+      v   <- OptionT(tbl.get(key))
+    } yield v).value
   }
 
   override def set(
@@ -101,10 +102,11 @@ final class BitcaskEngine[F[_]: Async: Logger](
     tblName:  String,
     key:      String
   ): F[Unit] = {
-    for {
+    (for {
       db  <- OptionT(databaseManager.getDatabase(baseName))
       tbl <- OptionT(db.getTable(tblName))
-    } yield tbl.delete(key)
+      _   <- tbl.delete(key)
+    } yield ()).value >> ().pure[F]
   }
-  
+
 }

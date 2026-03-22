@@ -9,10 +9,10 @@ import org.nazaroid.kvdb.binfileio.{WriteTask, writeBinary}
 import org.typelevel.log4cats.Logger
 
 final class Catalog[F[_]: Async: Files: Logger](
-                                                 val rootPath:       Path,
-                                                 val writeQueue:     Channel[F, WriteTask[F]],
-                                                 val configTemplate: BitcaskTableConfig,
-                                                 val databases:      Ref[F, Map[String, BitcaskDatabase[F]]]) {
+  val rootPath:       Path,
+  val writeQueue:     Channel[F, WriteTask[F]],
+  val configTemplate: BitcaskTableConfig,
+  val databases:      Ref[F, Map[String, BitcaskDatabase[F]]]) {
 
   def database(dbName: String): F[BitcaskDatabase[F]] = {
     databases.get.flatMap { activeDbs =>
@@ -48,7 +48,7 @@ final class Catalog[F[_]: Async: Files: Logger](
         }
     } yield result
   }
-  
+
   /** Get catalog statistics by aggregating all database statistics */
   def getStats: F[BitcaskCatalogStats] = {
     for {
@@ -56,7 +56,7 @@ final class Catalog[F[_]: Async: Files: Logger](
       allDatabaseStats <- databaseNames.traverse { dbName =>
         database(dbName).flatMap(_.getStats)
       }
-      
+
       // Aggregate statistics from all databases
       totalDatabases = allDatabaseStats.size
       totalTables = allDatabaseStats.map(_.totalTables).sum
@@ -66,15 +66,15 @@ final class Catalog[F[_]: Async: Files: Logger](
       totalDataSize = allDatabaseStats.map(_.totalDataSize).sum
       totalSegments = allDatabaseStats.map(_.totalSegments).sum
       activeSegments = allDatabaseStats.map(_.activeSegments).sum
-      
+
     } yield BitcaskCatalogStats(
       totalDatabases = totalDatabases,
-      totalTables = totalTables,
-      totalEntries = totalEntries,
-      activeEntries = activeEntries,
+      totalTables    = totalTables,
+      totalEntries   = totalEntries,
+      activeEntries  = activeEntries,
       deletedEntries = deletedEntries,
-      totalDataSize = totalDataSize,
-      totalSegments = totalSegments,
+      totalDataSize  = totalDataSize,
+      totalSegments  = totalSegments,
       activeSegments = activeSegments
     )
   }
@@ -83,10 +83,10 @@ final class Catalog[F[_]: Async: Files: Logger](
 object Catalog {
 
   def init[F[_]: Async: Files: Logger](
-                                        rootPath:       Path,
-                                        configTemplate: BitcaskTableConfig,
-                                        queueSize:      Int = 10000,
-                                        parallelism:    Int = 10
+    rootPath:       Path,
+    configTemplate: BitcaskTableConfig,
+    queueSize:      Int = 10000,
+    parallelism:    Int = 10
   ): F[Catalog[F]] = {
     for {
       // 1. Create root directory if it doesn't exist

@@ -43,6 +43,7 @@ class BinFileStorage[F[_]: Async: Files](
 }
 
 sealed class BitcaskTable[F[_]: Async: Files: Logger](
+  val name: String,
   val currentData:       Ref[F, BinFileStorage[F]],
   val currentSegmentIdx: Ref[F, BinFileStorage[F]],
   val tableStorage:      BinFileStorage[F],
