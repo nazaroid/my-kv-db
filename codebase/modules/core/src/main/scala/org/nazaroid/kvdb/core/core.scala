@@ -113,5 +113,4 @@ trait Engine[F[_]] {
     key: String
   ): F[Unit]
 
-  def getStats: F[DatabaseStats]
 }

@@ -1,4 +1,4 @@
-package org.nazaroid.kvdb.bitcask.catalog
+package org.nazaroid.kvdb.bitcask
 
 import cats.effect.{Async, Ref}
 import cats.implicits.given
@@ -6,15 +6,14 @@ import fs2.Stream
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.WriteTask
-import org.nazaroid.kvdb.bitcask.storage.{BitcaskTableConfig, BitcaskTable}
 import org.typelevel.log4cats.Logger
 
 final class BitcaskDatabase[F[_]: Async: Files: Logger](
-                                                         val dbName:         String,
-                                                         val dbPath:         Path,
-                                                         val writeQueue:     Channel[F, WriteTask[F]],
-                                                         val configTemplate: BitcaskTableConfig,
-                                                         val tables:         Ref[F, Map[String, BitcaskTable[F]]]) {
+  val dbName:         String,
+  val dbPath:         Path,
+  val writeQueue:     Channel[F, WriteTask[F]],
+  val configTemplate: BitcaskTableConfig,
+  val tables:         Ref[F, Map[String, BitcaskTable[F]]]) {
 
   def table(tableName: String): F[BitcaskTable[F]] = {
     tables.get.flatMap { activeTables =>

@@ -4,8 +4,7 @@ import cats.effect.{Async, Resource}
 import cats.implicits.given
 import fs2.io.file.{Files, Path}
 import io.circe.syntax.*
-import org.nazaroid.kvdb.bitcask.catalog.{BitcaskDatabase, BitcaskTable, Catalog}
-import org.nazaroid.kvdb.bitcask.storage.{BitcaskTableConfig, BitcaskTable}
+import org.nazaroid.kvdb.bitcask.catalog.BitcaskTable
 import org.nazaroid.kvdb.core.*
 import org.typelevel.log4cats.Logger
 
@@ -193,11 +192,11 @@ class DatabaseWrapper[F[_]: Async: Files: Logger](
 
   override def name: String = bitcaskDb.name
 
-  override def createTable(name: String): F[BitcaskTable[F]] = {
+  override def createTable(name: String): F[Table[F]] = {
     bitcaskDb.table(name).map(new TableWrapper(_))
   }
 
-  override def getTable(name: String): F[Option[BitcaskTable[F]]] = {
+  override def getTable(name: String): F[Option[Table[F]]] = {
     bitcaskDb.table(name).map(new TableWrapper(_))
   }
 

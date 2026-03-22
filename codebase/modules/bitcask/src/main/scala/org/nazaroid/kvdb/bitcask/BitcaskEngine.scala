@@ -8,8 +8,6 @@ import cats.implicits.given
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType}
 import org.nazaroid.kvdb.bitcask.BitcaskEngineConfig
-import org.nazaroid.kvdb.bitcask.catalog.Catalog
-import org.nazaroid.kvdb.bitcask.storage.{BitcaskTableConfig, BitcaskTable}
 import org.nazaroid.kvdb.core.Engine
 import org.typelevel.log4cats.Logger
 
@@ -108,8 +106,5 @@ final class BitcaskEngine[F[_]: Async: Logger](
       tbl <- OptionT(db.getTable(tblName))
     } yield tbl.delete(key)
   }
-
-  override def getStats: F[org.nazaroid.kvdb.core.DatabaseStats] = {
-    databaseManager.getStats
-  }
+  
 }

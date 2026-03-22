@@ -1,11 +1,11 @@
-package org.nazaroid.kvdb.bitcask.storage
+package org.nazaroid.kvdb.bitcask
 
 import cats.effect.IO
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import fs2.{Chunk, Stream}
 import org.nazaroid.kvdb.binfileio.*
-import org.nazaroid.kvdb.bitcask.storage.BitcaskTable
+import org.nazaroid.kvdb.bitcask.{BitcaskTable, BitcaskTableConfig}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import org.typelevel.log4cats.Logger

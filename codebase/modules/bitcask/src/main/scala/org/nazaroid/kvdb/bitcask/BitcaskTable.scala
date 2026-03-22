@@ -1,4 +1,4 @@
-package org.nazaroid.kvdb.bitcask.storage
+package org.nazaroid.kvdb.bitcask
 
 import cats.effect.{Async, Deferred, Ref}
 import cats.implicits.given

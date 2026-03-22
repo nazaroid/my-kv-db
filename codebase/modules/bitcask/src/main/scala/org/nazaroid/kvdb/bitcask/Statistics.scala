@@ -1,4 +1,4 @@
-package org.nazaroid.kvdb.bitcask.storage
+package org.nazaroid.kvdb.bitcask
 
 // Database statistics case classes
 case class BitcaskDatabaseStats(
@@ -11,9 +11,14 @@ case class BitcaskDatabaseStats(
   segmentStats:   List[SegmentStats])
 
 case class BitcaskTableStats(
-  name:             String,
-  entryCount:       Int,
-  activeEntryCount: Int)
+  name:              String,
+  entryCount:        Int,
+  activeEntryCount:  Int,
+  deletedEntryCount: Int,
+  totalDataSize:     Long,
+  segments:          List[SegmentStats],
+  segmentCount:      Int,
+  activeSegments:    Int)
 
 case class SegmentStats(
   name:           String,
