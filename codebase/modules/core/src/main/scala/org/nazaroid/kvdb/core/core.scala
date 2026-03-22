@@ -17,7 +17,9 @@ trait DatabaseManager[F[_]] {
   def listDatabases:                F[List[String]]
   def deleteDatabase(name: String): F[Unit]
 
-  def getStats: F[CatalogStats]
+  def getStats:                                         F[CatalogStats]
+  def getDatabaseStats(dbName: String):                 F[Option[DatabaseInfo]]
+  def getTableStats(dbName: String, tableName: String): F[Option[TableInfo]]
 }
 
 /** Abstract database interface

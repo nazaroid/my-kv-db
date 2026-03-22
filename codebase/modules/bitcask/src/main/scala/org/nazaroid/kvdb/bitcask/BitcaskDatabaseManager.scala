@@ -90,7 +90,7 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
   }
 
   /** Get statistics for a specific database */
-  def getDatabaseStats(dbName: String): F[Option[DatabaseInfo]] = {
+  override def getDatabaseStats(dbName: String): F[Option[DatabaseInfo]] = {
     for {
       db <- catalog.database(dbName)
       dbStats <- db.getStats
@@ -132,7 +132,7 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
   }
   
   /** Get statistics for a specific table in a database */
-  def getTableStats(dbName: String, tableName: String): F[Option[TableInfo]] = {
+  override def getTableStats(dbName: String, tableName: String): F[Option[TableInfo]] = {
     for {
       db <- catalog.database(dbName)
       table <- db.table(tableName)
