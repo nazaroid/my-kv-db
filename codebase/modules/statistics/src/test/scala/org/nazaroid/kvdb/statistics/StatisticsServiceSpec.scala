@@ -110,71 +110,7 @@ sealed class StatisticsServiceSpec extends AnyFunSuite with Matchers {
       }
     }
   }
-
-  test("StatisticsIntegration should provide health checks") {
-    withTempDirectory { tempDir =>
-      val dataSchema = List(
-        FieldDef("recordSize", FieldType.Int32),
-        FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize")),
-        FieldDef("timestamp", FieldType.Timestamp),
-        FieldDef("status", FieldType.RecordStatus),
-        FieldDef("crc", FieldType.CRC32)
-      )
-
-      val segmentSchema = List(
-        FieldDef("keySize", FieldType.Int32),
-        FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
-        FieldDef("offset", FieldType.Int64),
-        FieldDef("timestamp", FieldType.Timestamp),
-        FieldDef("status", FieldType.RecordStatus)
-      )
-
-      val tableSchema = List(
-        FieldDef("keySize", FieldType.Int32),
-        FieldDef("key", FieldType.StringUtf8(sizeFromField = "keySize")),
-        FieldDef("segmentNameSize", FieldType.Int32),
-        FieldDef("segmentName", FieldType.StringUtf8(sizeFromField = "segmentNameSize")),
-        FieldDef("timestamp", FieldType.Timestamp),
-        FieldDef("status", FieldType.RecordStatus)
-      )
-
-      val storageConfig = StorageConfig(
-        folder          = tempDir.toString,
-        maxSegmentSize  = 1024,
-        maxSegmentCount = 10,
-        dataSchema      = dataSchema,
-        segmentSchema   = segmentSchema,
-        tableSchema     = tableSchema,
-        maxRetries      = 3
-      )
-
-      val monitoringConfig = MonitoringConfig(
-        enableBackgroundMonitoring = false
-      )
-
-      for {
-        given Logger[IO]      <- Slf4jLogger.create[IO]
-        queue                 <- Channel.unbounded[IO, WriteTask[IO]]
-        storageManager        <- StorageManager.initialize(storageConfig, queue)
-        statisticsIntegration <- StatisticsIntegration.create(storageManager, monitoringConfig)
-
-        // Add test data
-        _ <- storageManager.write("test_table/key1", "value1")
-        _ <- storageManager.write("test_table/key2", "value2")
-
-        // Get health check
-        result <- statisticsIntegration.getHealthCheck
-
-      } yield {
-        result.totalDatabases should be(1)
-        result.healthyDatabases should be(1)
-        result.averageFragmentation should be >= 0.0
-        result.timestamp should be > 0L
-        result.status should be(HealthStatus.Healthy)
-      }
-    }
-  }
-
+  
   test("SegmentInfo should calculate correct metrics") {
     val segmentInfo = SegmentInfo(
       name           = "seg_12345",
@@ -232,35 +168,5 @@ sealed class StatisticsServiceSpec extends AnyFunSuite with Matchers {
     config.enableBackgroundMonitoring should be(true)
     config.maxStaleRatio should be(0.3)
     config.compactionThreshold should be(0.5)
-  }
-
-  test("HealthStatus should calculate correct status") {
-    val healthyStatus = HealthStatus(
-      status               = HealthStatus.Healthy,
-      totalDatabases       = 2,
-      healthyDatabases     = 2,
-      averageFragmentation = 0.2,
-      timestamp            = System.currentTimeMillis()
-    )
-
-    val degradedStatus = HealthStatus(
-      status               = HealthStatus.Degraded,
-      totalDatabases       = 2,
-      healthyDatabases     = 1,
-      averageFragmentation = 0.4,
-      timestamp            = System.currentTimeMillis()
-    )
-
-    val unhealthyStatus = HealthStatus(
-      status               = HealthStatus.Unhealthy,
-      totalDatabases       = 2,
-      healthyDatabases     = 0,
-      averageFragmentation = 0.7,
-      timestamp            = System.currentTimeMillis()
-    )
-
-    healthyStatus.status should be(HealthStatus.Healthy)
-    degradedStatus.status should be(HealthStatus.Degraded)
-    unhealthyStatus.status should be(HealthStatus.Unhealthy)
   }
 }

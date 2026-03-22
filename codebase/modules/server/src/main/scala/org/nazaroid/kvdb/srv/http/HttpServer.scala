@@ -4,22 +4,22 @@ import cats.effect.{Async, Resource}
 import cats.implicits.given
 import com.comcast.ip4s.{Ipv4Address, Port}
 import fs2.io.net.Network
+import io.circe.generic.auto.*
+import io.circe.syntax.*
 import io.prometheus.client.CollectorRegistry
 import org.http4s.Uri.Path.Root
+import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.dsl.Http4sDsl
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.metrics.prometheus.Prometheus
 import org.http4s.server.Router
 import org.http4s.server.middleware.Metrics
 import org.http4s.{HttpRoutes, Request, Response, Status, Uri}
-import org.http4s.circe.CirceEntityCodec._
-import io.circe.generic.auto._
-import io.circe.syntax._
-import org.nazaroid.kvdb.algebra.{Engine, Server, DatabaseInfo, TableInfo}
+import org.nazaroid.kvdb.algebra.{DatabaseInfo, Engine, Server, TableInfo}
 import org.nazaroid.kvdb.core.{CatalogStats, SegmentInfo}
 import org.nazaroid.kvdb.srv.ServerConfig
 import org.nazaroid.kvdb.srv.http.middlewares.Err
-import org.nazaroid.kvdb.statistics.{StatisticsService, StatisticsIntegration, MonitoringConfig}
+import org.nazaroid.kvdb.statistics.{MonitoringConfig, StatisticsIntegration, StatisticsService}
 import org.typelevel.log4cats.Logger
 
 final class HttpServer[F[_]: Async: Logger: Network](
