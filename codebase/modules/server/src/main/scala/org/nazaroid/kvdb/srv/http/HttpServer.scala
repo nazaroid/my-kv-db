@@ -15,14 +15,17 @@ import org.http4s.{HttpRoutes, Request, Response, Status, Uri}
 import org.http4s.circe.CirceEntityCodec._
 import io.circe.generic.auto._
 import io.circe.syntax._
-import org.nazaroid.kvdb.algebra.{Engine, Server}
-import org.nazaroid.kvdb.core.{CatalogStats, DatabaseInfo, SegmentInfo}
+import org.nazaroid.kvdb.algebra.{Engine, Server, DatabaseInfo, TableInfo}
+import org.nazaroid.kvdb.core.{CatalogStats, SegmentInfo}
 import org.nazaroid.kvdb.srv.ServerConfig
 import org.nazaroid.kvdb.srv.http.middlewares.Err
 import org.nazaroid.kvdb.statistics.{StatisticsService, StatisticsIntegration, MonitoringConfig}
 import org.typelevel.log4cats.Logger
 
-final class HttpServer[F[_]: Async: Logger: Network](conf: ServerConfig.Http, engine: Engine[F], statisticsService: StatisticsService[F])
+final class HttpServer[F[_]: Async: Logger: Network](
+  conf:              ServerConfig.Http,
+  engine:            Engine[F],
+  statisticsService: StatisticsService[F])
     extends Server[F]
     with Err[F] {
 
@@ -130,81 +133,66 @@ final class HttpServer[F[_]: Async: Logger: Network](conf: ServerConfig.Http, en
       } yield Metrics[F](healthServiceMetrics)(withErrorLogging(healthService))
     }
   }
-  
+
   private object StatisticsController {
-    
+
     def apply(statisticsService: StatisticsService[F]): Resource[F, HttpRoutes[F]] = {
       val statsService: HttpRoutes[F] = HttpRoutes.of[F] {
-        
-        // Get all databases stats
-        case GET -> Root / "databases" =>
-          statisticsService.getDatabases.flatMap { databases =>
-            Ok(databases.map { db =>
-              org.nazaroid.kvdb.algebra.DatabaseInfo(
-                name = db.name,
-                totalEntries = db.totalEntries,
-                activeEntries = db.activeEntries,
-                deletedEntries = db.deletedEntries,
-                totalDataSize = db.totalDataSize,
-                details = Map(
-                  "engine_specific" -> db.details.asJson
-                )
-              )
-            }.asJson)
-          }
-          
-        // Get specific database stats
-        case GET -> Root / "database" / dbName =>
-          statisticsService.getDatabaseStats(dbName).flatMap {
-            case Some(dbStats) => Ok(org.nazaroid.kvdb.algebra.DatabaseInfo(
-              name = dbStats.name,
-              totalEntries = dbStats.totalEntries,
-              activeEntries = dbStats.activeEntries,
-              deletedEntries = dbStats.deletedEntries,
-              totalDataSize = dbStats.totalDataSize,
-              details = Map(
-                "engine_specific" -> dbStats.details.asJson
-              )
-            ).asJson)
-            case None         => NotFound(s"Database $dbName not found")
-          }
-          
-        // Get segment stats
-        case GET -> Root / "segments" / dbName =>
-          statisticsService.getSegmentStats(dbName).flatMap { segments =>
-            Ok(segments.map { segment =>
-              org.nazaroid.kvdb.algebra.SegmentInfo(
-                name = segment.name,
-                fileSize = segment.fileSize,
-                isActive = segment.isActive,
-                entryCount = segment.entryCount,
-                details = Map(
-                  "engine_specific" -> segment.details.asJson
-                )
-              )
-            }.asJson)
-          }
-          
-        // Get storage stats
-        case GET -> Root / "storage" =>
+
+        // Get whole catalog stats
+        case GET -> Root / "catalog" =>
           statisticsService.getStats.flatMap { stats =>
             Ok(stats.asJson)
           }
-          
-        // Get Prometheus export
-        case GET -> Root / "prometheus" =>
-          val integration = StatisticsIntegration(statisticsService)
-          integration.exportForPrometheus().flatMap { prometheusData =>
-            Ok(prometheusData)
+
+        // Get specific database stats
+        case GET -> Root / "database" / dbName =>
+          statisticsService.getDatabaseStats(dbName).flatMap {
+            case Some(dbStats) =>
+              Ok(
+                org
+                  .nazaroid
+                  .kvdb
+                  .algebra
+                  .DatabaseInfo(
+                    name           = dbStats.name,
+                    totalEntries   = dbStats.totalEntries,
+                    activeEntries  = dbStats.activeEntries,
+                    deletedEntries = dbStats.deletedEntries,
+                    totalDataSize  = dbStats.totalDataSize,
+                    details = Map(
+                      "engine_specific" -> dbStats.details.asJson
+                    )
+                  )
+                  .asJson
+              )
+            case None => NotFound(s"Database $dbName not found")
           }
-          
-        // Start/stop monitoring
-        case POST -> Root / "monitoring" / "start" =>
-          statisticsService.startMonitoring().flatMap(_ => Ok("Monitoring started"))
-          
-        case POST -> Root / "monitoring" / "stop" =>
-          statisticsService.stopMonitoring().flatMap(_ => Ok("Monitoring stopped"))
-          
+
+        // Get specific table stats
+        case GET -> Root / "table" / dbName / tableName =>
+          statisticsService.getTableStats(dbName, tableName).flatMap {
+            case Some(tableStats) =>
+              Ok(
+                org
+                  .nazaroid
+                  .kvdb
+                  .algebra
+                  .TableInfo(
+                    name           = tableStats.name,
+                    totalEntries   = tableStats.totalEntries,
+                    activeEntries  = tableStats.activeEntries,
+                    deletedEntries = tableStats.deletedEntries,
+                    totalDataSize  = tableStats.totalDataSize,
+                    details = Map(
+                      "engine_specific" -> tableStats.details.asJson
+                    )
+                  )
+                  .asJson
+              )
+            case None => NotFound(s"Table $tableName not found in database $dbName")
+          }
+
       }
       for {
         statsServiceMetrics <- Prometheus
