@@ -48,6 +48,36 @@ final class Catalog[F[_]: Async: Files: Logger](
         }
     } yield result
   }
+  
+  /** Get catalog statistics by aggregating all database statistics */
+  def getStats: F[BitcaskCatalogStats] = {
+    for {
+      databaseNames <- listDatabases
+      allDatabaseStats <- databaseNames.traverse { dbName =>
+        database(dbName).flatMap(_.getStats)
+      }
+      
+      // Aggregate statistics from all databases
+      totalDatabases = allDatabaseStats.size
+      totalTables = allDatabaseStats.map(_.totalTables).sum
+      totalEntries = allDatabaseStats.map(_.totalEntries).sum
+      activeEntries = allDatabaseStats.map(_.activeEntries).sum
+      deletedEntries = allDatabaseStats.map(_.deletedEntries).sum
+      totalDataSize = allDatabaseStats.map(_.totalDataSize).sum
+      totalSegments = allDatabaseStats.map(_.totalSegments).sum
+      activeSegments = allDatabaseStats.map(_.activeSegments).sum
+      
+    } yield BitcaskCatalogStats(
+      totalDatabases = totalDatabases,
+      totalTables = totalTables,
+      totalEntries = totalEntries,
+      activeEntries = activeEntries,
+      deletedEntries = deletedEntries,
+      totalDataSize = totalDataSize,
+      totalSegments = totalSegments,
+      activeSegments = activeSegments
+    )
+  }
 }
 
 object Catalog {

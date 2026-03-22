@@ -375,23 +375,14 @@ sealed class BitcaskTable[F[_]: Async: Files: Logger](
       segmentStats <- getSegmentStats
 
     } yield BitcaskTableStats(
-      name           = Path(tableStorage.falePath).totalEntries = tableKeysCount,
-      activeEntries  = tableActiveCount,
+      name = config.folder.split("/").lastOption.getOrElse("unknown"),
+      totalEntries = tableKeysCount,
+      activeEntries = tableActiveCount,
       deletedEntries = deletedEntries,
-      totalDataSize  = totalDataSize,
-      details = Map(
-        "segments" -> segmentStats.map { segment =>
-          Map(
-            "name"             -> segment.name.asJson,
-            "file_size"        -> segment.fileSize.asJson,
-            "is_active"        -> segment.isActive.asJson,
-            "stale_data_ratio" -> segment.staleDataRatio.asJson,
-            "entry_count"      -> segment.entryCount.asJson
-          ).asJson
-        }.asJson,
-        "segment_count"   -> segmentStats.size.asJson,
-        "active_segments" -> segmentStats.count(_.isActive).asJson
-      )
+      totalDataSize = totalDataSize,
+      segmentCount = segmentStats.size,
+      activeSegmentCount = segmentStats.count(_.isActive),
+      segments = segmentStats
     )
   }
 }

@@ -4,8 +4,9 @@ import cats.effect.{Async, Resource}
 import cats.implicits.given
 import fs2.io.file.{Files, Path}
 import io.circe.syntax.*
-import org.nazaroid.kvdb.bitcask.catalog.BitcaskTable
-import org.nazaroid.kvdb.core.*
+import org.nazaroid.kvdb.bitcask.catalog.{BitcaskDatabase, BitcaskTable, Catalog}
+import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
+import org.nazaroid.kvdb.core.{Database, DatabaseManager, DatabaseStats, Table, TableInfo}
 import org.typelevel.log4cats.Logger
 
 import scala.collection.mutable
@@ -56,97 +57,36 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
 
   override def getStats: F[DatabaseStats] = {
     for {
-      _       <- Logger[F].debug("Collecting database statistics")
-      dbNames <- listDatabases
-
-      allDbStats <- dbNames.traverse { dbName =>
-        databases.get(dbName).traverse { db =>
-          for {
-            tableNames <- db.listTables()
-            allTableStats <- tableNames.traverse { tableName =>
-              for {
-                tbl        <- db.table(tableName)
-                tableStats <- getTableStats(table)
-              } yield tableName -> tableStats
-            }
-            tableStatsMap = allTableStats.flatten.toMap
-
-            totalEntries = tableStatsMap.values.map(_.totalEntries).sum
-            activeEntries = tableStatsMap.values.map(_.activeEntries).sum
-            deletedEntries = tableStatsMap.values.map(_.deletedEntries).sum
-            totalDataSize = tableStatsMap.values.map(_.totalDataSize).sum
-
-          } yield DatabaseInfo(
-            name           = dbName,
-            totalTables    = tableStatsMap.size,
-            totalEntries   = totalEntries,
-            activeEntries  = activeEntries,
-            deletedEntries = deletedEntries,
-            totalDataSize  = totalDataSize,
-            details = Map(
-              "tables" -> tableStatsMap.map { case (name, stats) =>
-                Map(
-                  "name"            -> name.asJson,
-                  "total_entries"   -> stats.totalEntries.asJson,
-                  "active_entries"  -> stats.activeEntries.asJson,
-                  "deleted_entries" -> stats.deletedEntries.asJson,
-                  "total_data_size" -> stats.totalDataSize.asJson
-                ).asJson
-              }.asJson
-            )
-          )
-        }
-      }
-      dbStatsMap = allDbStats.flatten.toMap
-
-      totalDatabases = dbStatsMap.size
-      totalTables = dbStatsMap.values.map(_.totalTables).sum
-      totalEntries = dbStatsMap.values.map(_.totalEntries).sum
-      activeEntries = dbStatsMap.values.map(_.activeEntries).sum
-      deletedEntries = dbStatsMap.values.map(_.deletedEntries).sum
-      totalDataSize = dbStatsMap.values.map(_.totalDataSize).sum
-
+      _ <- Logger[F].debug("Collecting database statistics")
+      
+      // Используем правильную иерархию: Catalog -> Database -> Table
+      catalogStats <- catalog.getStats
+      
+      // Конвертируем BitcaskCatalogStats в DatabaseStats с гетерогенными деталями
     } yield DatabaseStats(
-      totalDatabases = totalDatabases,
-      totalTables    = totalTables,
-      totalEntries   = totalEntries,
-      activeEntries  = activeEntries,
-      deletedEntries = deletedEntries,
-      totalDataSize  = totalDataSize,
+      totalDatabases = catalogStats.totalDatabases,
+      totalTables = catalogStats.totalTables,
+      totalEntries = catalogStats.totalEntries,
+      activeEntries = catalogStats.activeEntries,
+      deletedEntries = catalogStats.deletedEntries,
+      totalDataSize = catalogStats.totalDataSize,
       details = Map(
-        "engine_type"    -> "bitcask".asJson,
-        "root_path"      -> rootPath.asJson,
-        "database_count" -> totalDatabases.asJson,
-        "databases" -> dbStatsMap.map { case (name, stats) =>
-          Map(
-            "name"            -> name.asJson,
-            "total_tables"    -> stats.totalTables.asJson,
-            "total_entries"   -> stats.totalEntries.asJson,
-            "active_entries"  -> stats.activeEntries.asJson,
-            "deleted_entries" -> stats.deletedEntries.asJson,
-            "total_data_size" -> stats.totalDataSize.asJson,
-            "tables"          -> stats.details("tables")
-          ).asJson
-        }.asJson,
-        "compression"       -> "none".asJson,
-        "max_segment_size"  -> (1024 * 1024).asJson,
+        "engine_type" -> "bitcask".asJson,
+        "root_path" -> catalog.rootPath.asJson,
+        "database_count" -> catalogStats.totalDatabases.asJson,
+        "total_segments" -> catalogStats.totalSegments.asJson,
+        "active_segments" -> catalogStats.activeSegments.asJson,
+        "bitcask_stats" -> Map(
+          "total_databases" -> catalogStats.totalDatabases.asJson,
+          "total_tables" -> catalogStats.totalTables.asJson,
+          "total_segments" -> catalogStats.totalSegments.asJson,
+          "active_segments" -> catalogStats.activeSegments.asJson
+        ).asJson,
+        "compression" -> "none".asJson,
+        "max_segment_size" -> (1024 * 1024).asJson,
         "max_segment_count" -> 10.asJson
       )
     )
-  }
-
-  /** Get statistics for a single table through its StorageManager */
-  private def getTableStats(bitcaskTable: BitcaskTable[F]): F[TableInfo] = {
-    bitcaskTable.getStats.map { stats =>
-      TableInfo(
-        name           = Path(bitcaskTable.tableStorage.filePath).fileName,
-        totalEntries   = stats.totalEntries,
-        activeEntries  = stats.activeEntries,
-        deletedEntries = stats.deletedEntries,
-        totalDataSize  = stats.totalDataSize,
-        details        = stats.details
-      )
-    }
   }
 
   private def createDataSchema() = {
