@@ -11,11 +11,10 @@ trait Server[F[_]] {
   * and statistics
   */
 trait DatabaseManager[F[_]] {
-
   def createDatabase(name: String): F[Database[F]]
   def getDatabase(name: String):    F[Option[Database[F]]]
-  def listDatabases:                F[List[String]]
   def deleteDatabase(name: String): F[Unit]
+  def listDatabases:                F[List[String]]
 
   def getStats:                                         F[CatalogStats]
   def getDatabaseStats(dbName: String):                 F[Option[DatabaseInfo]]

@@ -7,6 +7,7 @@ import fs2.Stream
 import fs2.io.file.{Files, Path}
 import io.circe.*
 import org.nazaroid.kvdb.core.{CatalogStats, DatabaseInfo, DatabaseManager, DatabaseStats, SegmentInfo, TableInfo}
+import org.nazaroid.kvdb.bitcask.metrics.{BitcaskPrometheusMetricsAdapter, MetricsAdapter}
 import org.typelevel.log4cats.Logger
 
 import java.util.concurrent.TimeUnit
@@ -31,20 +32,19 @@ case class MonitoringConfig(
   compactionThreshold:        Double = 0.5)
 
 class StatisticsServiceImpl[F[_]: Async: Files: Logger](
-  databaseManager: DatabaseManager[F],  // ✅ Работаем с базами, не с таблицами
+  databaseManager: DatabaseManager[F],
   config:         MonitoringConfig,
   monitoringRef:  Ref[F, Boolean],
-  metricsAdapter: MetricsAdapter[F] // Injected via constructor, no Option!
+  metricsAdapter: MetricsAdapter[F] // Injected via constructor
 ) extends StatisticsService[F] {
 
   override def registerMetrics(): F[Unit] = {
     for {
       _ <- Logger[F].info("Registering metrics with adapter")
-      _ <- metricsAdapter.registerDatabaseMetrics()
-      _ <- metricsAdapter.registerTableMetrics()
-      _ <- metricsAdapter.registerSegmentMetrics()
+      _ <- metricsAdapter.registerMetrics()
       // Initial update with current values
-      _ <- updateAdapterMetrics()
+      stats <- getStats
+      _ <- metricsAdapter.updateMetrics(stats)
     } yield ()
   }
 
@@ -81,10 +81,8 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
   /** Update metrics through adapter */
   private def updateAdapterMetrics(): F[Unit] = {
     for {
-      databases <- getDatabases
-      _ <- metricsAdapter.updateDatabaseMetrics(databases)
-      _ <- metricsAdapter.updateTableMetrics(databases)
-      _ <- metricsAdapter.updateSegmentMetrics(databases)
+      stats <- getStats
+      _ <- metricsAdapter.updateMetrics(stats)
     } yield ()
   }
 
@@ -92,12 +90,19 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
     databaseManager.getStats
   }
   
-  override def getDatabaseStats(dbName: String): F[Option[CatalogStats]] = {
+  override def getDatabaseStats(dbName: String): F[Option[DatabaseInfo]] = {
     databaseManager.getDatabaseStats(dbName)
   }
 
   override def getTableStats(dbName: String, tableName: String): F[Option[TableInfo]] = {
     databaseManager.getTableStats(dbName, tableName)
+  }
+  
+  override def getDatabases: F[List[DatabaseInfo]] = {
+    for {
+      dbNames <- databaseManager.listDatabases
+      dbInfos   <- dbNames.traverse(databaseManager.getDatabaseStats)
+    } yield dbInfos.flatten
   }
 
 
@@ -109,28 +114,29 @@ object StatisticsService {
     databaseManager: DatabaseManager[F],
     config:         MonitoringConfig = MonitoringConfig()
   ): F[StatisticsService[F]] = {
-    createWithAdapter(databaseManager, config, MetricsAdapter.createNoOpAdapter(using summon[Async[F]]))
+    createWithAdapter(databaseManager, config, BitcaskPrometheusMetricsAdapter.create)
   }
 
   def createWithPrometheus[F[_]: Async: Files: Logger](
     databaseManager: DatabaseManager[F],
-    config:            MonitoringConfig = MonitoringConfig(),
-    collectorRegistry: io.prometheus.client.CollectorRegistry
+    config:         MonitoringConfig = MonitoringConfig()
   ): F[StatisticsService[F]] = {
-    val prometheusAdapter = MetricsAdapter.createPrometheusAdapter(collectorRegistry)
-    for {
-      service <- createWithAdapter(databaseManager, config, prometheusAdapter)
-    } yield service
+    createWithAdapter(databaseManager, config, BitcaskPrometheusMetricsAdapter.create)
   }
 
   def createWithAdapter[F[_]: Async: Files: Logger](
     databaseManager: DatabaseManager[F],
     config:         MonitoringConfig,
-    metricsAdapter: MetricsAdapter[F]
+    adapterFactory: F[MetricsAdapter[F]]
   ): F[StatisticsService[F]] = {
     for {
-      monitoringRef <- Ref.of[F, Boolean](false)
-      service = new StatisticsServiceImpl(databaseManager, config, monitoringRef, metricsAdapter)
-    } yield service
+      metricsAdapter <- adapterFactory
+      monitoringRef  <- Ref.of[F, Boolean](false)
+    } yield new StatisticsServiceImpl(
+      databaseManager = databaseManager,
+      config = config,
+      monitoringRef = monitoringRef,
+      metricsAdapter = metricsAdapter
+    )
   }
 }
