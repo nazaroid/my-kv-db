@@ -6,7 +6,7 @@ import cats.implicits.given
 import fs2.Stream
 import fs2.io.file.{Files, Path}
 import io.circe.*
-import org.nazaroid.kvdb.core.{DatabaseManager, DatabaseInfo, TableInfo, SegmentInfo, DatabaseStats}
+import org.nazaroid.kvdb.core.{DatabaseManager, DatabaseInfo, TableInfo, SegmentInfo, CatalogStats}
 import org.typelevel.log4cats.Logger
 
 import java.util.concurrent.TimeUnit
@@ -19,7 +19,7 @@ trait StatisticsService[F[_]] {
   def getDatabases:                     F[List[DatabaseInfo]]
   def getDatabaseStats(dbName: String): F[Option[DatabaseInfo]]
   def getSegmentStats(dbName: String):  F[List[SegmentInfo]]
-  def getStats:                         F[DatabaseStats]  // Delegate to databaseManager
+  def getStats:                         F[CatalogStats]  // Delegate to databaseManager
   def registerMetrics():                F[Unit]
 }
 
@@ -47,7 +47,7 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
     } yield ()
   }
 
-  override def getStats: F[DatabaseStats] = {
+  override def getStats: F[CatalogStats] = {
     databaseManager.getStats
   }
 

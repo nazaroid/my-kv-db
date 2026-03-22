@@ -55,7 +55,7 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
     } yield ()
   }
 
-  override def getStats: F[DatabaseStats] = {
+  override def getStats: F[CatalogStats] = {
     for {
       _ <- Logger[F].debug("Collecting database statistics")
       
@@ -63,7 +63,7 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
       catalogStats <- catalog.getStats
       
       // Конвертируем BitcaskCatalogStats в DatabaseStats с гетерогенными деталями
-    } yield DatabaseStats(
+    } yield CatalogStats(
       totalDatabases = catalogStats.totalDatabases,
       totalTables = catalogStats.totalTables,
       totalEntries = catalogStats.totalEntries,

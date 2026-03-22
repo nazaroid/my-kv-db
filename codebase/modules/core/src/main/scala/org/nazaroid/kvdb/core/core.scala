@@ -17,7 +17,7 @@ trait DatabaseManager[F[_]] {
   def listDatabases:                F[List[String]]
   def deleteDatabase(name: String): F[Unit]
 
-  def getStats: F[DatabaseStats]
+  def getStats: F[CatalogStats]
 }
 
 /** Abstract database interface
@@ -42,7 +42,7 @@ trait Table[F[_]] {
 
 /** Database statistics for multiple databases
   */
-case class DatabaseStats(
+case class CatalogStats(
   totalDatabases: Int,
   totalTables:    Int,
   totalEntries:   Int,
