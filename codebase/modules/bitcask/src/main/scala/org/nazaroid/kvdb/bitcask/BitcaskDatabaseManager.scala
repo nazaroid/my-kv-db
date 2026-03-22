@@ -55,7 +55,7 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
     } yield ()
   }
 
-  override def getStats: F[CatalogStats] = {
+  override def getStats: F[DatabaseStats] = {
     for {
       _ <- Logger[F].debug("Collecting database statistics")
       
@@ -63,7 +63,7 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
       catalogStats <- catalog.getStats
       
       // Конвертируем BitcaskCatalogStats в DatabaseStats с гетерогенными деталями
-    } yield CatalogStats(
+    } yield DatabaseStats(
       totalDatabases = catalogStats.totalDatabases,
       totalTables = catalogStats.totalTables,
       totalEntries = catalogStats.totalEntries,
@@ -89,6 +89,79 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
     )
   }
 
+  /** Get statistics for a specific database */
+  def getDatabaseStats(dbName: String): F[Option[DatabaseInfo]] = {
+    for {
+      db <- catalog.database(dbName)
+      dbStats <- db.getStats
+      
+      // Конвертируем BitcaskDatabaseStats в DatabaseInfo
+    } yield Some(DatabaseInfo(
+      name = dbStats.name,
+      totalTables = dbStats.totalTables,
+      totalEntries = dbStats.totalEntries,
+      activeEntries = dbStats.activeEntries,
+      deletedEntries = dbStats.deletedEntries,
+      totalDataSize = dbStats.totalDataSize,
+      details = Map(
+        "engine_type" -> "bitcask".asJson,
+        "total_segments" -> dbStats.totalSegments.asJson,
+        "active_segments" -> dbStats.activeSegments.asJson,
+        "tables" -> dbStats.tableStats.map { table =>
+          Map(
+            "name" -> table.name.asJson,
+            "total_entries" -> table.totalEntries.asJson,
+            "active_entries" -> table.activeEntries.asJson,
+            "deleted_entries" -> table.deletedEntries.asJson,
+            "total_data_size" -> table.totalDataSize.asJson,
+            "segment_count" -> table.segmentCount.asJson,
+            "active_segments" -> table.activeSegmentCount.asJson,
+            "segments" -> table.segments.map { segment =>
+              Map(
+                "name" -> segment.name.asJson,
+                "file_size" -> segment.fileSize.asJson,
+                "is_active" -> segment.isActive.asJson,
+                "stale_data_ratio" -> segment.staleDataRatio.asJson,
+                "entry_count" -> segment.entryCount.asJson
+              ).asJson
+            }.asJson
+          ).asJson
+        }.asJson
+      )
+    ))
+  }
+  
+  /** Get statistics for a specific table in a database */
+  def getTableStats(dbName: String, tableName: String): F[Option[TableInfo]] = {
+    for {
+      db <- catalog.database(dbName)
+      table <- db.table(tableName)
+      tableStats <- table.getStats
+      
+      // Конвертируем BitcaskTableStats в TableInfo
+    } yield Some(TableInfo(
+      name = tableStats.name,
+      totalEntries = tableStats.totalEntries,
+      activeEntries = tableStats.activeEntries,
+      deletedEntries = tableStats.deletedEntries,
+      totalDataSize = tableStats.totalDataSize,
+      details = Map(
+        "engine_type" -> "bitcask".asJson,
+        "segment_count" -> tableStats.segmentCount.asJson,
+        "active_segments" -> tableStats.activeSegmentCount.asJson,
+        "segments" -> tableStats.segments.map { segment =>
+          Map(
+            "name" -> segment.name.asJson,
+            "file_size" -> segment.fileSize.asJson,
+            "is_active" -> segment.isActive.asJson,
+            "stale_data_ratio" -> segment.staleDataRatio.asJson,
+            "entry_count" -> segment.entryCount.asJson
+          ).asJson
+        }.asJson
+      )
+    ))
+  }
+  
   private def createDataSchema() = {
     import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType}
     List(
