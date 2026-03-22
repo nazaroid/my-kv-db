@@ -5,7 +5,7 @@ import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import fs2.{Chunk, Stream}
 import org.nazaroid.kvdb.binfileio.*
-import org.nazaroid.kvdb.bitcask.storage.StorageManager
+import org.nazaroid.kvdb.bitcask.storage.BitcaskTable
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import org.typelevel.log4cats.Logger
@@ -14,7 +14,7 @@ import scodec.bits.ByteVector
 
 import java.nio.file.Files as JFiles
 
-final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
+final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
 
   def withTempDirectory[T](test: Path => IO[T]): IO[T] = {
     IO.delay {
@@ -59,7 +59,7 @@ final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("status", FieldType.RecordStatus)
       )
 
-      val config = StorageConfig(
+      val config = BitcaskTableConfig(
         folder          = tempDir.toString,
         maxSegmentSize  = 1024,
         maxSegmentCount = 10,
@@ -72,7 +72,7 @@ final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
       for {
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
-        storageManager   <- StorageManager.initialize(config, queue)
+        storageManager   <- BitcaskTable.initialize(config, queue)
         _                <- storageManager.write("testKey", "testValue")
         readValue        <- storageManager.read("testKey")
 
@@ -107,7 +107,7 @@ final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("status", FieldType.RecordStatus)
       )
 
-      val config = StorageConfig(
+      val config = BitcaskTableConfig(
         folder          = tempDir.toString,
         maxSegmentSize  = 1024,
         maxSegmentCount = 10,
@@ -120,7 +120,7 @@ final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
       for {
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
-        storageManager   <- StorageManager.initialize(config, queue)
+        storageManager   <- BitcaskTable.initialize(config, queue)
 
         // Create corrupted data file manually
         dataFile = tempDir / "seg_0.bin"
@@ -172,7 +172,7 @@ final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         // No CRC for table
       )
 
-      val config = StorageConfig(
+      val config = BitcaskTableConfig(
         folder          = tempDir.toString,
         maxSegmentSize  = 1024,
         maxSegmentCount = 10,
@@ -185,7 +185,7 @@ final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
       for {
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
-        storageManager   <- StorageManager.initialize(config, queue)
+        storageManager   <- BitcaskTable.initialize(config, queue)
         _                <- storageManager.write("testKey", "testValue")
         readValue        <- storageManager.read("testKey")
       } yield readValue shouldBe Some("testValue")
@@ -219,7 +219,7 @@ final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("status", FieldType.RecordStatus)
       )
 
-      val config = StorageConfig(
+      val config = BitcaskTableConfig(
         folder          = tempDir.toString,
         maxSegmentSize  = 1024,
         maxSegmentCount = 10,
@@ -232,7 +232,7 @@ final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
       for {
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
-        storageManager   <- StorageManager.initialize(config, queue)
+        storageManager   <- BitcaskTable.initialize(config, queue)
         // Make directory read-only to simulate write failure
         dataFile = tempDir / "seg_0.bin"
         _ <- Files[IO].setPosixPermissions(
@@ -278,7 +278,7 @@ final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
         FieldDef("status", FieldType.RecordStatus)
       )
 
-      val config = StorageConfig(
+      val config = BitcaskTableConfig(
         folder          = tempDir.toString,
         maxSegmentSize  = 1024,
         maxSegmentCount = 10,
@@ -291,7 +291,7 @@ final class StorageManagerErrorHandlingSpec extends AnyFunSuite with Matchers {
       for {
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
-        storageManager   <- StorageManager.initialize(config, queue)
+        storageManager   <- BitcaskTable.initialize(config, queue)
         _                <- storageManager.write("testKey", "testValue")
         readValue1       <- storageManager.read("testKey")
         _                <- storageManager.delete("testKey")

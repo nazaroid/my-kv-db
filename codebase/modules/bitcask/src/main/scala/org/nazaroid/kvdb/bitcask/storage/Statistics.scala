@@ -1,26 +1,23 @@
 package org.nazaroid.kvdb.bitcask.storage
 
 // Database statistics case classes
-case class DatabaseStats(
-  totalTables: Int,
-  totalEntries: Int,
-  activeEntries: Int,
+case class BitcaskDatabaseStats(
+  totalTables:    Int,
+  totalEntries:   Int,
+  activeEntries:  Int,
   deletedEntries: Int,
-  totalDataSize: Long,
-  tableStats: List[TableStats],
-  segmentStats: List[SegmentStats]
-)
+  totalDataSize:  Long,
+  tableStats:     List[BitcaskTableStats],
+  segmentStats:   List[SegmentStats])
 
-case class TableStats(
-  name: String,
-  entryCount: Int,
-  activeEntryCount: Int
-)
+case class BitcaskTableStats(
+  name:             String,
+  entryCount:       Int,
+  activeEntryCount: Int)
 
 case class SegmentStats(
-  name: String,
-  fileSize: Long,
-  isActive: Boolean,
+  name:           String,
+  fileSize:       Long,
+  isActive:       Boolean,
   staleDataRatio: Double,
-  entryCount: Int
-)
+  entryCount:     Int)

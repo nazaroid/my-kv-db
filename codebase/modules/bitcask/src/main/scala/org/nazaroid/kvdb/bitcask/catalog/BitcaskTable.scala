@@ -1,5 +1,5 @@
 package org.nazaroid.kvdb.bitcask.catalog
 
-import org.nazaroid.kvdb.bitcask.storage.StorageManager
+import org.nazaroid.kvdb.bitcask.storage.BitcaskTable
 
-type BitcaskTable[F[_]] = StorageManager[F]
+BitcaskTable[F]

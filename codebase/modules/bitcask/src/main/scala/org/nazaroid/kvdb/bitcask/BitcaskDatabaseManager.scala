@@ -5,7 +5,7 @@ import cats.implicits.given
 import fs2.io.file.{Files, Path}
 import io.circe.syntax.*
 import org.nazaroid.kvdb.bitcask.catalog.{BitcaskDatabase, BitcaskTable, Catalog}
-import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
+import org.nazaroid.kvdb.bitcask.storage.{BitcaskTableConfig, BitcaskTable}
 import org.nazaroid.kvdb.core.*
 import org.typelevel.log4cats.Logger
 
@@ -237,7 +237,7 @@ class TableWrapper[F[_]: Async: Files: Logger](
 
 object BitcaskDatabaseManager {
 
-  def create[F[_]: Async: Files: Logger](rootPath: String, configTemplate: StorageConfig): DatabaseManager[F] = {
+  def create[F[_]: Async: Files: Logger](rootPath: String, configTemplate: BitcaskTableConfig): DatabaseManager[F] = {
     for {
       c <- Catalog.init(rootPath, storageConfig, 1024, 2)
     } yield new BitcaskDatabaseManager[F](c)

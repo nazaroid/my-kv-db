@@ -15,7 +15,7 @@ import java.nio.file.Paths
 import scala.concurrent.duration.DurationInt
 import scala.reflect.io.Directory
 
-final class StorageManagerOperationSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
+final class BitcaskTableOperationSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
   override def withFixture(test: NoArgAsyncTest): FutureOutcome = {
     java.nio.file.Files.createDirectories(testDir)
@@ -30,7 +30,7 @@ final class StorageManagerOperationSpec extends AsyncFreeSpec with AsyncIOSpec w
 
   private val testDir = Paths.get("./testFolder")
 
-  private val config = StorageConfig(
+  private val config = BitcaskTableConfig(
     folder         = testDir.toString,
     maxSegmentSize = 1024, // Small size for rotation testing (1KB)
     maxSegmentCount = 10,
@@ -58,13 +58,13 @@ final class StorageManagerOperationSpec extends AsyncFreeSpec with AsyncIOSpec w
   )
 
   // Resource for running the manager in tests
-  private val storageResource: Resource[IO, StorageManager[IO]] = for {
+  private val storageResource: Resource[IO, BitcaskTable[IO]] = for {
     given Logger[IO] <- Resource.eval(Slf4jLogger.create[IO])
     _     <- Resource.eval(Files[IO].createDirectories(Path(testDir.toString)).handleError(_ => ()))
     queue <- Channel.bounded[IO, WriteTask[IO]](100).toResource
     // Run the background binary write worker
     _       <- writeBinary(queue.stream, parallelism = 1).compile.drain.background
-    manager <- Resource.eval(StorageManager.initialize[IO](config, queue))
+    manager <- Resource.eval(BitcaskTable.initialize[IO](config, queue))
   } yield manager
 
   "Write and Read: written value should be accessible" in {
@@ -132,12 +132,12 @@ final class StorageManagerOperationSpec extends AsyncFreeSpec with AsyncIOSpec w
   "Segment threshold: compaction should run when segment count exceeds limit" in {
     val compactConfig = config.copy(maxSegmentSize = 200, maxSegmentCount = 1)
 
-    val compactResource: Resource[IO, StorageManager[IO]] = for {
+    val compactResource: Resource[IO, BitcaskTable[IO]] = for {
       given Logger[IO] <- Resource.eval(Slf4jLogger.create[IO])
       _     <- Resource.eval(Files[IO].createDirectories(Path(testDir.toString)).handleError(_ => ()))
       queue <- Channel.bounded[IO, WriteTask[IO]](100).toResource
       _       <- writeBinary(queue.stream, parallelism = 1).compile.drain.background
-      manager <- Resource.eval(StorageManager.initialize[IO](compactConfig, queue))
+      manager <- Resource.eval(BitcaskTable.initialize[IO](compactConfig, queue))
     } yield manager
 
     compactResource.use { sm =>

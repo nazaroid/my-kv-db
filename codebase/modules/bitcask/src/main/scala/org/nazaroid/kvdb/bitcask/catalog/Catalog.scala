@@ -6,14 +6,14 @@ import cats.implicits.given
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.{WriteTask, writeBinary}
-import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
+import org.nazaroid.kvdb.bitcask.storage.{BitcaskTableConfig, BitcaskTable}
 import org.typelevel.log4cats.Logger
 
 final class Catalog[F[_]: Async: Files: Logger](
-  val rootPath:       Path,
-  val writeQueue:     Channel[F, WriteTask[F]],
-  val configTemplate: StorageConfig,
-  val databases:      Ref[F, Map[String, BitcaskDatabase[F]]]) {
+                                                 val rootPath:       Path,
+                                                 val writeQueue:     Channel[F, WriteTask[F]],
+                                                 val configTemplate: BitcaskTableConfig,
+                                                 val databases:      Ref[F, Map[String, BitcaskDatabase[F]]]) {
 
   def database(dbName: String): F[BitcaskDatabase[F]] = {
     databases.get.flatMap { activeDbs =>
@@ -23,7 +23,7 @@ final class Catalog[F[_]: Async: Files: Logger](
           val dbPath = rootPath / dbName
           for {
             _         <- Files[F].createDirectories(dbPath).handleError(_ => ())
-            tablesRef <- Ref.of[F, Map[String, StorageManager[F]]](Map.empty)
+            tablesRef <- Ref.of[F, Map[String, BitcaskTable[F]]](Map.empty)
             db = new BitcaskDatabase(dbName, dbPath, writeQueue, configTemplate, tablesRef)
             _ <- databases.update(_ + (dbName -> db))
           } yield db
@@ -54,10 +54,10 @@ final class Catalog[F[_]: Async: Files: Logger](
 object Catalog {
 
   def init[F[_]: Async: Files: Logger](
-    rootPath:       Path,
-    configTemplate: StorageConfig,
-    queueSize:      Int = 10000,
-    parallelism:    Int = 10
+                                        rootPath:       Path,
+                                        configTemplate: BitcaskTableConfig,
+                                        queueSize:      Int = 10000,
+                                        parallelism:    Int = 10
   ): F[Catalog[F]] = {
     for {
       // 1. Create root directory if it doesn't exist

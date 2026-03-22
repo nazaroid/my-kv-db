@@ -9,7 +9,7 @@ import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType}
 import org.nazaroid.kvdb.bitcask.BitcaskEngineConfig
 import org.nazaroid.kvdb.bitcask.catalog.Catalog
-import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
+import org.nazaroid.kvdb.bitcask.storage.{BitcaskTableConfig, BitcaskTable}
 import org.nazaroid.kvdb.core.Engine
 import org.typelevel.log4cats.Logger
 
@@ -42,7 +42,7 @@ object BitcaskEngine {
       // No CRC for table
     )
 
-    val storageConfig = StorageConfig(
+    val storageConfig = BitcaskTableConfig(
       folder          = conf.rootDir,
       maxSegmentSize  = conf.maxSegmentSize,
       maxSegmentCount = conf.maxSegmentCount,

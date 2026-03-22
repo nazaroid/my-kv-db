@@ -6,15 +6,15 @@ import fs2.Stream
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.WriteTask
-import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
+import org.nazaroid.kvdb.bitcask.storage.{BitcaskTableConfig, BitcaskTable}
 import org.typelevel.log4cats.Logger
 
 final class BitcaskDatabase[F[_]: Async: Files: Logger](
-  val dbName:         String,
-  val dbPath:         Path,
-  val writeQueue:     Channel[F, WriteTask[F]],
-  val configTemplate: StorageConfig,
-  val tables:         Ref[F, Map[String, BitcaskTable[F]]]) {
+                                                         val dbName:         String,
+                                                         val dbPath:         Path,
+                                                         val writeQueue:     Channel[F, WriteTask[F]],
+                                                         val configTemplate: BitcaskTableConfig,
+                                                         val tables:         Ref[F, Map[String, BitcaskTable[F]]]) {
 
   def table(tableName: String): F[BitcaskTable[F]] = {
     tables.get.flatMap { activeTables =>
@@ -27,7 +27,7 @@ final class BitcaskDatabase[F[_]: Async: Files: Logger](
             // Configure storage settings specifically for this table's directory
             tableConfig = configTemplate.copy(folder = tablePath.toString)
             // Initialize storage manager (including recovery from existing files)
-            sm <- StorageManager.initialize[F](tableConfig, writeQueue)
+            sm <- BitcaskTable.initialize[F](tableConfig, writeQueue)
             _  <- tables.update(_ + (tableName -> sm))
           } yield sm
       }
