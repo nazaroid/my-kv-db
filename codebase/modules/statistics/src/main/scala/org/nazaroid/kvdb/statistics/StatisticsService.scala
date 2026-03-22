@@ -6,7 +6,7 @@ import cats.implicits.given
 import fs2.Stream
 import fs2.io.file.{Files, Path}
 import io.circe.*
-import org.nazaroid.kvdb.core.{DatabaseManager, DatabaseInfo, TableInfo, SegmentInfo, CatalogStats}
+import org.nazaroid.kvdb.database.{DatabaseManager, DatabaseInfo, TableInfo, DatabaseStats, SegmentInfo}
 import org.typelevel.log4cats.Logger
 
 import java.util.concurrent.TimeUnit
@@ -18,8 +18,8 @@ trait StatisticsService[F[_]] {
   def stopMonitoring():                 F[Unit]
   def getDatabases:                     F[List[DatabaseInfo]]
   def getDatabaseStats(dbName: String): F[Option[DatabaseInfo]]
-  def getSegmentStats(dbName: String):  F[List[SegmentInfo]]
-  def getStats:                         F[CatalogStats]  // Delegate to databaseManager
+  def getTableStats(dbName: String, tableName: String): F[Option[TableInfo]]
+  def getStats:                         F[DatabaseStats]  // Delegate to databaseManager
   def registerMetrics():                F[Unit]
 }
 
@@ -47,7 +47,7 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
     } yield ()
   }
 
-  override def getStats: F[CatalogStats] = {
+  override def getStats: F[DatabaseStats] = {
     databaseManager.getStats
   }
 
@@ -90,17 +90,39 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
   }
 
   override def getDatabaseStats(dbName: String): F[Option[DatabaseInfo]] = {
-    for {
-      db <- databaseManager.getDatabase(dbName)
-      dbInfo <- db.traverse(collectDatabaseInfo)
-    } yield dbInfo.flatten.headOption
+    // Используем метод databaseManager.getDatabaseStats если доступен
+    // Иначе собираем через getDatabases
+    databaseManager match {
+      case bdm: org.nazaroid.kvdb.bitcask.BitcaskDatabaseManager[F] =>
+        bdm.getDatabaseStats(dbName)
+      case _ =>
+        getDatabases.map(_.find(_.name == dbName))
+    }
   }
 
-  override def getSegmentStats(dbName: String): F[List[SegmentInfo]] = {
-    for {
-      dbPath   <- getDatabasePath(dbName)
-      segments <- collectSegmentInfo(dbPath)
-    } yield segments
+  override def getTableStats(dbName: String, tableName: String): F[Option[TableInfo]] = {
+    // Используем метод databaseManager.getTableStats если доступен
+    databaseManager match {
+      case bdm: org.nazaroid.kvdb.bitcask.BitcaskDatabaseManager[F] =>
+        bdm.getTableStats(dbName, tableName)
+      case _ =>
+        // Fallback: собираем через getDatabaseStats
+        getDatabaseStats(dbName).map(_.flatMap { dbInfo =>
+          dbInfo.details.get("tables").flatMap { tablesJson =>
+            tablesJson.asArray.flatMap(_.toList.find(_.asObject.exists(_.apply("name").contains(tableName.asJson)))).map { tableJson =>
+              val tableObj = tableJson.asObject.get
+              TableInfo(
+                name = tableName,
+                totalEntries = tableObj("total_entries").flatMap(_.asNumber).map(_.toInt).getOrElse(0),
+                activeEntries = tableObj("active_entries").flatMap(_.asNumber).map(_.toInt).getOrElse(0),
+                deletedEntries = tableObj("deleted_entries").flatMap(_.asNumber).map(_.toInt).getOrElse(0),
+                totalDataSize = tableObj("total_data_size").flatMap(_.asNumber).map(_.toLong).getOrElse(0L),
+                details = tableObj.toMap.filterKeys(_ != "name" && _ != "total_entries" && _ != "active_entries" && _ != "deleted_entries" && _ != "total_data_size")
+              )
+            }
+          }
+        })
+    }
   }
 
   /** Collect statistics for all databases */
@@ -110,11 +132,32 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
       _ <- databases.traverse_ { db =>
         for {
           _ <-
-            if (db.fragmentationRatio > config.maxStaleRatio) {
-              Logger[F].warn(s"Database ${db.name} has high fragmentation: ${db.fragmentationRatio}")
+            if (db.details.get("fragmentation_ratio").exists(_.asNumber.exists(_.toDouble > config.maxStaleRatio))) {
+              Logger[F].warn(s"Database ${db.name} has high fragmentation")
             } else ().pure[F]
 
-          segments <- getSegmentStats(db.name)
+          // Проверяем сегменты через детали базы данных
+          segments <- db.details.get("tables") match {
+            case Some(tablesJson) =>
+              tablesJson.asArray.map(_.toList.flatMap { tableJson =>
+                tableJson.asObject.flatMap { tableObj =>
+                  tableObj("segments").asArray.map(_.toList.map { segmentJson =>
+                    val segmentObj = segmentJson.asObject.get
+                    SegmentInfo(
+                      name = segmentObj("name").flatMap(_.asString).getOrElse("unknown"),
+                      filePath = "", // Не доступно в статистике
+                      fileSize = segmentObj("file_size").flatMap(_.asNumber).map(_.toLong).getOrElse(0L),
+                      isActive = segmentObj("is_active").flatMap(_.asBoolean).getOrElse(false),
+                      staleDataRatio = segmentObj("stale_data_ratio").flatMap(_.asNumber).map(_.toDouble).getOrElse(0.0),
+                      entryCount = segmentObj("entry_count").flatMap(_.asNumber).map(_.toInt).getOrElse(0),
+                      lastModified = 0L // Не доступно в статистике
+                    )
+                  })
+                }
+              }).getOrElse(List.empty)
+            case None => List.empty
+          }
+          
           _ <- segments.traverse_ { segment =>
             if (!segment.isActive && segment.staleDataRatio > config.compactionThreshold) {
               Logger[F].info(s"Segment ${segment.name} in database ${db.name} needs compaction")
@@ -126,150 +169,11 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
     } yield ()
   }
 
-  /** Get all database folders */
-  private def getAllDatabaseFolders: F[List[Path]] = {
-    // Assuming databases are in subdirectories of the main folder
-    Files[F]
-      .list(Path(storageManager.config.folder))
-      .filter(_.fileName.toString.endsWith(".db"))
-      .compile
-      .toList
+  /** Collect database information using databaseManager */
+  private def collectDatabaseInfo(dbName: String): F[Option[DatabaseInfo]] = {
+    getDatabaseStats(dbName)
   }
-
-  /** Get path for specific database */
-  private def getDatabasePath(dbName: String): F[Path] = {
-    Async[F].pure(Path(storageManager.config.folder) / s"$dbName.db")
-  }
-
-  /** Collect database information from disk and memory */
-  private def collectDatabaseInfo(dbPath: Path): F[Option[DatabaseInfo]] = {
-    val dbName = dbPath.fileName.toString.replace(".db", "")
-
-    Files[F].exists(dbPath).flatMap {
-      case false =>
-        Async[F].pure(None)
-      case true =>
-        for {
-          storageStats <- storageManager.getStats
-          segments     <- collectSegmentInfo(dbPath)
-          tables       <- collectTableInfo(dbPath, segments)
-
-          // Вспомогательные расчеты
-          totalDiskSize = segments.map(_.fileSize).sum
-          totalEntries = segments.map(_.entryCount).sum
-          activeEntries = segments.filter(_.isActive).map(_.entryCount).sum
-
-          // Исправлен расчет fragmentationRatio (избегаем дублирования суммы)
-          fragmentationRatio =
-            if (totalDiskSize > 0) {
-              segments.map(s => s.staleDataRatio * s.fileSize).sum / totalDiskSize
-            } else 0.0
-
-          dbInfo = DatabaseInfo(
-            name               = dbName,
-            tables             = tables,
-            totalEntries       = totalEntries,
-            activeEntries      = activeEntries,
-            deletedEntries     = totalEntries - activeEntries,
-            totalDiskSize      = totalDiskSize,
-            totalMemorySize    = storageStats.totalDataSize,
-            fragmentationRatio = fragmentationRatio
-          )
-        } yield Some(dbInfo)
-    }
-  }
-
-  /** Collect segment information from disk files */
-  private def collectSegmentInfo(dbPath: Path): F[List[SegmentInfo]] = {
-    for {
-      segmentFiles <- Files[F]
-        .list(dbPath)
-        .filter(_.fileName.toString.endsWith(".bin"))
-        .filter(_.fileName.toString.startsWith("seg_"))
-        .compile
-        .toList
-
-      // Get active segments from storage manager
-      storageStats <- storageManager.getStats
-      activeSegmentNames = storageStats.segmentStats.filter(_.isActive).map(_.name).toSet
-
-      segmentInfos <- segmentFiles.traverse { segmentFile =>
-        val segmentName = segmentFile.fileName.toString.replace(".bin", "")
-
-        for {
-          fileSize     <- Files[F].size(segmentFile)
-          lastModified <- Files[F].getLastModifiedTime(segmentFile).map(_.toUnit(TimeUnit.MILLISECONDS).toLong)
-
-          // Calculate stale data ratio by analyzing segment content
-          staleRatio <- calculateStaleDataRatio(segmentFile)
-
-          // Count entries (simplified - would need actual parsing)
-          entryCount <- countSegmentEntries(segmentFile)
-
-        } yield SegmentInfo(
-          name           = segmentName,
-          filePath       = segmentFile.toString,
-          fileSize       = fileSize,
-          isActive       = activeSegmentNames.contains(segmentName),
-          staleDataRatio = staleRatio,
-          entryCount     = entryCount,
-          lastModified   = lastModified
-        )
-      }
-
-    } yield segmentInfos
-  }
-
-  /** Collect table information from segment files */
-  private def collectTableInfo(dbPath: Path, segments: List[SegmentInfo]): F[List[TableInfo]] = {
-    // Extract table names from keys in segments (simplified approach)
-    val tableNames = segments.flatMap { segment =>
-      // In a real implementation, this would parse segment files to extract table names
-      // For now, we'll use a simplified approach
-      List("default_table") // Placeholder
-    }.distinct
-
-    tableNames
-      .map { tableName =>
-        // Calculate table statistics from segments
-        val tableSegments = segments.filter(_.name.contains(tableName))
-        val entryCount = tableSegments.map(_.entryCount).sum
-        val activeEntryCount = tableSegments.filter(_.isActive).map(_.entryCount).sum
-        val diskSize = tableSegments.map(_.fileSize).sum
-        val memorySize = entryCount * 100L // Estimate (100 bytes per entry)
-
-        TableInfo(
-          name             = tableName,
-          entryCount       = entryCount,
-          activeEntryCount = activeEntryCount,
-          diskSize         = diskSize,
-          memorySize       = memorySize
-        )
-      }
-      .pure[F]
-  }
-
-  /** Calculate stale data ratio for a segment */
-  private def calculateStaleDataRatio(segmentFile: Path): F[Double] = {
-    // This is a simplified implementation
-    // In reality, this would parse the segment file and count deleted/updated entries
-    for {
-      fileSize <- Files[F].size(segmentFile)
-      // Assume 20% stale data as a placeholder
-      staleRatio = 0.2
-    } yield staleRatio
-  }
-
-  /** Count entries in a segment file */
-  private def countSegmentEntries(segmentFile: Path): F[Int] = {
-    // Simplified implementation - would need to parse binary format
-    for {
-      fileSize <- Files[F].size(segmentFile)
-      // Assume average entry size of 100 bytes
-      entryCount = (fileSize / 100).toInt
-    } yield entryCount
-  }
-
+  
   /** Update metrics through adapter */
   private def updateAdapterMetrics(): F[Unit] = {
     for {
