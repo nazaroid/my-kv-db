@@ -35,7 +35,9 @@ case class BitcaskCatalogStats(
   deletedEntries: Int,
   totalDataSize:  Long,
   totalSegments:  Int,
-  activeSegments: Int)
+  activeSegments: Int,
+  databaseStats: List[BitcaskDatabaseStats]
+)
 
 case class SegmentStats(
   name:           String,

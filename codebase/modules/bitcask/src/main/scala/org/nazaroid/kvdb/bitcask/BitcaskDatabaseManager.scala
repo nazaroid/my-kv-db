@@ -74,15 +74,7 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
         "database_count"  -> catalogStats.totalDatabases.asJson,
         "total_segments"  -> catalogStats.totalSegments.asJson,
         "active_segments" -> catalogStats.activeSegments.asJson,
-        "bitcask_stats" -> Map(
-          "total_databases" -> catalogStats.totalDatabases.asJson,
-          "total_tables"    -> catalogStats.totalTables.asJson,
-          "total_segments"  -> catalogStats.totalSegments.asJson,
-          "active_segments" -> catalogStats.activeSegments.asJson
-        ).asJson,
-        "compression"       -> "none".asJson,
-        "max_segment_size"  -> (1024 * 1024).asJson,
-        "max_segment_count" -> 10.asJson
+        "databases"       -> catalogStats.databaseStats.asJson
       )
     )
   }

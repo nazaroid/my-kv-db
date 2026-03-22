@@ -75,7 +75,8 @@ final class Catalog[F[_]: Async: Files: Logger](
       deletedEntries = deletedEntries,
       totalDataSize  = totalDataSize,
       totalSegments  = totalSegments,
-      activeSegments = activeSegments
+      activeSegments = activeSegments,
+      databaseStats  = allDatabaseStats  // ✅ Добавляем детальную статистику по базам
     )
   }
 }
