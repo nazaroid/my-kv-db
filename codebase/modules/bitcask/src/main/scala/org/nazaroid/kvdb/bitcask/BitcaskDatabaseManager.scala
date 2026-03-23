@@ -13,7 +13,7 @@ import scala.collection.mutable
 
 /** Bitcask-specific implementation of DatabaseManager Handles multiple Bitcask databases
   */
-class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
+final class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
   catalog: Catalog[F])
     extends DatabaseManager[F] {
 
@@ -57,11 +57,8 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
 
   override def getStats: F[CatalogStats] = {
     for {
-      _ <- Logger[F].debug("Collecting database statistics")
-
-      // Используем правильную иерархию: Catalog -> Database -> Table
+      _            <- Logger[F].debug("Collecting database statistics")
       catalogStats <- catalog.getStats
-
     } yield CatalogStats(
       totalDatabases = catalogStats.totalDatabases,
       totalTables    = catalogStats.totalTables,
@@ -128,21 +125,21 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
 
   /** Get statistics for a specific table in a database */
   override def getTableStats(dbName: String, tableName: String): F[Option[TableInfo]] =
-    for {
+    (for {
       db         <- OptionT(catalog.getDatabase(dbName))
       table      <- OptionT(db.getTable(tableName))
-      tableStats <- OptionT.liftF(db.getStats)
+      tableStats <- OptionT.liftF(table.getStats)
 
     } yield TableInfo(
-      name           = tableStats.name,
-      totalEntries   = tableStats.totalEntries,
-      activeEntries  = tableStats.activeEntries,
-      deletedEntries = tableStats.deletedEntries,
-      totalDataSize  = tableStats.totalDataSize,
+      name              = tableStats.name,
+      entryCount        = tableStats.totalEntries,
+      activeEntryCount  = tableStats.activeEntries,
+      deletedEntryCount = tableStats.deletedEntries,
+      totalDataSize     = tableStats.totalDataSize,
       details = Map(
-        "engine_type"     -> "bitcask".asJson,
-        "total_segments"  -> tableStats.totalSegments.asJson,
-        "active_segments" -> tableStats.activeSegments.asJson,
+        "engine_type"          -> "bitcask".asJson,
+        "segment_count"        -> tableStats.segmentCount.asJson,
+        "active_segment_count" -> tableStats.activeSegmentCount.asJson,
         "segments" -> tableStats
           .segments
           .map { segment =>
@@ -156,7 +153,7 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
           }
           .asJson
       )
-    )
+    )).value
 
   private def createDataSchema() = {
     import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType}
@@ -244,9 +241,8 @@ object BitcaskDatabaseManager {
   def create[F[_]: Async: Files: Logger](
     rootPath:       String,
     configTemplate: BitcaskTableConfig
-  ): Resource[F, BitcaskDatabaseManager[F]] = {
+  ): Resource[F, BitcaskDatabaseManager[F]] =
     for {
       c <- Catalog.init(Path(rootPath), configTemplate, 1024, 2)
     } yield new BitcaskDatabaseManager[F](c)
-  }
 }
