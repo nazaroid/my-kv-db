@@ -1,4 +1,4 @@
-package org.nazaroid.kvdb.bitcask
+package org.nazaroid.kvdb.bitcask.lib
 
 import cats.effect.implicits.given
 import cats.effect.{Async, Ref, Resource}
@@ -6,6 +6,7 @@ import cats.implicits.given
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.{WriteTask, writeBinary}
+import org.nazaroid.kvdb.bitcask.lib.*
 import org.typelevel.log4cats.Logger
 
 final class Catalog[F[_]: Async: Files: Logger](

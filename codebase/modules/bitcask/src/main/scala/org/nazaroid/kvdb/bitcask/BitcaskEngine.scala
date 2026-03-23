@@ -6,6 +6,7 @@ import cats.effect.kernel.Resource
 import cats.implicits.given
 import fs2.io.file.Files
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType}
+import org.nazaroid.kvdb.bitcask.lib.BitcaskTableConfig
 import org.nazaroid.kvdb.core.Engine
 import org.typelevel.log4cats.Logger
 

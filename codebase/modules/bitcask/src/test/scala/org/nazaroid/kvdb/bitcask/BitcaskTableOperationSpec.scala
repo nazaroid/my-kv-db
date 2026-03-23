@@ -5,7 +5,7 @@ import cats.effect.{IO, Resource}
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType, WriteTask, writeBinary}
-import org.nazaroid.kvdb.bitcask.{BitcaskTable, BitcaskTableConfig}
+import org.nazaroid.kvdb.bitcask.lib.{BitcaskTable, BitcaskTableConfig}
 import org.scalatest.FutureOutcome
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -59,17 +59,17 @@ final class BitcaskTableOperationSpec extends AsyncFreeSpec with AsyncIOSpec wit
   )
 
   // Resource for running the manager in tests
-  private val storageResource: Resource[IO, BitcaskTable[IO]] = for {
+  private val tableResource: Resource[IO, BitcaskTable[IO]] = for {
     given Logger[IO] <- Resource.eval(Slf4jLogger.create[IO])
     _     <- Resource.eval(Files[IO].createDirectories(Path(testDir.toString)).handleError(_ => ()))
     queue <- Channel.bounded[IO, WriteTask[IO]](100).toResource
     // Run the background binary write worker
     _       <- writeBinary(queue.stream, parallelism = 1).compile.drain.background
-    manager <- Resource.eval(BitcaskTable.initialize[IO](config, queue))
-  } yield manager
+    table <- Resource.eval(BitcaskTable.initialize[IO]("testTable", config, queue))
+  } yield table
 
   "Write and Read: written value should be accessible" in {
-    storageResource.use { sm =>
+    tableResource.use { sm =>
       for {
         _   <- sm.write("user:1", "hello stratum")
         res <- sm.read("user:1")
@@ -78,7 +78,7 @@ final class BitcaskTableOperationSpec extends AsyncFreeSpec with AsyncIOSpec wit
   }
 
   "Delete: deleted value should return None" in {
-    storageResource.use { sm =>
+    tableResource.use { sm =>
       for {
         _   <- sm.write("user:2", "to be deleted")
         _   <- sm.delete("user:2")
@@ -88,7 +88,7 @@ final class BitcaskTableOperationSpec extends AsyncFreeSpec with AsyncIOSpec wit
   }
 
   "Rotation: new segment should be created when limit is exceeded" in {
-    storageResource.use { sm =>
+    tableResource.use { sm =>
       for {
         // Write enough data to trigger rotation (1KB limit)
         _    <- sm.write("k1", "a" * 1025)
@@ -109,7 +109,7 @@ final class BitcaskTableOperationSpec extends AsyncFreeSpec with AsyncIOSpec wit
   }
 
   "Compaction & Cleanup: old files should be removed after compaction" in {
-    storageResource.use { sm =>
+    tableResource.use { sm =>
       for {
         _ <- sm.write("temp", "data")
         _ <- sm.delete("temp") // Create "garbage"
@@ -164,12 +164,12 @@ final class BitcaskTableOperationSpec extends AsyncFreeSpec with AsyncIOSpec wit
     val value = "{\"data\": \"important\"}"
 
     // 1. First session: write data and shutdown
-    val session1 = storageResource.use { sm =>
+    val session1 = tableResource.use { sm =>
       sm.write(key, value) *> IO.sleep(100.millis) // Wait for disk write completion
     }
 
     // 2. Second session: reopen storage and read
-    val session2 = storageResource.use { sm =>
+    val session2 = tableResource.use { sm =>
       sm.read(key).map { recoveredValue =>
         assert(recoveredValue.contains(value), "Data should be recovered from disk indexes")
       }
@@ -183,7 +183,7 @@ final class BitcaskTableOperationSpec extends AsyncFreeSpec with AsyncIOSpec wit
 
     val scenario = for {
       // Step 1: Write two keys, delete one
-      _ <- storageResource.use { sm =>
+      _ <- tableResource.use { sm =>
         for {
           _ <- sm.write(keyToKeep, "value1")
           _ <- sm.write(keyToDelete, "value2")
@@ -193,7 +193,7 @@ final class BitcaskTableOperationSpec extends AsyncFreeSpec with AsyncIOSpec wit
       }
 
       // Step 2: Restart and verify state
-      _ <- storageResource.use { sm =>
+      _ <- tableResource.use { sm =>
         for {
           val1 <- sm.read(keyToKeep)
           val2 <- sm.read(keyToDelete)

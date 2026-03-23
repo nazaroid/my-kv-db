@@ -4,6 +4,7 @@ import cats.effect.Async
 import cats.implicits.given
 import io.circe.*
 import io.prometheus.client.*
+import org.nazaroid.kvdb.bitcask.lib.BitcaskDatabaseStats
 import org.nazaroid.kvdb.core.{CatalogStats, MetricsAdapter}
 import org.typelevel.log4cats.Logger
 

@@ -4,7 +4,7 @@ import cats.effect.IO
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType, WriteTask}
-import org.nazaroid.kvdb.bitcask.{BitcaskTable, BitcaskTableConfig}
+import org.nazaroid.kvdb.bitcask.lib.{BitcaskTable, BitcaskTableConfig}
 import org.nazaroid.kvdb.core.MonitoringConfig
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -78,13 +78,15 @@ sealed class BitcaskStatisticsServiceSpec extends AnyFunSuite with Matchers {
       for {
         given Logger[IO]  <- Slf4jLogger.create[IO]
         queue             <- Channel.unbounded[IO, WriteTask[IO]]
-        table             <- BitcaskTable.initialize("test_table", bitcaskTableConfig, queue)
-        statisticsService <- BitcaskStatisticsService.create(table, monitoringConfig)
+        dbManager             <- BitcaskDatabaseManager.create[IO](tempDir.toString, bitcaskTableConfig)
+        statisticsService <- BitcaskStatisticsService.create(dbManager, monitoringConfig)
 
         // Add test data
-        _ <- table.write("key1", "value1")
-        _ <- table.write("key2", "value2")
-        _ <- table.write("key3", "value3")
+        db <- dbManager.createDatabase("testDb")
+        table <- db.createTable("testTable")
+        _ <- table.set("key1", "value1")
+        _ <- table.set("key2", "value2")
+        _ <- table.set("key3", "value3")
         _ <- table.delete("key3") // Delete one entry
 
         // Collect statistics

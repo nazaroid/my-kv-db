@@ -5,6 +5,7 @@ import cats.effect.{Async, Resource}
 import cats.implicits.given
 import fs2.io.file.{Files, Path}
 import io.circe.syntax.*
+import org.nazaroid.kvdb.bitcask.lib.*
 import org.nazaroid.kvdb.core.*
 import org.typelevel.log4cats.Logger
 
@@ -217,7 +218,7 @@ class DatabaseWrapper[F[_]: Async: Files: Logger](
 /** Wrapper to adapt BitcaskTable to Table interface
   */
 class TableWrapper[F[_]: Async: Files: Logger](
-  bitcaskTable: org.nazaroid.kvdb.bitcask.BitcaskTable[F])
+  bitcaskTable: BitcaskTable[F])
     extends Table[F] {
 
   override def name: String = bitcaskTable.name

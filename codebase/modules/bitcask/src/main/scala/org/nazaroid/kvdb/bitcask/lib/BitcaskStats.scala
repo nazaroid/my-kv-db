@@ -1,4 +1,4 @@
-package org.nazaroid.kvdb.bitcask
+package org.nazaroid.kvdb.bitcask.lib
 
 import io.circe.Codec
 import io.circe.generic.semiauto.*
