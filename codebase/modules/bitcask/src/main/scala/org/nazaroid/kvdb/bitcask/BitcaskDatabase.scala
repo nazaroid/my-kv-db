@@ -2,7 +2,6 @@ package org.nazaroid.kvdb.bitcask
 
 import cats.effect.{Async, Ref}
 import cats.implicits.given
-import fs2.Stream
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.WriteTask

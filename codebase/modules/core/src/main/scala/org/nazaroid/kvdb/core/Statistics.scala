@@ -1,17 +1,59 @@
-package org.nazaroid.kvdb.statistics
+package org.nazaroid.kvdb.core
 
 import cats.effect.implicits.given
 import cats.effect.{Async, Ref}
 import cats.implicits.given
 import fs2.Stream
-import fs2.io.file.{Files, Path}
-import io.circe.*
-import org.nazaroid.kvdb.bitcask.metrics.{BitcaskPrometheusMetricsAdapter, MetricsAdapter}
+import fs2.io.file.Files
 import org.nazaroid.kvdb.core.*
 import org.typelevel.log4cats.Logger
-
-import java.util.concurrent.TimeUnit
+import io.circe.Json
 import scala.concurrent.duration.*
+
+/** Database statistics for multiple databases
+ */
+case class CatalogStats(
+                         totalDatabases: Int,
+                         totalTables:    Int,
+                         totalEntries:   Int,
+                         activeEntries:  Int,
+                         deletedEntries: Int,
+                         totalDataSize:  Long,
+                         // Heterogeneous collection for engine-specific details
+                         details: Map[String, Json] = Map.empty)
+
+/** Database information for single database
+ */
+case class DatabaseInfo(
+                         name:           String,
+                         totalTables:    Int,
+                         totalEntries:   Int,
+                         activeEntries:  Int,
+                         deletedEntries: Int,
+                         totalDataSize:  Long,
+                         // Engine-specific details
+                         details: Map[String, Json] = Map.empty)
+
+/** Table information
+ */
+case class TableInfo(
+                      name:              String,
+                      entryCount:        Int,
+                      activeEntryCount:  Int,
+                      deletedEntryCount: Int,
+                      totalDataSize:     Long,
+                      // Engine-specific details
+                      details: Map[String, Json] = Map.empty)
+
+/** Segment information (for storage-like engines)
+ */
+case class SegmentInfo(
+                        name:       String,
+                        fileSize:   Long,
+                        isActive:   Boolean,
+                        entryCount: Int,
+                        // Engine-specific details
+                        details: Map[String, Json] = Map.empty)
 
 /** Background process for monitoring segments and fragmentation */
 trait StatisticsService[F[_]] {
@@ -25,6 +67,11 @@ trait StatisticsService[F[_]] {
   def getTableStats(dbName: String, tableName: String): F[Option[TableInfo]]
 }
 
+trait MetricsAdapter[F[_]] {
+  def registerMetrics():                  F[Unit]
+  def updateMetrics(stats: CatalogStats): F[Unit]
+}
+
 case class MonitoringConfig(
   checkInterval:              FiniteDuration = 30.seconds,
   enableBackgroundMonitoring: Boolean = true,
@@ -35,8 +82,8 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
   databaseManager: DatabaseManager[F],
   config:          MonitoringConfig,
   monitoringRef:   Ref[F, Boolean],
-  metricsAdapter:  MetricsAdapter[F] // Injected via constructor
-) extends StatisticsService[F] {
+  metricsAdapter:  MetricsAdapter[F])
+    extends StatisticsService[F] {
 
   override def registerMetrics(): F[Unit] = {
     for {
@@ -109,20 +156,6 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
 }
 
 object StatisticsService {
-
-  def create[F[_]: Async: Files: Logger](
-    databaseManager: DatabaseManager[F],
-    config:          MonitoringConfig = MonitoringConfig()
-  ): F[StatisticsService[F]] = {
-    createWithAdapter(databaseManager, config, BitcaskPrometheusMetricsAdapter.create)
-  }
-
-  def createWithPrometheus[F[_]: Async: Files: Logger](
-    databaseManager: DatabaseManager[F],
-    config:          MonitoringConfig = MonitoringConfig()
-  ): F[StatisticsService[F]] = {
-    createWithAdapter(databaseManager, config, BitcaskPrometheusMetricsAdapter.create)
-  }
 
   def createWithAdapter[F[_]: Async: Files: Logger](
     databaseManager: DatabaseManager[F],

@@ -5,7 +5,6 @@ import cats.effect.{Async, Resource}
 import cats.implicits.given
 import fs2.io.file.{Files, Path}
 import io.circe.syntax.*
-import org.nazaroid.kvdb.bitcask.{BitcaskDatabase, BitcaskTable, BitcaskTableConfig, Catalog}
 import org.nazaroid.kvdb.core.*
 import org.typelevel.log4cats.Logger
 

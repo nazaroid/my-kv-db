@@ -31,7 +31,7 @@ final class Catalog[F[_]: Async: Files: Logger](
         } yield db
     }
 
-  override def listDatabases: F[List[String]] = {
+  def listDatabases: F[List[String]] = {
     for {
       rootDirExists <- Files[F].exists(rootPath)
       result <-

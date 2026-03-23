@@ -1,4 +1,4 @@
-package org.nazaroid.kvdb.statistics
+package org.nazaroid.kvdb.core
 
 import cats.effect.IO
 import fs2.concurrent.Channel
