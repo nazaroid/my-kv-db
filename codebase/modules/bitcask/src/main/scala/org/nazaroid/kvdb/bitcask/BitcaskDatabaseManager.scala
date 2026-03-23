@@ -82,9 +82,9 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
 
   /** Get statistics for a specific database */
   override def getDatabaseStats(dbName: String): F[Option[DatabaseInfo]] = {
-    for {
+    (for {
       db      <- OptionT(catalog.getDatabase(dbName))
-      dbStats <- db.getStats
+      dbStats <- OptionT.liftF(db.getStats)
     } yield DatabaseInfo(
       name           = dbStats.name,
       totalTables    = dbStats.totalTables,
@@ -123,16 +123,15 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
           }
           .asJson
       )
-    )
-
+    )).value
   }
 
   /** Get statistics for a specific table in a database */
-  override def getTableStats(dbName: String, tableName: String): F[Option[TableInfo]] = {
+  override def getTableStats(dbName: String, tableName: String): F[Option[TableInfo]] =
     for {
       db         <- OptionT(catalog.getDatabase(dbName))
       table      <- OptionT(db.getTable(tableName))
-      tableStats <- table.getStats
+      tableStats <- OptionT.liftF(db.getStats)
 
     } yield TableInfo(
       name           = tableStats.name,
@@ -142,8 +141,8 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
       totalDataSize  = tableStats.totalDataSize,
       details = Map(
         "engine_type"     -> "bitcask".asJson,
-        "segment_count"   -> tableStats.segmentCount.asJson,
-        "active_segments" -> tableStats.activeSegmentCount.asJson,
+        "total_segments"  -> tableStats.totalSegments.asJson,
+        "active_segments" -> tableStats.activeSegments.asJson,
         "segments" -> tableStats
           .segments
           .map { segment =>
@@ -158,7 +157,6 @@ class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
           .asJson
       )
     )
-  }
 
   private def createDataSchema() = {
     import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType}
