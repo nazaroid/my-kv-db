@@ -4,7 +4,7 @@ import cats.effect.IO
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType, WriteTask}
-import org.nazaroid.kvdb.bitcask.lib.{BitcaskTable, BitcaskTableConfig}
+import org.nazaroid.kvdb.bitcask.lib.{BitcaskDatabaseStats, BitcaskTableConfig}
 import org.nazaroid.kvdb.core.MonitoringConfig
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -75,43 +75,45 @@ sealed class BitcaskStatisticsServiceSpec extends AnyFunSuite with Matchers {
         maxStaleRatio              = 0.3,
         compactionThreshold        = 0.5
       )
+
       for {
-        given Logger[IO]  <- Slf4jLogger.create[IO]
-        queue             <- Channel.unbounded[IO, WriteTask[IO]]
-        dbManager             <- BitcaskDatabaseManager.create[IO](tempDir.toString, bitcaskTableConfig)
-        statisticsService <- BitcaskStatisticsService.create(dbManager, monitoringConfig)
+        given Logger[IO] <- Slf4jLogger.create[IO]
+        queue            <- Channel.unbounded[IO, WriteTask[IO]]
+        assertations <- BitcaskDatabaseManager.create[IO](tempDir.toString, bitcaskTableConfig).use { dbManager =>
+          for {
 
-        // Add test data
-        db <- dbManager.createDatabase("testDb")
-        table <- db.createTable("testTable")
-        _ <- table.set("key1", "value1")
-        _ <- table.set("key2", "value2")
-        _ <- table.set("key3", "value3")
-        _ <- table.delete("key3") // Delete one entry
+            statisticsService <- BitcaskStatisticsService.create(dbManager, monitoringConfig)
 
-        // Collect statistics
-        result <- statisticsService.getDatabases
+            // Add test data
+            db    <- dbManager.createDatabase("testDb")
+            table <- db.createTable("testTable")
+            _     <- table.set("key1", "value1")
+            _     <- table.set("key2", "value2")
+            _     <- table.set("key3", "value3")
+            _     <- table.delete("key3")
 
-      } yield {
-        result should have size 1
-        val dbInfo = result.head
-        dbInfo.name should include("test")
-        dbInfo.totalEntries should be(3)   // 3 entries total
-        dbInfo.activeEntries should be(2)  // 2 active (one deleted)
-        dbInfo.deletedEntries should be(1) // 1 deleted
-        dbInfo.totalDiskSize should be > 0L
-        dbInfo.totalMemorySize should be > 0L
-        dbInfo.fragmentationRatio should be >= 0.0
-        dbInfo.tables should have size 1
+            result <- statisticsService.getStats
 
-        val tableInfo = dbInfo.tables.head
-        tableInfo.name should be("test_table")
-        tableInfo.entryCount should be(3)
-        tableInfo.activeEntryCount should be(2)
-        tableInfo.diskSize should be > 0L
-        tableInfo.memorySize should be > 0L
-      }
+          } yield {
+            result.totalDatabases should be(1)
+            val databases = result.details("databases").as[List[BitcaskDatabaseStats]].getOrElse(Nil)
+            val dbInfo = databases.head
+            dbInfo.name should include("test")
+            dbInfo.totalEntries should be(3)
+            dbInfo.activeEntries should be(2)
+            dbInfo.deletedEntries should be(1)
+            dbInfo.totalDataSize should be > 0L
+
+            val tableInfo = dbInfo.tableStats.head
+
+            tableInfo.name should be("testTable")
+            tableInfo.totalEntries should be(3)
+            tableInfo.activeEntries should be(2)
+            tableInfo.totalDataSize should be > 0L
+            tableInfo.deletedEntries should be(1)
+          }
+        }
+      } yield assertations
     }
   }
-
 }
