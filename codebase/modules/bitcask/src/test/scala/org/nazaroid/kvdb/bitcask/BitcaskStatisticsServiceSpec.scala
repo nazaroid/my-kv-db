@@ -1,6 +1,7 @@
 package org.nazaroid.kvdb.bitcask
 
 import cats.effect.IO
+import cats.effect.kernel.Resource
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType, WriteTask}
@@ -76,44 +77,50 @@ sealed class BitcaskStatisticsServiceSpec extends AnyFunSuite with Matchers {
         compactionThreshold        = 0.5
       )
 
-      for {
-        given Logger[IO] <- Slf4jLogger.create[IO]
-        queue            <- Channel.unbounded[IO, WriteTask[IO]]
-        assertations <- BitcaskDatabaseManager.create[IO](tempDir.toString, bitcaskTableConfig).use { dbManager =>
-          for {
+      dbManagerResource(tempDir, bitcaskTableConfig).use { dbManager =>
+        for {
+          given Logger[IO]  <- Slf4jLogger.create[IO]
+          statisticsService <- BitcaskStatisticsService.create(dbManager, monitoringConfig)
+          // Add test data
+          db    <- dbManager.createDatabase("testDb")
+          table <- db.createTable("testTable")
+          _     <- table.set("key1", "value1")
+          _     <- table.set("key2", "value2")
+          _     <- table.set("key3", "value3")
+          _     <- table.delete("key3")
 
-            statisticsService <- BitcaskStatisticsService.create(dbManager, monitoringConfig)
+          result <- statisticsService.getStats
 
-            // Add test data
-            db    <- dbManager.createDatabase("testDb")
-            table <- db.createTable("testTable")
-            _     <- table.set("key1", "value1")
-            _     <- table.set("key2", "value2")
-            _     <- table.set("key3", "value3")
-            _     <- table.delete("key3")
+        } yield {
+          result.totalDatabases should be(1)
+          val databases = result.details("databases").as[List[BitcaskDatabaseStats]].getOrElse(Nil)
+          val dbInfo = databases.head
+          dbInfo.name should include("test")
+          dbInfo.totalEntries should be(3)
+          dbInfo.activeEntries should be(2)
+          dbInfo.deletedEntries should be(1)
+          dbInfo.totalDataSize should be > 0L
 
-            result <- statisticsService.getStats
+          val tableInfo = dbInfo.tableStats.head
 
-          } yield {
-            result.totalDatabases should be(1)
-            val databases = result.details("databases").as[List[BitcaskDatabaseStats]].getOrElse(Nil)
-            val dbInfo = databases.head
-            dbInfo.name should include("test")
-            dbInfo.totalEntries should be(3)
-            dbInfo.activeEntries should be(2)
-            dbInfo.deletedEntries should be(1)
-            dbInfo.totalDataSize should be > 0L
-
-            val tableInfo = dbInfo.tableStats.head
-
-            tableInfo.name should be("testTable")
-            tableInfo.totalEntries should be(3)
-            tableInfo.activeEntries should be(2)
-            tableInfo.totalDataSize should be > 0L
-            tableInfo.deletedEntries should be(1)
-          }
+          tableInfo.name should be("testTable")
+          tableInfo.totalEntries should be(3)
+          tableInfo.activeEntries should be(2)
+          tableInfo.totalDataSize should be > 0L
+          tableInfo.deletedEntries should be(1)
         }
-      } yield assertations
+      }
     }
+  }
+
+  private def dbManagerResource(
+    tempDir:            Path,
+    bitcaskTableConfig: BitcaskTableConfig
+  ): Resource[IO, BitcaskDatabaseManager[IO]] = {
+    for {
+      given Logger[IO] <- Slf4jLogger.create[IO].toResource
+      queue            <- Channel.unbounded[IO, WriteTask[IO]].toResource
+      dbManager        <- BitcaskDatabaseManager.create[IO](tempDir.toString, bitcaskTableConfig)
+    } yield dbManager
   }
 }
