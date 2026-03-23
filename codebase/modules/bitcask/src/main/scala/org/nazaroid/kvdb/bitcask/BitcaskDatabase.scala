@@ -15,21 +15,23 @@ final class BitcaskDatabase[F[_]: Async: Files: Logger](
   val configTemplate: BitcaskTableConfig,
   val tables:         Ref[F, Map[String, BitcaskTable[F]]]) {
 
-  def table(tableName: String): F[BitcaskTable[F]] = {
-    tables.get.flatMap { activeTables =>
-      activeTables.get(tableName) match {
-        case Some(sm) => Async[F].pure(sm)
-        case None =>
-          val tablePath = path / tableName
-          for {
-            _ <- Files[F].createDirectories(tablePath).handleError(_ => ())
-            // Configure storage settings specifically for this table's directory
-            tableConfig = configTemplate.copy(folder = tablePath.toString)
-            // Initialize storage manager (including recovery from existing files)
-            sm <- BitcaskTable.initialize[F](tableConfig, writeQueue)
-            _  <- tables.update(_ + (tableName -> sm))
-          } yield sm
-      }
+  def getTable(tableName: String): F[Option[BitcaskTable[F]]] = {
+    tables.get.map { _.get(tableName) }
+  }
+
+  def createTable(tableName: String): F[BitcaskTable[F]] = {
+    getTable(tableName).flatMap {
+      case Some(sm) => sm.pure[F]
+      case None =>
+        val tablePath = path / tableName
+        for {
+          _ <- Files[F].createDirectories(tablePath).handleError(_ => ())
+          // Configure storage settings specifically for this table's directory
+          tableConfig = configTemplate.copy(folder = tablePath.toString)
+          // Initialize storage manager (including recovery from existing files)
+          sm <- BitcaskTable.initialize[F](tableConfig, writeQueue)
+          _  <- tables.update(_ + (tableName -> sm))
+        } yield sm
     }
   }
 
@@ -50,8 +52,11 @@ final class BitcaskDatabase[F[_]: Async: Files: Logger](
   def getStats: F[BitcaskDatabaseStats] = {
     for {
       tableNames <- listTables()
-      allTableStats <- tableNames.traverse { tableName =>
-        table(tableName).flatMap(_.getStats)
+      allTableStats <- tableNames.flatTraverse { tableName =>
+        getTable(tableName).flatMap {
+          case Some(table) => table.getStats.map(List(_))
+          case None        => Async[F].pure(Nil)
+        }
       }
 
       // Aggregate statistics from all tables

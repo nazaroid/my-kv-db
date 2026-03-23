@@ -14,21 +14,22 @@ final class Catalog[F[_]: Async: Files: Logger](
   val configTemplate: BitcaskTableConfig,
   val databases:      Ref[F, Map[String, BitcaskDatabase[F]]]) {
 
-  def database(dbName: String): F[BitcaskDatabase[F]] = {
-    databases.get.flatMap { activeDbs =>
-      activeDbs.get(dbName) match {
-        case Some(db) => Async[F].pure(db)
-        case None =>
-          val dbPath = rootPath / dbName
-          for {
-            _         <- Files[F].createDirectories(dbPath).handleError(_ => ())
-            tablesRef <- Ref.of[F, Map[String, BitcaskTable[F]]](Map.empty)
-            db = new BitcaskDatabase(dbName, dbPath, writeQueue, configTemplate, tablesRef)
-            _ <- databases.update(_ + (dbName -> db))
-          } yield db
-      }
-    }
+  def getDatabase(dbName: String): F[Option[BitcaskDatabase[F]]] = {
+    databases.get.map(_.get(dbName))
   }
+
+  def createDatabase(dbName: String): F[BitcaskDatabase[F]] =
+    getDatabase(dbName).flatMap {
+      case Some(db) => Async[F].pure(db)
+      case None =>
+        val dbPath = rootPath / dbName
+        for {
+          _         <- Files[F].createDirectories(dbPath).handleError(_ => ())
+          tablesRef <- Ref.of[F, Map[String, BitcaskTable[F]]](Map.empty)
+          db = new BitcaskDatabase(dbName, dbPath, writeQueue, configTemplate, tablesRef)
+          _ <- databases.update(_ + (dbName -> db))
+        } yield db
+    }
 
   override def listDatabases: F[List[String]] = {
     for {
@@ -38,8 +39,8 @@ final class Catalog[F[_]: Async: Files: Logger](
           for {
             entries <- Files[F]
               .list(rootPath)
-              .filter(Files[F].isDirectory)
-              .evalMap(entry => Files[F].fileName(entry))
+              .evalFilter(Files[F].isDirectory)
+              .map(_.fileName.toString)
               .compile
               .toList
           } yield entries
@@ -53,8 +54,11 @@ final class Catalog[F[_]: Async: Files: Logger](
   def getStats: F[BitcaskCatalogStats] = {
     for {
       databaseNames <- listDatabases
-      allDatabaseStats <- databaseNames.traverse { dbName =>
-        database(dbName).flatMap(_.getStats)
+      allDatabaseStats <- databaseNames.flatTraverse { dbName =>
+        getDatabase(dbName).flatMap {
+          case Some(db) => db.getStats.map(List(_))
+          case None     => Async[F].pure(Nil)
+        }
       }
 
       // Aggregate statistics from all databases
@@ -76,7 +80,7 @@ final class Catalog[F[_]: Async: Files: Logger](
       totalDataSize  = totalDataSize,
       totalSegments  = totalSegments,
       activeSegments = activeSegments,
-      databaseStats  = allDatabaseStats  // ✅ Добавляем детальную статистику по базам
+      databaseStats  = allDatabaseStats
     )
   }
 }
@@ -88,10 +92,10 @@ object Catalog {
     configTemplate: BitcaskTableConfig,
     queueSize:      Int = 10000,
     parallelism:    Int = 10
-  ): F[Catalog[F]] = {
+  ): Resource[F, Catalog[F]] = {
     for {
       // 1. Create root directory if it doesn't exist
-      _ <- Files[F].createDirectories(rootPath).handleError(_ => ())
+      _ <- Files[F].createDirectories(rootPath).handleError(_ => ()).toResource
 
       // 2. Create a unified write queue for the entire catalog
       writeQueue <- Channel.bounded[F, WriteTask[F]](queueSize).toResource
@@ -101,7 +105,7 @@ object Catalog {
       _ <- writeBinary(writeQueue.stream, parallelism = 1).compile.drain.background
 
       // 4. Initialize the registry for open databases
-      activeDbs <- Ref.of(Map.empty[String, BitcaskDatabase[F]])
+      activeDbs <- Ref.of(Map.empty[String, BitcaskDatabase[F]]).toResource
 
     } yield Catalog[F](
       rootPath       = rootPath,
