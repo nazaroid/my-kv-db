@@ -2,18 +2,16 @@ package org.nazaroid.kvdb.bitcask
 
 import cats.data.OptionT
 import cats.effect.Async
-import cats.effect.implicits.given
 import cats.effect.kernel.Resource
 import cats.implicits.given
-import fs2.io.file.{Files, Path}
+import fs2.io.file.Files
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType}
-import org.nazaroid.kvdb.bitcask.BitcaskEngineConfig
 import org.nazaroid.kvdb.core.Engine
 import org.typelevel.log4cats.Logger
 
 object BitcaskEngine {
 
-  def init[F[_]: Async: Files: Logger](conf: BitcaskEngineConfig): F[Engine[F]] = {
+  def init[F[_]: Async: Files: Logger](conf: BitcaskEngineConfig): Resource[F, Engine[F]] = {
     // Data files use CRC, segment and table - no
     val dataSchema = List(
       FieldDef("valueSize", FieldType.Int32),
@@ -105,7 +103,7 @@ final class BitcaskEngine[F[_]: Async: Logger](
     (for {
       db  <- OptionT(databaseManager.getDatabase(baseName))
       tbl <- OptionT(db.getTable(tblName))
-      _   <- tbl.delete(key)
+      _   <- OptionT.liftF(tbl.delete(key))
     } yield ()).value >> ().pure[F]
   }
 
