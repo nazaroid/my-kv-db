@@ -1,5 +1,8 @@
 package org.nazaroid.kvdb.bitcask
 
+import io.circe.Codec
+import io.circe.generic.semiauto.*
+
 /** Statistics structures for Bitcask hierarchy No heterogeneous collections - concrete implementation
   */
 
@@ -13,6 +16,7 @@ case class BitcaskTableStats(
   segmentCount:       Int,
   activeSegmentCount: Int,
   segments:           List[SegmentStats])
+    derives Codec.AsObject
 
 // Statistics for single BitcaskDatabase
 case class BitcaskDatabaseStats(
@@ -25,6 +29,7 @@ case class BitcaskDatabaseStats(
   totalSegments:  Int,
   activeSegments: Int,
   tableStats:     List[BitcaskTableStats])
+    derives Codec.AsObject
 
 // Statistics for BitcaskCatalog (all databases)
 case class BitcaskCatalogStats(
@@ -36,8 +41,8 @@ case class BitcaskCatalogStats(
   totalDataSize:  Long,
   totalSegments:  Int,
   activeSegments: Int,
-  databaseStats: List[BitcaskDatabaseStats]
-)
+  databaseStats:  List[BitcaskDatabaseStats])
+    derives Codec.AsObject
 
 case class SegmentStats(
   name:           String,
@@ -45,3 +50,4 @@ case class SegmentStats(
   isActive:       Boolean,
   staleDataRatio: Double,
   entryCount:     Int)
+    derives Codec.AsObject
