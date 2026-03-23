@@ -43,7 +43,7 @@ class BinFileStorage[F[_]: Async: Files](
 }
 
 sealed class BitcaskTable[F[_]: Async: Files: Logger](
-  val name: String,
+  val name:              String,
   val currentData:       Ref[F, BinFileStorage[F]],
   val currentSegmentIdx: Ref[F, BinFileStorage[F]],
   val tableStorage:      BinFileStorage[F],
@@ -376,14 +376,14 @@ sealed class BitcaskTable[F[_]: Async: Files: Logger](
       segmentStats <- getSegmentStats
 
     } yield BitcaskTableStats(
-      name = config.folder.split("/").lastOption.getOrElse("unknown"),
-      totalEntries = tableKeysCount,
-      activeEntries = tableActiveCount,
-      deletedEntries = deletedEntries,
-      totalDataSize = totalDataSize,
-      segmentCount = segmentStats.size,
+      name               = config.folder.split("/").lastOption.getOrElse("unknown"),
+      totalEntries       = tableKeysCount,
+      activeEntries      = tableActiveCount,
+      deletedEntries     = deletedEntries,
+      totalDataSize      = totalDataSize,
+      segmentCount       = segmentStats.size,
       activeSegmentCount = segmentStats.count(_.isActive),
-      segments = segmentStats
+      segments           = segmentStats
     )
   }
 }
@@ -403,6 +403,7 @@ object BitcaskTable {
   }
 
   def initialize[F[_]: Async: Files: Logger](
+    name:       String,
     config:     BitcaskTableConfig,
     writeQueue: Channel[F, WriteTask[F]]
   ): F[BitcaskTable[F]] = {
@@ -464,6 +465,6 @@ object BitcaskTable {
       dsRef <- Ref.of[F, BinFileStorage[F]](dataStorage)
       ssRef <- Ref.of[F, BinFileStorage[F]](segStorage)
 
-    } yield new BitcaskTable(dsRef, ssRef, tableStorage, cacheRef, config, writeQueue)
+    } yield new BitcaskTable(name, dsRef, ssRef, tableStorage, cacheRef, config, writeQueue)
   }
 }

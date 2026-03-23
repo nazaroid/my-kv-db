@@ -138,8 +138,8 @@ final class BitcaskTableOperationSpec extends AsyncFreeSpec with AsyncIOSpec wit
       _     <- Resource.eval(Files[IO].createDirectories(Path(testDir.toString)).handleError(_ => ()))
       queue <- Channel.bounded[IO, WriteTask[IO]](100).toResource
       _       <- writeBinary(queue.stream, parallelism = 1).compile.drain.background
-      manager <- Resource.eval(BitcaskTable.initialize[IO](compactConfig, queue))
-    } yield manager
+      table <- Resource.eval(BitcaskTable.initialize[IO]("testTable", compactConfig, queue))
+    } yield table
 
     compactResource.use { sm =>
       for {

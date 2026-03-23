@@ -29,7 +29,7 @@ final class BitcaskDatabase[F[_]: Async: Files: Logger](
           // Configure storage settings specifically for this table's directory
           tableConfig = configTemplate.copy(folder = tablePath.toString)
           // Initialize storage manager (including recovery from existing files)
-          sm <- BitcaskTable.initialize[F](tableConfig, writeQueue)
+          sm <- BitcaskTable.initialize[F](tableName, tableConfig, writeQueue)
           _  <- tables.update(_ + (tableName -> sm))
         } yield sm
     }

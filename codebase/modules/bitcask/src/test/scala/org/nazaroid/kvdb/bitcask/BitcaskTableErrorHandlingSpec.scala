@@ -32,7 +32,7 @@ final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
     )
   }
 
-  test("StorageManager should handle CRC-enabled data files correctly") {
+  test("BitcaskTable should handle CRC-enabled data files correctly") {
     withTempDirectory { tempDir =>
       val dataSchema = List(
         FieldDef("valueSize", FieldType.Int32),
@@ -72,15 +72,15 @@ final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
       for {
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
-        storageManager   <- BitcaskTable.initialize(config, queue)
-        _                <- storageManager.write("testKey", "testValue")
-        readValue        <- storageManager.read("testKey")
+        table   <- BitcaskTable.initialize("testTable", config, queue)
+        _                <- table.write("testKey", "testValue")
+        readValue        <- table.read("testKey")
 
       } yield readValue shouldBe Some("testValue")
     }
   }
 
-  test("StorageManager should handle corrupted data gracefully") {
+  test("BitcaskTable should handle corrupted data gracefully") {
     withTempDirectory { tempDir =>
       val dataSchema = List(
         FieldDef("valueSize", FieldType.Int32),
@@ -120,7 +120,7 @@ final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
       for {
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
-        storageManager   <- BitcaskTable.initialize(config, queue)
+        table   <- BitcaskTable.initialize("testTable", config, queue)
 
         // Create corrupted data file manually
         dataFile = tempDir / "seg_0.bin"
@@ -137,13 +137,13 @@ final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
         corruptedData = validEncoded.toByteVector.dropRight(8) ++ ByteVector.fromLong(99999L)
         _ <- Stream.emits(corruptedData.toArray).through(Files[IO].writeAll(dataFile)).compile.drain
         // Try to read corrupted data
-        readValue <- storageManager.read("testKey")
+        readValue <- table.read("testKey")
         // Should return None due to CRC validation failure
       } yield readValue shouldBe None
     }
   }
 
-  test("StorageManager should handle segment and table files without CRC") {
+  test("BitcaskTable should handle segment and table files without CRC") {
     withTempDirectory { tempDir =>
       val dataSchema = List(
         FieldDef("valueSize", FieldType.Int32),
@@ -185,14 +185,14 @@ final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
       for {
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
-        storageManager   <- BitcaskTable.initialize(config, queue)
-        _                <- storageManager.write("testKey", "testValue")
-        readValue        <- storageManager.read("testKey")
+        table   <- BitcaskTable.initialize("testTable", config, queue)
+        _                <- table.write("testKey", "testValue")
+        readValue        <- table.read("testKey")
       } yield readValue shouldBe Some("testValue")
     }
   }
 
-  test("StorageManager should handle write failures with retry logic") {
+  test("BitcaskTable should handle write failures with retry logic") {
     withTempDirectory { tempDir =>
       val dataSchema = List(
         FieldDef("valueSize", FieldType.Int32),
@@ -232,14 +232,14 @@ final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
       for {
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
-        storageManager   <- BitcaskTable.initialize(config, queue)
+        table   <- BitcaskTable.initialize("testTable", config, queue)
         // Make directory read-only to simulate write failure
         dataFile = tempDir / "seg_0.bin"
         _ <- Files[IO].setPosixPermissions(
           dataFile,
           fs2.io.file.PosixPermissions.fromString("r--r--r--").get
         )
-        writeResult <- storageManager.write("testKey", "testValue")
+        writeResult <- table.write("testKey", "testValue")
       } yield {
         // Should fail due to permission error
         writeResult shouldBe a[Left[String, Row]]
@@ -251,7 +251,7 @@ final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
     }
   }
 
-  test("StorageManager should handle delete operations correctly") {
+  test("BitcaskTable should handle delete operations correctly") {
     withTempDirectory { tempDir =>
       val dataSchema = List(
         FieldDef("valueSize", FieldType.Int32),
@@ -291,11 +291,11 @@ final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
       for {
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
-        storageManager   <- BitcaskTable.initialize(config, queue)
-        _                <- storageManager.write("testKey", "testValue")
-        readValue1       <- storageManager.read("testKey")
-        _                <- storageManager.delete("testKey")
-        readValue2       <- storageManager.read("testKey")
+        table   <- BitcaskTable.initialize("testTable", config, queue)
+        _                <- table.write("testKey", "testValue")
+        readValue1       <- table.read("testKey")
+        _                <- table.delete("testKey")
+        readValue2       <- table.read("testKey")
       } yield {
         readValue1 shouldBe Some("testValue")
         readValue2 shouldBe None // Should be None after delete
