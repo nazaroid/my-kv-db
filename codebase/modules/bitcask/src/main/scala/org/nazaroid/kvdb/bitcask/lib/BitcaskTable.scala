@@ -351,11 +351,10 @@ sealed class BitcaskTable[F[_]: Async: Files: Logger](
         case ((active, deleted, size), entry) =>
           entry match {
             case CacheEntry.Pending(row) =>
-              val rowSize = row.get("recordSize").collect { case i: Int => i }.getOrElse(0)
+              val rowSize = encode(row, config.dataSchema).size
               (active + 1, deleted, size + rowSize)
-
             case CacheEntry.Persistent(row, _, _) =>
-              val rowSize = row.get("recordSize").collect { case i: Int => i }.getOrElse(0)
+              val rowSize = encode(row, config.dataSchema).size
               (active + 1, deleted, size + rowSize)
 
             case CacheEntry.Deleted =>
