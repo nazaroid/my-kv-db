@@ -1,5 +1,6 @@
 package org.nazaroid.kvdb.srv
 
+import org.nazaroid.kvdb.bitcask.BitcaskEngineConfig
 import org.nazaroid.kvdb.{EngineConfig, ServerConfig, ServerConfigBase}
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}

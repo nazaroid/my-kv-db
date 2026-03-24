@@ -15,11 +15,9 @@ import org.http4s.metrics.prometheus.Prometheus
 import org.http4s.server.Router
 import org.http4s.server.middleware.Metrics
 import org.http4s.{HttpRoutes, Request, Response, Status, Uri}
-import org.nazaroid.kvdb.algebra.{DatabaseInfo, Engine, Server, TableInfo}
-import org.nazaroid.kvdb.core.{CatalogStats, SegmentInfo}
+import org.nazaroid.kvdb.core.*
 import org.nazaroid.kvdb.srv.ServerConfig
 import org.nazaroid.kvdb.srv.http.middlewares.Err
-import org.nazaroid.kvdb.statistics.{MonitoringConfig, StatisticsIntegration, StatisticsService}
 import org.typelevel.log4cats.Logger
 
 final class HttpServer[F[_]: Async: Logger: Network](
@@ -148,49 +146,15 @@ final class HttpServer[F[_]: Async: Logger: Network](
         // Get specific database stats
         case GET -> Root / "database" / dbName =>
           statisticsService.getDatabaseStats(dbName).flatMap {
-            case Some(dbStats) =>
-              Ok(
-                org
-                  .nazaroid
-                  .kvdb
-                  .algebra
-                  .DatabaseInfo(
-                    name           = dbStats.name,
-                    totalEntries   = dbStats.totalEntries,
-                    activeEntries  = dbStats.activeEntries,
-                    deletedEntries = dbStats.deletedEntries,
-                    totalDataSize  = dbStats.totalDataSize,
-                    details = Map(
-                      "engine_specific" -> dbStats.details.asJson
-                    )
-                  )
-                  .asJson
-              )
-            case None => NotFound(s"Database $dbName not found")
+            case Some(dbStats) => Ok(dbStats.asJson)
+            case None          => NotFound(s"Database $dbName not found")
           }
 
         // Get specific table stats
         case GET -> Root / "table" / dbName / tableName =>
           statisticsService.getTableStats(dbName, tableName).flatMap {
-            case Some(tableStats) =>
-              Ok(
-                org
-                  .nazaroid
-                  .kvdb
-                  .algebra
-                  .TableInfo(
-                    name           = tableStats.name,
-                    totalEntries   = tableStats.totalEntries,
-                    activeEntries  = tableStats.activeEntries,
-                    deletedEntries = tableStats.deletedEntries,
-                    totalDataSize  = tableStats.totalDataSize,
-                    details = Map(
-                      "engine_specific" -> tableStats.details.asJson
-                    )
-                  )
-                  .asJson
-              )
-            case None => NotFound(s"Table $tableName not found in database $dbName")
+            case Some(tableStats) => Ok(tableStats.asJson)
+            case None             => NotFound(s"Table $tableName not found in database $dbName")
           }
 
       }

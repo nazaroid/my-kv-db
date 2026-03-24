@@ -10,7 +10,7 @@ import com.comcast.ip4s.{Host, Port, SocketAddress}
 import fs2.io.file.Files
 import fs2.io.net.Network
 import org.nazaroid.kvdb.srv.composition.DiContainer
-import org.nazaroid.kvdb.{DbHandle, DbInstanceConfig}
+import org.nazaroid.kvdb.srv.{DbHandle, DbInstanceConfig}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
