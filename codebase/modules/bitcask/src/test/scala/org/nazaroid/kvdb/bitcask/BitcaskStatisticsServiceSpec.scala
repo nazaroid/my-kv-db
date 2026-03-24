@@ -2,12 +2,13 @@ package org.nazaroid.kvdb.bitcask
 
 import cats.effect.IO
 import cats.effect.kernel.Resource
+import cats.effect.testing.scalatest.AsyncIOSpec
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType, WriteTask}
 import org.nazaroid.kvdb.bitcask.lib.{BitcaskDatabaseStats, BitcaskTableConfig}
 import org.nazaroid.kvdb.core.MonitoringConfig
-import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -15,7 +16,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import java.nio.file.Files as JFiles
 import scala.concurrent.duration.*
 
-sealed class BitcaskStatisticsServiceSpec extends AnyFunSuite with Matchers {
+sealed class BitcaskStatisticsServiceSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
   def withTempDirectory[T](test: Path => IO[T]): IO[T] = {
     IO.delay {
@@ -33,11 +34,11 @@ sealed class BitcaskStatisticsServiceSpec extends AnyFunSuite with Matchers {
     )
   }
 
-  test("StatisticsService should collect database information") {
+  "StatisticsService should collect database information" in {
     withTempDirectory { tempDir =>
       val dataSchema = List(
-        FieldDef("recordSize", FieldType.Int32),
-        FieldDef("value", FieldType.StringUtf8(sizeFromField = "recordSize")),
+        FieldDef("valueSize", FieldType.Int32),
+        FieldDef("value", FieldType.StringUtf8(sizeFromField = "valueSize")),
         FieldDef("timestamp", FieldType.Timestamp),
         FieldDef("status", FieldType.RecordStatus),
         FieldDef("crc", FieldType.CRC32)

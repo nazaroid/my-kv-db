@@ -1,12 +1,13 @@
 package org.nazaroid.kvdb.bitcask
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import fs2.{Chunk, Stream}
 import org.nazaroid.kvdb.binfileio.*
 import org.nazaroid.kvdb.bitcask.lib.{BitcaskTable, BitcaskTableConfig}
-import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -14,7 +15,7 @@ import scodec.bits.ByteVector
 
 import java.nio.file.Files as JFiles
 
-final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
+final class BitcaskTableErrorHandlingSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
   def withTempDirectory[T](test: Path => IO[T]): IO[T] = {
     IO.delay {
@@ -32,7 +33,7 @@ final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
     )
   }
 
-  test("BitcaskTable should handle CRC-enabled data files correctly") {
+  "BitcaskTable should handle CRC-enabled data files correctly" in {
     withTempDirectory { tempDir =>
       val dataSchema = List(
         FieldDef("valueSize", FieldType.Int32),
@@ -72,7 +73,7 @@ final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
       for {
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
-        table   <- BitcaskTable.initialize("testTable", config, queue)
+        table            <- BitcaskTable.initialize("testTable", config, queue)
         _                <- table.write("testKey", "testValue")
         readValue        <- table.read("testKey")
 
@@ -80,7 +81,7 @@ final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
     }
   }
 
-  test("BitcaskTable should handle corrupted data gracefully") {
+  "BitcaskTable should handle corrupted data gracefully" in {
     withTempDirectory { tempDir =>
       val dataSchema = List(
         FieldDef("valueSize", FieldType.Int32),
@@ -120,16 +121,16 @@ final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
       for {
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
-        table   <- BitcaskTable.initialize("testTable", config, queue)
+        table            <- BitcaskTable.initialize("testTable", config, queue)
 
         // Create corrupted data file manually
         dataFile = tempDir / "seg_0.bin"
         validRow = Map(
           "valueSize" -> 9,
-          "value"      -> "testValue",
-          "timestamp"  -> System.currentTimeMillis(),
-          "status"     -> 1,
-          "crc"        -> 0L
+          "value"     -> "testValue",
+          "timestamp" -> System.currentTimeMillis(),
+          "status"    -> 1,
+          "crc"       -> 0L
         )
         validEncoded = encode(validRow, dataSchema)
 
@@ -143,7 +144,7 @@ final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
     }
   }
 
-  test("BitcaskTable should handle segment and table files without CRC") {
+  "BitcaskTable should handle segment and table files without CRC" in {
     withTempDirectory { tempDir =>
       val dataSchema = List(
         FieldDef("valueSize", FieldType.Int32),
@@ -185,14 +186,14 @@ final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
       for {
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
-        table   <- BitcaskTable.initialize("testTable", config, queue)
+        table            <- BitcaskTable.initialize("testTable", config, queue)
         _                <- table.write("testKey", "testValue")
         readValue        <- table.read("testKey")
       } yield readValue shouldBe Some("testValue")
     }
   }
 
-  test("BitcaskTable should handle write failures with retry logic") {
+  "BitcaskTable should handle write failures with retry logic" in {
     withTempDirectory { tempDir =>
       val dataSchema = List(
         FieldDef("valueSize", FieldType.Int32),
@@ -232,7 +233,7 @@ final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
       for {
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
-        table   <- BitcaskTable.initialize("testTable", config, queue)
+        table            <- BitcaskTable.initialize("testTable", config, queue)
         // Make directory read-only to simulate write failure
         dataFile = tempDir / "seg_0.bin"
         _ <- Files[IO].setPosixPermissions(
@@ -251,7 +252,7 @@ final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
     }
   }
 
-  test("BitcaskTable should handle delete operations correctly") {
+  "BitcaskTable should handle delete operations correctly" in {
     withTempDirectory { tempDir =>
       val dataSchema = List(
         FieldDef("valueSize", FieldType.Int32),
@@ -291,7 +292,7 @@ final class BitcaskTableErrorHandlingSpec extends AnyFunSuite with Matchers {
       for {
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
-        table   <- BitcaskTable.initialize("testTable", config, queue)
+        table            <- BitcaskTable.initialize("testTable", config, queue)
         _                <- table.write("testKey", "testValue")
         readValue1       <- table.read("testKey")
         _                <- table.delete("testKey")
