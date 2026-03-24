@@ -14,6 +14,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import scodec.bits.ByteVector
 
 import java.nio.file.Files as JFiles
+import scala.concurrent.duration.DurationInt
 
 final class BitcaskTableErrorHandlingSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
@@ -240,19 +241,21 @@ final class BitcaskTableErrorHandlingSpec extends AsyncFreeSpec with AsyncIOSpec
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
         table            <- BitcaskTable.initialize("testTable", config, queue)
         (_, release)     <- writeBinary[IO](queue.stream, parallelism = 1).compile.drain.background.allocated
+        writeResult <- table.write("testKey1", "testValue1")
+        _ <- IO.sleep(300.millis)
+        dataFile <- Files[IO].list(tempDir, "seg_*.bin").compile.lastOrError
         // Make directory read-only to simulate write failure
-        dataFile = tempDir / "seg_0.bin"
         _ <- Files[IO].setPosixPermissions(
           dataFile,
           fs2.io.file.PosixPermissions.fromString("r--r--r--").get
         )
-        writeResult <- table.write("testKey", "testValue")
+        writeResult <- table.write("testKey2", "testValue2")
         _           <- release
       } yield {
         // Should fail due to permission error
         writeResult shouldBe a[Left[String, Row]]
         writeResult match {
-          case Left(error) => error should include("Write failed")
+          case Left(error) => error should include("Write operation failed")
           case Right(_)    => fail("Should not succeed with read-only directory")
         }
       }
