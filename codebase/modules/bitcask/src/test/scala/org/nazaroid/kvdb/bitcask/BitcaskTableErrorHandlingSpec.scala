@@ -74,9 +74,10 @@ final class BitcaskTableErrorHandlingSpec extends AsyncFreeSpec with AsyncIOSpec
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
         table            <- BitcaskTable.initialize("testTable", config, queue)
+        (_, release)     <- writeBinary[IO](queue.stream, parallelism = 1).compile.drain.background.allocated
         _                <- table.write("testKey", "testValue")
         readValue        <- table.read("testKey")
-
+        _                <- release
       } yield readValue shouldBe Some("testValue")
     }
   }
@@ -122,6 +123,7 @@ final class BitcaskTableErrorHandlingSpec extends AsyncFreeSpec with AsyncIOSpec
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
         table            <- BitcaskTable.initialize("testTable", config, queue)
+        (_, release)     <- writeBinary[IO](queue.stream, parallelism = 1).compile.drain.background.allocated
 
         // Create corrupted data file manually
         dataFile = tempDir / "seg_0.bin"
@@ -139,6 +141,7 @@ final class BitcaskTableErrorHandlingSpec extends AsyncFreeSpec with AsyncIOSpec
         _ <- Stream.emits(corruptedData.toArray).through(Files[IO].writeAll(dataFile)).compile.drain
         // Try to read corrupted data
         readValue <- table.read("testKey")
+        _         <- release
         // Should return None due to CRC validation failure
       } yield readValue shouldBe None
     }
@@ -187,8 +190,10 @@ final class BitcaskTableErrorHandlingSpec extends AsyncFreeSpec with AsyncIOSpec
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
         table            <- BitcaskTable.initialize("testTable", config, queue)
+        (_, release)     <- writeBinary[IO](queue.stream, parallelism = 1).compile.drain.background.allocated
         _                <- table.write("testKey", "testValue")
         readValue        <- table.read("testKey")
+        _                <- release
       } yield readValue shouldBe Some("testValue")
     }
   }
@@ -234,6 +239,7 @@ final class BitcaskTableErrorHandlingSpec extends AsyncFreeSpec with AsyncIOSpec
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
         table            <- BitcaskTable.initialize("testTable", config, queue)
+        (_, release)     <- writeBinary[IO](queue.stream, parallelism = 1).compile.drain.background.allocated
         // Make directory read-only to simulate write failure
         dataFile = tempDir / "seg_0.bin"
         _ <- Files[IO].setPosixPermissions(
@@ -241,6 +247,7 @@ final class BitcaskTableErrorHandlingSpec extends AsyncFreeSpec with AsyncIOSpec
           fs2.io.file.PosixPermissions.fromString("r--r--r--").get
         )
         writeResult <- table.write("testKey", "testValue")
+        _           <- release
       } yield {
         // Should fail due to permission error
         writeResult shouldBe a[Left[String, Row]]
@@ -293,10 +300,12 @@ final class BitcaskTableErrorHandlingSpec extends AsyncFreeSpec with AsyncIOSpec
         given Logger[IO] <- Slf4jLogger.create[IO]
         queue            <- Channel.unbounded[IO, WriteTask[IO]]
         table            <- BitcaskTable.initialize("testTable", config, queue)
+        (_, release)     <- writeBinary[IO](queue.stream, parallelism = 1).compile.drain.background.allocated
         _                <- table.write("testKey", "testValue")
         readValue1       <- table.read("testKey")
         _                <- table.delete("testKey")
         readValue2       <- table.read("testKey")
+        _                <- release
       } yield {
         readValue1 shouldBe Some("testValue")
         readValue2 shouldBe None // Should be None after delete
