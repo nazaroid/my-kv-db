@@ -10,56 +10,56 @@ import org.typelevel.log4cats.Logger
 
 /** Prometheus-based MetricsAdapter for Bitcask
   */
-class BitcaskPrometheusMetricsAdapter[F[_]: Async: Logger] extends MetricsAdapter[F] {
+class BitcaskPrometheusMetricsAdapter[F[_]: Async: Logger](reg: CollectorRegistry) extends MetricsAdapter[F] {
 
   // Catalog-level metrics
   private val totalDatabasesGauge = Gauge
     .build()
     .name("bitcask_databases_total")
     .help("Total number of databases")
-    .register()
+    .register(reg)
 
   private val totalTablesGauge = Gauge
     .build()
     .name("bitcask_tables_total")
     .help("Total number of tables across all databases")
-    .register()
+    .register(reg)
 
   private val totalEntriesGauge = Gauge
     .build()
     .name("bitcask_entries_total")
     .help("Total number of entries across all databases")
-    .register()
+    .register(reg)
 
   private val activeEntriesGauge = Gauge
     .build()
     .name("bitcask_entries_active_total")
     .help("Total number of active entries across all databases")
-    .register()
+    .register(reg)
 
   private val deletedEntriesGauge = Gauge
     .build()
     .name("bitcask_entries_deleted_total")
     .help("Total number of deleted entries across all databases")
-    .register()
+    .register(reg)
 
   private val totalDataSizeGauge = Gauge
     .build()
     .name("bitcask_data_size_bytes")
     .help("Total data size in bytes across all databases")
-    .register()
+    .register(reg)
 
   private val totalSegmentsGauge = Gauge
     .build()
     .name("bitcask_segments_total")
     .help("Total number of segments across all databases")
-    .register()
+    .register(reg)
 
   private val activeSegmentsGauge = Gauge
     .build()
     .name("bitcask_segments_active_total")
     .help("Total number of active segments across all databases")
-    .register()
+    .register(reg)
 
   // Database-level metrics
   private val databaseEntriesGauge = Gauge
@@ -67,21 +67,21 @@ class BitcaskPrometheusMetricsAdapter[F[_]: Async: Logger] extends MetricsAdapte
     .name("bitcask_database_entries_total")
     .help("Total number of entries in a database")
     .labelNames("database")
-    .register()
+    .register(reg)
 
   private val databaseTablesGauge = Gauge
     .build()
     .name("bitcask_database_tables_total")
     .help("Total number of tables in a database")
     .labelNames("database")
-    .register()
+    .register(reg)
 
   private val databaseDataSizeGauge = Gauge
     .build()
     .name("bitcask_database_data_size_bytes")
     .help("Total data size in bytes for a database")
     .labelNames("database")
-    .register()
+    .register(reg)
 
   // Table-level metrics
   private val tableEntriesGauge = Gauge
@@ -89,35 +89,35 @@ class BitcaskPrometheusMetricsAdapter[F[_]: Async: Logger] extends MetricsAdapte
     .name("bitcask_table_entries_total")
     .help("Total number of entries in a table")
     .labelNames("database", "table")
-    .register()
+    .register(reg)
 
   private val tableActiveEntriesGauge = Gauge
     .build()
     .name("bitcask_table_entries_active_total")
     .help("Total number of active entries in a table")
     .labelNames("database", "table")
-    .register()
+    .register(reg)
 
   private val tableDeletedEntriesGauge = Gauge
     .build()
     .name("bitcask_table_entries_deleted_total")
     .help("Total number of deleted entries in a table")
     .labelNames("database", "table")
-    .register()
+    .register(reg)
 
   private val tableDataSizeGauge = Gauge
     .build()
     .name("bitcask_table_data_size_bytes")
     .help("Total data size in bytes for a table")
     .labelNames("database", "table")
-    .register()
+    .register(reg)
 
   private val tableSegmentsGauge = Gauge
     .build()
     .name("bitcask_table_segments_total")
     .help("Total number of segments for a table")
     .labelNames("database", "table")
-    .register()
+    .register(reg)
 
   // Segment-level metrics
   private val segmentSizeGauge = Gauge
@@ -125,21 +125,21 @@ class BitcaskPrometheusMetricsAdapter[F[_]: Async: Logger] extends MetricsAdapte
     .name("bitcask_segment_size_bytes")
     .help("Size of a segment in bytes")
     .labelNames("database", "table", "segment")
-    .register()
+    .register(reg)
 
   private val segmentEntriesGauge = Gauge
     .build()
     .name("bitcask_segment_entries_total")
     .help("Number of entries in a segment")
     .labelNames("database", "table", "segment")
-    .register()
+    .register(reg)
 
   private val segmentStaleRatioGauge = Gauge
     .build()
     .name("bitcask_segment_stale_data_ratio")
     .help("Ratio of stale data in a segment")
     .labelNames("database", "table", "segment")
-    .register()
+    .register(reg)
 
   override def registerMetrics(): F[Unit] = {
     Logger[F].info("Bitcask Prometheus metrics registered")
@@ -230,10 +230,10 @@ class BitcaskPrometheusMetricsAdapter[F[_]: Async: Logger] extends MetricsAdapte
 
 object BitcaskPrometheusMetricsAdapter {
 
-  def create[F[_]: Async: Logger]: F[BitcaskPrometheusMetricsAdapter[F]] = {
+  def create[F[_]: Async: Logger](reg: CollectorRegistry): F[BitcaskPrometheusMetricsAdapter[F]] = {
     for {
       _ <- Logger[F].info("Creating Bitcask Prometheus metrics adapter")
-      adapter = new BitcaskPrometheusMetricsAdapter[F]()
+      adapter = new BitcaskPrometheusMetricsAdapter[F](reg: CollectorRegistry)
     } yield adapter
   }
 }

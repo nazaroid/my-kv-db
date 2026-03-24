@@ -7,7 +7,7 @@ import cats.implicits.given
 import fs2.io.file.Files
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType}
 import org.nazaroid.kvdb.bitcask.lib.BitcaskTableConfig
-import org.nazaroid.kvdb.core.Engine
+import org.nazaroid.kvdb.core.{DatabaseManager, Engine}
 import org.typelevel.log4cats.Logger
 
 object BitcaskEngine {
@@ -57,6 +57,8 @@ object BitcaskEngine {
 final class BitcaskEngine[F[_]: Async: Logger](
   databaseManager: BitcaskDatabaseManager[F])
     extends Engine[F] {
+
+  override def dbManager: DatabaseManager[F] = databaseManager
 
   override def createDbIfNotExists(name: String): F[Unit] = {
     databaseManager.createDatabase(name).void

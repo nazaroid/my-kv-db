@@ -114,7 +114,6 @@ lazy val `core` = (project in file("codebase/modules/core"))
 
 lazy val `server` = (project in file("codebase/modules/server"))
   .dependsOn(`metrics` % "compile->compile;test->test;it->it")
-  .dependsOn(`core` % "compile->compile;test->test;it->it")
   .dependsOn(`bitcask` % "compile->compile;test->test;it->it")
   .enablePlugins(DockerPlugin, JavaAppPackaging)
   .disablePlugins(AssemblyPlugin)

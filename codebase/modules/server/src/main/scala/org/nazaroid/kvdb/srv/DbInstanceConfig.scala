@@ -1,7 +1,6 @@
 package org.nazaroid.kvdb.srv
 
 import org.nazaroid.kvdb.bitcask.BitcaskEngineConfig
-import org.nazaroid.kvdb.{EngineConfig, ServerConfig, ServerConfigBase}
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
@@ -21,7 +20,6 @@ enum ServerConfig extends ServerConfigBase:
   case Grpc(
     host: String,
     port: Int)
-
 
 final case class DbInstanceConfig(
   server: ServerConfig = ServerConfig.Http(),

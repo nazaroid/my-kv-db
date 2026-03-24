@@ -7,7 +7,7 @@ import cats.effect.{Async, Resource}
 import cats.implicits.given
 import fs2.io.file.Files
 import fs2.io.net.Network
-import org.nazaroid.kvdb.algebra.Server
+import org.nazaroid.kvdb.core.Server
 import org.nazaroid.kvdb.srv.DbInstanceConfig
 import org.typelevel.log4cats.Logger
 

@@ -10,6 +10,7 @@ trait Server[F[_]] {
   * database module, not on server module
   */
 trait Engine[F[_]] {
+  def dbManager: DatabaseManager[F]
 
   def createDbIfNotExists(name: String): F[Unit]
 
