@@ -10,10 +10,12 @@ import cats.implicits.given
 import fs2.io.file.Files
 import io.circe.Json
 import org.http4s.Method.{DELETE, POST}
+import org.http4s.circe.*
 import org.http4s.client.Client
+import org.http4s.dsl.io.*
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.implicits.*
-import org.http4s.{Method, Request, Status, Uri}
+import org.http4s.{EntityDecoder, Method, Request, Status, Uri}
 import org.nazaroid.kvdb.bitcask.BitcaskEngine
 import org.nazaroid.kvdb.core.*
 import org.nazaroid.kvdb.srv.http.HttpServer
@@ -22,7 +24,10 @@ import org.scalatest.FutureOutcome
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.{Logger, SelfAwareStructuredLogger}
+import org.http4s.implicits.given
 
+import java.nio.file.Paths
 import scala.concurrent.duration.*
 import scala.reflect.io.Directory
 
@@ -69,9 +74,9 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
   "GET /stats/catalog should return catalog statistics" in withDbServerRunning { client =>
     for {
       // Setup: create some test data
-      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
-      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user2")).withEntity("John Smith")).use_
-      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/orders/order1")).withEntity("product1")).use_
+      _ <- client.run(Request[IO](POST, uri(f"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
+      _ <- client.run(Request[IO](POST, uri(f"$baseUrl/data/testdb/users/user2")).withEntity("John Smith")).use_
+      _ <- client.run(Request[IO](POST, uri(f"$baseUrl/data/testdb/orders/order1")).withEntity("product1")).use_
 
       // Test catalog statistics
       request = Request[IO](Method.GET, uri"$baseUrl/stats/catalog")
@@ -106,9 +111,9 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
   "GET /stats/database/{dbName} should return database statistics" in withDbServerRunning { client =>
     for {
       // Setup: create test data
-      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
-      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user2")).withEntity("John Smith")).use_
-      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/orders/order1")).withEntity("product1")).use_
+      _ <- client.run(Request[IO](POST, uri(f"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
+      _ <- client.run(Request[IO](POST, uri(f"$baseUrl/data/testdb/users/user2")).withEntity("John Smith")).use_
+      _ <- client.run(Request[IO](POST, uri(f"$baseUrl/data/testdb/orders/order1")).withEntity("product1")).use_
 
       // Test database statistics
       request = Request[IO](Method.GET, uri"$baseUrl/stats/database/testdb")
@@ -152,9 +157,9 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
   "GET /stats/table/{dbName}/{tableName} should return table statistics" in withDbServerRunning { client =>
     for {
       // Setup: create test data
-      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
-      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user2")).withEntity("John Smith")).use_
-      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/orders/order1")).withEntity("product1")).use_
+      _ <- client.run(Request[IO](POST, uri(f"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
+      _ <- client.run(Request[IO](POST, uri(f"$baseUrl/data/testdb/users/user2")).withEntity("John Smith")).use_
+      _ <- client.run(Request[IO](POST, uri(f"$baseUrl/data/testdb/orders/order1")).withEntity("product1")).use_
 
       // Test table statistics
       request = Request[IO](Method.GET, uri"$baseUrl/stats/table/testdb/users")
@@ -211,7 +216,7 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
   "GET /stats/table/{dbName}/{nonExistentTable} should return 404" in withDbServerRunning { client =>
     for {
       // Setup: create database but no table
-      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
+      _ <- client.run(Request[IO](POST, uri(f"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
 
       request = Request[IO](Method.GET, uri"$baseUrl/stats/table/testdb/nonexistent")
       response <- client.status(request)
@@ -226,7 +231,7 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
   "Statistics should reflect data changes" in withDbServerRunning { client =>
     for {
       // Initial setup
-      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
+      _ <- client.run(Request[IO](POST, uri(f"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
 
       // Get initial stats
       initialRequest = Request[IO](Method.GET, uri"$baseUrl/stats/table/testdb/users")
@@ -238,8 +243,8 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
       }
 
       // Add more data
-      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user3")).withEntity("Jane Smith")).use_
-      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user2")).withEntity("Bob Johnson")).use_
+      _ <- client.run(Request[IO](POST, uri(f"$baseUrl/data/testdb/users/user3")).withEntity("Jane Smith")).use_
+      _ <- client.run(Request[IO](POST, uri(f"$baseUrl/data/testdb/users/user2")).withEntity("Bob Johnson")).use_
 
       // Get updated stats
       updatedRequest = Request[IO](Method.GET, uri"$baseUrl/stats/table/testdb/users")
@@ -251,7 +256,7 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
       }
 
       // Test deletion
-      _ <- client.run(Request[IO](Request[IO](DELETE, uri(s"$baseUrl/data/testdb/users/user2")))).use_
+      _ <- client.run(Request[IO](Request[IO](DELETE, uri(f"$baseUrl/data/testdb/users/user2")))).use_
 
       // Get final stats
       finalRequest = Request[IO](Method.GET, uri"$baseUrl/stats/table/testdb/users")
@@ -269,10 +274,10 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
   "Multiple databases statistics" in withDbServerRunning { client =>
     for {
       // Setup: create multiple databases
-      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
-      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/db1/orders/order1")).withEntity("product1")).use_
-      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/db2/products/prod1")).withEntity("Laptop")).use_
-      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/db3/customers/cust1")).withEntity("Alice")).use_
+      _ <- client.run(Request[IO](POST, uri(f"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
+      _ <- client.run(Request[IO](POST, uri(f"$baseUrl/data/db1/orders/order1")).withEntity("product1")).use_
+      _ <- client.run(Request[IO](POST, uri(f"$baseUrl/data/db2/products/prod1")).withEntity("Laptop")).use_
+      _ <- client.run(Request[IO](POST, uri(f"$baseUrl/data/db3/customers/cust1")).withEntity("Alice")).use_
 
       // Test catalog statistics
       catalogRequest = Request[IO](Method.GET, uri"$baseUrl/stats/catalog")
