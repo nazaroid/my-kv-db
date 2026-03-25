@@ -26,7 +26,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import scala.concurrent.duration.*
 import scala.reflect.io.Directory
 
-object HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
+final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
   override def withFixture(test: NoArgAsyncTest): FutureOutcome = {
     java.nio.file.Files.createDirectories(testDir)
