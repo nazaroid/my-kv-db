@@ -78,7 +78,7 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
       _ <- client.run(Request[IO](POST, Uri.unsafeFromString(f"$baseUrl/data/testdb/orders/order1")).withEntity("product1")).use_
 
       // Test catalog statistics
-      request = Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/catalog")
+      request = Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/catalog"))
       response <- client.expect[Json](request)
 
       // Verify catalog stats structure
@@ -115,7 +115,7 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
       _ <- client.run(Request[IO](POST, Uri.unsafeFromString(f"$baseUrl/data/testdb/orders/order1")).withEntity("product1")).use_
 
       // Test database statistics
-      request = Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/database/testdb")
+      request = Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/database/testdb"))
       response <- client.expect[Json](request)
 
       // Verify database stats structure
@@ -161,7 +161,7 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
       _ <- client.run(Request[IO](POST, Uri.unsafeFromString(f"$baseUrl/data/testdb/orders/order1")).withEntity("product1")).use_
 
       // Test table statistics
-      request = Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/table/testdb/users")
+      request = Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/table/testdb/users"))
       response <- client.expect[Json](request)
 
       // Verify table stats structure
@@ -202,7 +202,7 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
 
   "GET /stats/database/{nonExistentDb} should return 404" in withDbServerRunning { client =>
     for {
-      request  <- Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/database/nonexistent").pure[IO]
+      request  <- Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/database/nonexistent")).pure[IO]
       response <- client.status(request)
 
       _ <- IO {
@@ -217,7 +217,7 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
       // Setup: create database but no table
       _ <- client.run(Request[IO](POST, Uri.unsafeFromString(f"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
 
-      request = Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/table/testdb/nonexistent")
+      request = Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/table/testdb/nonexistent"))
       response <- client.status(request)
 
       _ <- IO {
@@ -233,7 +233,7 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
       _ <- client.run(Request[IO](POST, Uri.unsafeFromString(f"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
 
       // Get initial stats
-      initialRequest = Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/table/testdb/users")
+      initialRequest = Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/table/testdb/users"))
       initialResponse <- client.expect[Json](initialRequest)
 
       _ <- IO {
@@ -246,7 +246,7 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
       _ <- client.run(Request[IO](POST, Uri.unsafeFromString(f"$baseUrl/data/testdb/users/user2")).withEntity("Bob Johnson")).use_
 
       // Get updated stats
-      updatedRequest = Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/table/testdb/users")
+      updatedRequest = Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/table/testdb/users"))
       updatedResponse <- client.expect[Json](updatedRequest)
 
       _ <- IO {
@@ -278,7 +278,7 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
       _ <- client.run(Request[IO](POST, Uri.unsafeFromString(f"$baseUrl/data/db3/customers/cust1")).withEntity("Alice")).use_
 
       // Test catalog statistics
-      catalogRequest = Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/catalog")
+      catalogRequest = Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/catalog"))
       catalogResponse <- client.expect[Json](catalogRequest)
 
       _ <- IO {
@@ -289,7 +289,7 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
       }
 
       // Test individual database stats
-      db1Request = Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/database/db1")
+      db1Request = Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/database/db1"))
       db1Response <- client.expect[Json](db1Request)
 
       _ <- IO {
