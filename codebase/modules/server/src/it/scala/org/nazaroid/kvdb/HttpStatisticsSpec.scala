@@ -1,72 +1,82 @@
 package org.nazaroid.kvdb
 
-import cats.effect.{IO, Resource}
+import cats.effect.implicits.given
+import cats.effect.kernel.Async
+import cats.effect.std.Dispatcher
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.effect.unsafe.implicits.global
+import cats.effect.{IO, Resource}
+import cats.implicits.given
 import fs2.io.file.Files
 import io.circe.Json
-import org.http4s.{Method, Request, Status, Uri}
+import org.http4s.Method.{DELETE, POST}
 import org.http4s.client.Client
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.implicits.*
-import org.nazaroid.kvdb.algebra.Engine
+import org.http4s.{Method, Request, Status, Uri}
 import org.nazaroid.kvdb.bitcask.BitcaskEngine
-import org.nazaroid.kvdb.database.{DatabaseManager, DatabaseStats, DatabaseInfo, TableInfo}
-import org.nazaroid.kvdb.srv.ServerConfig
+import org.nazaroid.kvdb.core.*
 import org.nazaroid.kvdb.srv.http.HttpServer
-import org.nazaroid.kvdb.statistics.{StatisticsService, MonitoringConfig}
+import org.nazaroid.kvdb.srv.{DbInstance, DbInstanceConfig, ServerConfig}
+import org.scalatest.FutureOutcome
+import org.scalatest.freespec.AsyncFreeSpec
+import org.scalatest.matchers.should.Matchers
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import weaver.*
 
 import scala.concurrent.duration.*
+import scala.reflect.io.Directory
 
-object HttpStatisticsSpec extends IOSuite {
+object HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
-  type Res = (Client[IO], Engine[IO], StatisticsService[IO])
+  override def withFixture(test: NoArgAsyncTest): FutureOutcome = {
+    java.nio.file.Files.createDirectories(testDir)
+    val outcome = super.withFixture(test)
+    outcome.onCompletedThen { _ =>
+      val dir = new Directory(testDir.toFile)
+      if (dir.exists) {
+        dir.deleteRecursively()
+      }
+    }
+  }
 
-  def sharedResource: Resource[IO, (Client[IO], Engine[IO], StatisticsService[IO])] =
-    for {
-      logger <- Resource.eval(Slf4jLogger.create[IO])
-      tempDir <- Resource.eval(Files[IO].tempDirectory(None, "http-stats-test"))
-      
-      // Create Bitcask engine
-      engine <- BitcaskEngine.create[IO](tempDir.toString)
-      
-      // Create statistics service
-      statsService <- Resource.eval(
-        StatisticsService.create[IO](engine.databaseManager, MonitoringConfig())
-      )
-      
-      // Create HTTP server
-      server <- new HttpServer[IO](
-        conf = ServerConfig.Http(
-          host = "localhost",
-          port = 0, // Random port
-          idleTimeout = 30.seconds,
-          maxConnections = 10
-        ),
-        engine = engine,
-        statisticsService = statsService
-      ).run().background
-      
-      // Create HTTP client
-      client <- EmberClientBuilder.default[IO].build
-      
-      // Wait for server to start
-      _ <- Resource.eval(IO.sleep(1.second))
-      
-    } yield (client, engine, statsService)
+  private val testDir = Paths.get("./testFolder")
+  private val config  = DbInstanceConfig()
 
-  test("GET /stats/catalog should return catalog statistics") { case (client, engine, statsService) =>
+  private val httpConf = config.server match {
+    case http: ServerConfig.Http => http
+    case _                       => throw new IllegalStateException("Expected Http server configuration")
+  }
+  private val host    = httpConf.host
+  private val port    = httpConf.port
+  private val baseUrl = s"http://$host:$port"
+  private val responseDecoder: EntityDecoder[IO, String] = EntityDecoder.text
+
+  def withDbServerRunning[T](test: Client[IO] => IO[T]): IO[T] = {
+    Dispatcher.parallel[IO].use { d =>
+      given Dispatcher[IO] = d
+      for {
+        logger <- Slf4jLogger.create[IO]
+        given Logger[IO] = logger
+        res <- DbInstance[IO]().resource(config).use { handle =>
+          EmberClientBuilder.default[IO].build.use { client =>
+            test(client)
+          }
+        }
+      } yield res
+    }
+  }
+
+  "GET /stats/catalog should return catalog statistics" in withDbServerRunning { client =>
     for {
       // Setup: create some test data
-      _ <- engine.set("testdb", "users", "user1", "John Doe")
-      _ <- engine.set("testdb", "users", "user2", "Jane Smith")
-      _ <- engine.set("testdb", "orders", "order1", "product1")
-      
+      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
+      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user2")).withEntity("John Smith")).use_
+      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/orders/order1")).withEntity("product1")).use_
+
       // Test catalog statistics
-      request = Request[IO](Method.GET, uri"http://localhost:8080/stats/catalog")
+      request = Request[IO](Method.GET, uri"$baseUrl/stats/catalog")
       response <- client.expect[Json](request)
-      
+
       // Verify catalog stats structure
       _ <- IO {
         assert(response.isObject, "Catalog stats should be a JSON object")
@@ -79,7 +89,7 @@ object HttpStatisticsSpec extends IOSuite {
         assert(obj.contains("totalDataSize"), "Should contain totalDataSize")
         assert(obj.contains("details"), "Should contain details")
       }
-      
+
       // Verify values
       _ <- IO {
         val obj = response.asObject.get
@@ -89,21 +99,21 @@ object HttpStatisticsSpec extends IOSuite {
         assert(obj("activeEntries").exists(_.asNumber.exists(_.toInt == 3)), "Should have 3 active entries")
         assert(obj("deletedEntries").exists(_.asNumber.exists(_.toInt == 0)), "Should have 0 deleted entries")
       }
-      
+
     } yield success
   }
 
-  test("GET /stats/database/{dbName} should return database statistics") { case (client, engine, statsService) =>
+  "GET /stats/database/{dbName} should return database statistics" in withDbServerRunning { client =>
     for {
       // Setup: create test data
-      _ <- engine.set("testdb", "users", "user1", "John Doe")
-      _ <- engine.set("testdb", "users", "user2", "Jane Smith")
-      _ <- engine.set("testdb", "orders", "order1", "product1")
-      
+      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
+      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user2")).withEntity("John Smith")).use_
+      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/orders/order1")).withEntity("product1")).use_
+
       // Test database statistics
-      request = Request[IO](Method.GET, uri"http://localhost:8080/stats/database/testdb")
+      request = Request[IO](Method.GET, uri"$baseUrl/stats/database/testdb")
       response <- client.expect[Json](request)
-      
+
       // Verify database stats structure
       _ <- IO {
         assert(response.isObject, "Database stats should be a JSON object")
@@ -116,7 +126,7 @@ object HttpStatisticsSpec extends IOSuite {
         assert(obj.contains("totalDataSize"), "Should contain totalDataSize")
         assert(obj.contains("details"), "Should contain details")
       }
-      
+
       // Verify values
       _ <- IO {
         val obj = response.asObject.get
@@ -126,7 +136,7 @@ object HttpStatisticsSpec extends IOSuite {
         assert(obj("activeEntries").exists(_.asNumber.exists(_.toInt == 3)), "Should have 3 active entries")
         assert(obj("deletedEntries").exists(_.asNumber.exists(_.toInt == 0)), "Should have 0 deleted entries")
       }
-      
+
       // Verify engine-specific details
       _ <- IO {
         val obj = response.asObject.get
@@ -135,21 +145,21 @@ object HttpStatisticsSpec extends IOSuite {
         assert(details.contains("engine_specific"), "Should contain engine_specific details")
         assert(details("engine_specific").exists(_.isObject), "Engine specific should be an object")
       }
-      
+
     } yield success
   }
 
-  test("GET /stats/table/{dbName}/{tableName} should return table statistics") { case (client, engine, statsService) =>
+  "GET /stats/table/{dbName}/{tableName} should return table statistics" in withDbServerRunning { client =>
     for {
       // Setup: create test data
-      _ <- engine.set("testdb", "users", "user1", "John Doe")
-      _ <- engine.set("testdb", "users", "user2", "Jane Smith")
-      _ <- engine.set("testdb", "orders", "order1", "product1")
-      
+      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
+      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user2")).withEntity("John Smith")).use_
+      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/orders/order1")).withEntity("product1")).use_
+
       // Test table statistics
-      request = Request[IO](Method.GET, uri"http://localhost:8080/stats/table/testdb/users")
+      request = Request[IO](Method.GET, uri"$baseUrl/stats/table/testdb/users")
       response <- client.expect[Json](request)
-      
+
       // Verify table stats structure
       _ <- IO {
         assert(response.isObject, "Table stats should be a JSON object")
@@ -161,7 +171,7 @@ object HttpStatisticsSpec extends IOSuite {
         assert(obj.contains("totalDataSize"), "Should contain totalDataSize")
         assert(obj.contains("details"), "Should contain details")
       }
-      
+
       // Verify values
       _ <- IO {
         val obj = response.asObject.get
@@ -170,130 +180,130 @@ object HttpStatisticsSpec extends IOSuite {
         assert(obj("activeEntries").exists(_.asNumber.exists(_.toInt == 2)), "Should have 2 active entries")
         assert(obj("deletedEntries").exists(_.asNumber.exists(_.toInt == 0)), "Should have 0 deleted entries")
       }
-      
+
       // Verify engine-specific details with segments
       _ <- IO {
         val obj = response.asObject.get
         assert(obj("details").exists(_.isObject), "Details should be an object")
         val details = obj("details").get.asObject.get
         assert(details.contains("engine_specific"), "Should contain engine_specific details")
-        
+
         val engineSpecific = details("engine_specific").get.asObject.get
         assert(engineSpecific.contains("segments"), "Should contain segments information")
         assert(engineSpecific("segments").exists(_.isArray), "Segments should be an array")
       }
-      
+
     } yield success
   }
 
-  test("GET /stats/database/{nonExistentDb} should return 404") { case (client, engine, statsService) =>
+  "GET /stats/database/{nonExistentDb} should return 404" in withDbServerRunning { client =>
     for {
-      request = Request[IO](Method.GET, uri"http://localhost:8080/stats/database/nonexistent")
+      request  <- Request[IO](Method.GET, uri"$baseUrl/stats/database/nonexistent").pure[IO]
       response <- client.status(request)
-      
+
       _ <- IO {
         assert(response == Status.NotFound, "Should return 404 for non-existent database")
       }
-      
+
     } yield success
   }
 
-  test("GET /stats/table/{dbName}/{nonExistentTable} should return 404") { case (client, engine, statsService) =>
+  "GET /stats/table/{dbName}/{nonExistentTable} should return 404" in withDbServerRunning { client =>
     for {
       // Setup: create database but no table
-      _ <- engine.set("testdb", "users", "user1", "John Doe")
-      
-      request = Request[IO](Method.GET, uri"http://localhost:8080/stats/table/testdb/nonexistent")
+      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
+
+      request = Request[IO](Method.GET, uri"$baseUrl/stats/table/testdb/nonexistent")
       response <- client.status(request)
-      
+
       _ <- IO {
         assert(response == Status.NotFound, "Should return 404 for non-existent table")
       }
-      
+
     } yield success
   }
 
-  test("Statistics should reflect data changes") { case (client, engine, statsService) =>
+  "Statistics should reflect data changes" in withDbServerRunning { client =>
     for {
       // Initial setup
-      _ <- engine.set("testdb", "users", "user1", "John Doe")
-      
+      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
+
       // Get initial stats
-      initialRequest = Request[IO](Method.GET, uri"http://localhost:8080/stats/table/testdb/users")
+      initialRequest = Request[IO](Method.GET, uri"$baseUrl/stats/table/testdb/users")
       initialResponse <- client.expect[Json](initialRequest)
-      
+
       _ <- IO {
         val obj = initialResponse.asObject.get
         assert(obj("totalEntries").exists(_.asNumber.exists(_.toInt == 1)), "Should have 1 entry initially")
       }
-      
+
       // Add more data
-      _ <- engine.set("testdb", "users", "user2", "Jane Smith")
-      _ <- engine.set("testdb", "users", "user3", "Bob Johnson")
-      
+      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user3")).withEntity("Jane Smith")).use_
+      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user2")).withEntity("Bob Johnson")).use_
+
       // Get updated stats
-      updatedRequest = Request[IO](Method.GET, uri"http://localhost:8080/stats/table/testdb/users")
+      updatedRequest = Request[IO](Method.GET, uri"$baseUrl/stats/table/testdb/users")
       updatedResponse <- client.expect[Json](updatedRequest)
-      
+
       _ <- IO {
         val obj = updatedResponse.asObject.get
         assert(obj("totalEntries").exists(_.asNumber.exists(_.toInt == 3)), "Should have 3 entries after updates")
       }
-      
+
       // Test deletion
-      _ <- engine.delete("testdb", "users", "user2")
-      
+      _ <- client.run(Request[IO](Request[IO](DELETE, uri(s"$baseUrl/data/testdb/users/user2")))).use_
+
       // Get final stats
-      finalRequest = Request[IO](Method.GET, uri"http://localhost:8080/stats/table/testdb/users")
+      finalRequest = Request[IO](Method.GET, uri"$baseUrl/stats/table/testdb/users")
       finalResponse <- client.expect[Json](finalRequest)
-      
+
       _ <- IO {
         val obj = finalResponse.asObject.get
         assert(obj("totalEntries").exists(_.asNumber.exists(_.toInt == 2)), "Should have 2 entries after deletion")
         assert(obj("deletedEntries").exists(_.asNumber.exists(_.toInt == 1)), "Should have 1 deleted entry")
       }
-      
+
     } yield success
   }
 
-  test("Multiple databases statistics") { case (client, engine, statsService) =>
+  "Multiple databases statistics" in withDbServerRunning { client =>
     for {
       // Setup: create multiple databases
-      _ <- engine.set("db1", "users", "user1", "John Doe")
-      _ <- engine.set("db1", "orders", "order1", "product1")
-      _ <- engine.set("db2", "products", "prod1", "Laptop")
-      _ <- engine.set("db3", "customers", "cust1", "Alice")
-      
+      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/testdb/users/user1")).withEntity("John Doe")).use_
+      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/db1/orders/order1")).withEntity("product1")).use_
+      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/db2/products/prod1")).withEntity("Laptop")).use_
+      _ <- client.run(Request[IO](POST, uri(s"$baseUrl/data/db3/customers/cust1")).withEntity("Alice")).use_
+
       // Test catalog statistics
-      catalogRequest = Request[IO](Method.GET, uri"http://localhost:8080/stats/catalog")
+      catalogRequest = Request[IO](Method.GET, uri"$baseUrl/stats/catalog")
       catalogResponse <- client.expect[Json](catalogRequest)
-      
+
       _ <- IO {
         val obj = catalogResponse.asObject.get
         assert(obj("totalDatabases").exists(_.asNumber.exists(_.toInt == 3)), "Should have 3 databases")
         assert(obj("totalTables").exists(_.asNumber.exists(_.toInt == 3)), "Should have 3 tables")
         assert(obj("totalEntries").exists(_.asNumber.exists(_.toInt == 4)), "Should have 4 total entries")
       }
-      
+
       // Test individual database stats
-      db1Request = Request[IO](Method.GET, uri"http://localhost:8080/stats/database/db1")
+      db1Request = Request[IO](Method.GET, uri"$baseUrl/stats/database/db1")
       db1Response <- client.expect[Json](db1Request)
-      
+
       _ <- IO {
         val obj = db1Response.asObject.get
         assert(obj("totalTables").exists(_.asNumber.exists(_.toInt == 2)), "DB1 should have 2 tables")
         assert(obj("totalEntries").exists(_.asNumber.exists(_.toInt == 2)), "DB1 should have 2 entries")
       }
-      
-      db2Request = Request[IO](Method.GET, uri"http://localhost:8080/stats/database/db2")
+
+      db2Request = Request[IO](Method.GET, uri"$baseUrl/stats/database/db2")
       db2Response <- client.expect[Json](db2Request)
-      
+
       _ <- IO {
         val obj = db2Response.asObject.get
         assert(obj("totalTables").exists(_.asNumber.exists(_.toInt == 1)), "DB2 should have 1 table")
         assert(obj("totalEntries").exists(_.asNumber.exists(_.toInt == 1)), "DB2 should have 1 entry")
       }
-      
+
     } yield success
   }
 }
