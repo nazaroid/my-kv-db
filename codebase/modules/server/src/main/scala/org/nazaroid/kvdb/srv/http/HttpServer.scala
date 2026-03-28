@@ -8,13 +8,12 @@ import io.circe.generic.auto.*
 import io.circe.syntax.*
 import io.prometheus.client.CollectorRegistry
 import org.http4s.Uri.Path.Root
-import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.dsl.Http4sDsl
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.metrics.prometheus.Prometheus
 import org.http4s.server.Router
 import org.http4s.server.middleware.Metrics
-import org.http4s.{HttpRoutes, Request, Response, Status, Uri}
+import org.http4s.{HttpRoutes, Request, Response}
 import org.nazaroid.kvdb.core.*
 import org.nazaroid.kvdb.srv.ServerConfig
 import org.nazaroid.kvdb.srv.http.middlewares.Err
@@ -76,8 +75,8 @@ final class HttpServer[F[_]: Async: Logger: Network](
               vOpt <- engine.get(dbName, tblName, key)
             } yield {
               vOpt match {
-                case Some(v) => Status.Ok(v)
-                case None    => Status.NotFound()
+                case Some(v) => Ok(v) // ✅ Без явного указания кодека
+                case None    => NotFound("Value not found")
               }
             }
           }.flatten
@@ -133,6 +132,7 @@ final class HttpServer[F[_]: Async: Logger: Network](
   }
 
   private object StatisticsController {
+    import org.http4s.circe.CirceEntityCodec.*
 
     def apply(statisticsService: StatisticsService[F]): Resource[F, HttpRoutes[F]] = {
       val statsService: HttpRoutes[F] = HttpRoutes.of[F] {
