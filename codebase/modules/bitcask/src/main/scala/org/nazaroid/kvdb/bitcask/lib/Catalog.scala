@@ -88,14 +88,14 @@ final class Catalog[F[_]: Async: Files: Logger](
   /** Load existing databases and their tables from filesystem */
   def loadExistingDatabases: F[Catalog[F]] = {
     for {
-      _ <- Logger[F].info("Loading existing databases...")
+      _       <- Logger[F].info("Loading existing databases...")
       dbNames <- listDatabases
-      _ <- Logger[F].info(s"Found databases: $dbNames")
-      
+      _       <- Logger[F].info(s"Found databases: $dbNames")
+
       loadedDbs <- dbNames.traverse { dbName =>
         loadDatabase(dbName)
       }
-      
+
       _ <- Logger[F].info(s"Successfully loaded ${loadedDbs.size} databases")
     } yield this
   }
@@ -105,24 +105,36 @@ final class Catalog[F[_]: Async: Files: Logger](
     for {
       _ <- Logger[F].info(s"Loading database: $dbName")
       dbPath = rootPath / dbName
-      
+
       // Check if database directory exists
       exists <- Files[F].exists(dbPath)
-      _ <- if (!exists) {
-        Logger[F].warn(s"Database directory $dbPath does not exist, skipping")
-      } else Async[F].unit
-      
+      _ <-
+        if (!exists) {
+          Logger[F].warn(s"Database directory $dbPath does not exist, skipping")
+        } else Async[F].unit
+
       // Create database instance
       tablesRef <- Ref.of[F, Map[String, BitcaskTable[F]]](Map.empty)
-      db = new BitcaskDatabase(dbName, dbPath, writeQueue, configTemplate, tablesRef)
-      
+      db = BitcaskDatabase(dbName, dbPath, writeQueue, configTemplate, tablesRef)
+
       // Load existing tables
       _ <- db.loadExistingTables
-      
+
       // Register database
       _ <- databases.update(_ + (dbName -> db))
-      
+
     } yield db
+  }
+
+  def deleteDatabase(dbName: String): F[Unit] = {
+    getDatabase(dbName).flatMap {
+      case Some(db) =>
+        for {
+          _ <- databases.update(_ - dbName)
+          _ <- Files[F].deleteIfExists(db.path)
+        } yield ()
+      case None => Async[F].unit
+    }
   }
 }
 
@@ -150,12 +162,14 @@ object Catalog {
       activeDbs <- Ref.of(Map.empty[String, BitcaskDatabase[F]]).toResource
 
       // 5. Load existing databases and tables
-      catalog <- Resource.eval(Catalog[F](
-        rootPath       = rootPath,
-        writeQueue     = writeQueue,
-        configTemplate = configTemplate,
-        databases      = activeDbs
-      ).loadExistingDatabases)
+      catalog <- Resource.eval(
+        Catalog[F](
+          rootPath       = rootPath,
+          writeQueue     = writeQueue,
+          configTemplate = configTemplate,
+          databases      = activeDbs
+        ).loadExistingDatabases
+      )
 
     } yield catalog
   }

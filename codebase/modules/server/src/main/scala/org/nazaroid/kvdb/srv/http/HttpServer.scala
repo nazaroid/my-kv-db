@@ -75,7 +75,7 @@ final class HttpServer[F[_]: Async: Logger: Network](
               vOpt <- engine.get(dbName, tblName, key)
             } yield {
               vOpt match {
-                case Some(v) => Ok(v) // ✅ Без явного указания кодека
+                case Some(v) => Ok(v)
                 case None    => NotFound("Value not found")
               }
             }

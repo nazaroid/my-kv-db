@@ -9,31 +9,21 @@ import org.nazaroid.kvdb.bitcask.lib.*
 import org.nazaroid.kvdb.core.*
 import org.typelevel.log4cats.Logger
 
-import scala.collection.mutable
-
 /** Bitcask-specific implementation of DatabaseManager Handles multiple Bitcask databases
   */
 final class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
   catalog: Catalog[F])
     extends DatabaseManager[F] {
 
-  private val databases = mutable.Map[String, BitcaskDatabase[F]]()
-
   override def createDatabase(name: String): F[Database[F]] = {
     for {
       _  <- Logger[F].info(s"Creating database: $name")
       db <- catalog.createDatabase(name)
-      _ <- Async[F].delay {
-        databases(name) = db
-      }
-
     } yield new DatabaseWrapper[F](db)
   }
 
   override def getDatabase(name: String): F[Option[Database[F]]] = {
-    Async[F].delay {
-      databases.get(name).map(db => new DatabaseWrapper[F](db))
-    }
+    catalog.getDatabase(name).map(_.map(new DatabaseWrapper[F](_)))
   }
 
   override def listDatabases: F[List[String]] = {
@@ -46,11 +36,7 @@ final class BitcaskDatabaseManager[F[_]: Async: Files: Logger](
   override def deleteDatabase(name: String): F[Unit] = {
     for {
       _ <- Logger[F].info(s"Deleting database: $name")
-      _ <- Async[F].delay {
-        databases.remove(name)
-      }
-      dbPath = Path(s"${catalog.rootPath}/$name")
-      _ <- Files[F].deleteIfExists(dbPath)
+      _ <- catalog.deleteDatabase(name)
 
     } yield ()
   }
