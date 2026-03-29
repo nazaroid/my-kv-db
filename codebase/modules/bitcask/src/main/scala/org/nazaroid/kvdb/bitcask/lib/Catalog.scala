@@ -84,6 +84,46 @@ final class Catalog[F[_]: Async: Files: Logger](
       databaseStats  = allDatabaseStats
     )
   }
+
+  /** Load existing databases and their tables from filesystem */
+  def loadExistingDatabases: F[Catalog[F]] = {
+    for {
+      _ <- Logger[F].info("Loading existing databases...")
+      dbNames <- listDatabases
+      _ <- Logger[F].info(s"Found databases: $dbNames")
+      
+      loadedDbs <- dbNames.traverse { dbName =>
+        loadDatabase(dbName)
+      }
+      
+      _ <- Logger[F].info(s"Successfully loaded ${loadedDbs.size} databases")
+    } yield this
+  }
+
+  /** Load a single database and its tables */
+  private def loadDatabase(dbName: String): F[BitcaskDatabase[F]] = {
+    for {
+      _ <- Logger[F].info(s"Loading database: $dbName")
+      dbPath = rootPath / dbName
+      
+      // Check if database directory exists
+      exists <- Files[F].exists(dbPath)
+      _ <- if (!exists) {
+        Logger[F].warn(s"Database directory $dbPath does not exist, skipping")
+      } else Async[F].unit
+      
+      // Create database instance
+      tablesRef <- Ref.of[F, Map[String, BitcaskTable[F]]](Map.empty)
+      db = new BitcaskDatabase(dbName, dbPath, writeQueue, configTemplate, tablesRef)
+      
+      // Load existing tables
+      _ <- db.loadExistingTables
+      
+      // Register database
+      _ <- databases.update(_ + (dbName -> db))
+      
+    } yield db
+  }
 }
 
 object Catalog {
@@ -95,6 +135,7 @@ object Catalog {
     parallelism:    Int = 10
   ): Resource[F, Catalog[F]] = {
     for {
+      _ <- Logger[F].info(f"catalog reading: $rootPath").toResource
       // 1. Create root directory if it doesn't exist
       _ <- Files[F].createDirectories(rootPath).handleError(_ => ()).toResource
 
@@ -108,11 +149,14 @@ object Catalog {
       // 4. Initialize the registry for open databases
       activeDbs <- Ref.of(Map.empty[String, BitcaskDatabase[F]]).toResource
 
-    } yield Catalog[F](
-      rootPath       = rootPath,
-      writeQueue     = writeQueue,
-      configTemplate = configTemplate,
-      databases      = activeDbs
-    )
+      // 5. Load existing databases and tables
+      catalog <- Resource.eval(Catalog[F](
+        rootPath       = rootPath,
+        writeQueue     = writeQueue,
+        configTemplate = configTemplate,
+        databases      = activeDbs
+      ).loadExistingDatabases)
+
+    } yield catalog
   }
 }

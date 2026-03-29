@@ -79,4 +79,43 @@ final class BitcaskDatabase[F[_]: Async: Files: Logger](
       tableStats     = allTableStats
     )
   }
+
+  /** Load existing tables and their data from filesystem */
+  def loadExistingTables: F[Unit] = {
+    for {
+      _ <- Logger[F].info(s"Loading tables for database: $name")
+      tableNames <- listTables()
+      _ <- Logger[F].info(s"Found tables: $tableNames")
+      
+      _ <- tableNames.traverse { tableName =>
+        loadTable(tableName)
+      }
+      
+      _ <- Logger[F].info(s"Successfully loaded ${tableNames.size} tables for database: $name")
+    } yield ()
+  }
+
+  /** Load a single table and its segments */
+  private def loadTable(tableName: String): F[BitcaskTable[F]] = {
+    for {
+      _ <- Logger[F].info(s"Loading table: $tableName")
+      tablePath = path / tableName
+      
+      // Check if table directory exists
+      exists <- Files[F].exists(tablePath)
+      _ <- if (!exists) {
+        Logger[F].warn(s"Table directory $tablePath does not exist, skipping")
+      } else Async[F].unit
+      
+      // Configure table settings
+      tableConfig = configTemplate.copy(folder = tablePath.toString)
+      
+      // Initialize table with existing data (segments will be loaded by BitcaskTable.initialize)
+      table <- BitcaskTable.initialize[F](tableName, tableConfig, writeQueue)
+      
+      // Register table
+      _ <- tables.update(_ + (tableName -> table))
+      
+    } yield table
+  }
 }
