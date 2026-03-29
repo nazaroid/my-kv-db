@@ -15,7 +15,6 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import org.typelevel.log4cats.{Logger, SelfAwareStructuredLogger}
 
 import java.nio.file.Paths
-import scala.concurrent.duration.DurationInt
 import scala.reflect.io.Directory
 
 // noinspection ScalaUnusedSymbol
@@ -70,10 +69,10 @@ final class HttpDbServerCrudSpec extends AsyncFreeSpec with AsyncIOSpec with Mat
 
             req = Request[IO](GET, Uri.unsafeFromString(s"http://$host:$port/data/db/tbl/key"))
             _    <- logger.info(f"get value request: $req")
-            resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder)).option
+            resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
             _    <- logger.info(f"get value response: $resp")
             _    <- handle.stop
-          } yield assert(resp.contains("value"))
+          } yield assert(resp == "value")
         }
       } yield ()
     }
@@ -147,8 +146,6 @@ final class HttpDbServerCrudSpec extends AsyncFreeSpec with AsyncIOSpec with Mat
             _    <- handle.stop
           } yield ()
         }
-        _ <- Async[IO].sleep(100.millis)
-
         _ <- logger.info(f"=== second db session ===")
         _ <- DbInstance[IO]().resource(config).use { handle =>
           for {
@@ -157,7 +154,7 @@ final class HttpDbServerCrudSpec extends AsyncFreeSpec with AsyncIOSpec with Mat
             resp <- EmberClientBuilder.default[IO].build.use(_.expect(req)(responseDecoder))
             _    <- logger.info(f"get value response: $resp")
             _    <- handle.stop
-          } yield assert(resp.contains("value"))
+          } yield assert(resp == "value")
         }
       } yield ()
     }

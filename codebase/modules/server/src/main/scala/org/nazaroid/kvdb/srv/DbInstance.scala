@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import com.comcast.ip4s.{Host, Port, SocketAddress}
 import fs2.io.file.Files
 import fs2.io.net.Network
+import io.prometheus.client.CollectorRegistry
 import org.nazaroid.kvdb.srv.composition.DiContainer
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -32,10 +33,21 @@ final class DbInstance[F[_]: Async: Files: Parallel: Network: Spawn] {
       stopSignal <- Resource.eval(Deferred[F, Unit])
       serverRes  <- Resource.eval(di.resolveServer(conf))
       _          <- Resource.eval(Logger[F].info("starting..."))
-      _          <- serverRes.flatMap(_.run()).use(_ => stopSignal.get).background
-      _          <- Resource.eval(waitForPort(conf.server.host, conf.server.port))
+      _ <- serverRes
+        .flatMap(_.run())
+        .use(_ => stopSignal.get)
+        .guarantee(afterServerStop)
+        .background
+      _ <- Resource.eval(waitForPort(conf.server.host, conf.server.port) *> Logger[F].info("server ready!"))
 
     } yield DbHandle(
-      stop = Logger[F].info("stopping...") *> stopSignal.complete(()).void
+      stop = Logger[F].warn("stopping...") *> stopSignal.complete(()).void
     )
+
+  private def afterServerStop(using Logger[F]) = {
+    for {
+      _ <- Async[F].delay(CollectorRegistry.defaultRegistry.clear())
+      _ <- Logger[F].info("stopped!")
+    } yield ()
+  }
 }
