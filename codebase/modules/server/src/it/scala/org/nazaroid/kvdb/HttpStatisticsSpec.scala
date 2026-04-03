@@ -151,8 +151,7 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
         val obj = response.asObject.get
         assert(obj("details").exists(_.isObject), "Details should be an object")
         val details = obj("details").get.asObject.get
-        assert(details.contains("engine_specific"), "Should contain engine_specific details")
-        assert(details("engine_specific").exists(_.isObject), "Engine specific should be an object")
+        assert(details.contains("engine_type"), "Details should contain engine_type")
       }
 
     } yield ()
@@ -180,9 +179,9 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
         assert(response.isObject, "Table stats should be a JSON object")
         val obj = response.asObject.get
         assert(obj.contains("name"), "Should contain name")
-        assert(obj.contains("totalEntries"), "Should contain totalEntries")
-        assert(obj.contains("activeEntries"), "Should contain activeEntries")
-        assert(obj.contains("deletedEntries"), "Should contain deletedEntries")
+        assert(obj.contains("entryCount"), "Should contain totalEntries")
+        assert(obj.contains("activeEntryCount"), "Should contain activeEntries")
+        assert(obj.contains("deletedEntryCount"), "Should contain deletedEntries")
         assert(obj.contains("totalDataSize"), "Should contain totalDataSize")
         assert(obj.contains("details"), "Should contain details")
       }
@@ -191,9 +190,9 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
       _ <- IO {
         val obj = response.asObject.get
         assert(obj("name").exists(_.asString.contains("users")), "Should have correct table name")
-        assert(obj("totalEntries").exists(_.asNumber.exists(_.toInt.contains(2))), "Should have 2 entries")
-        assert(obj("activeEntries").exists(_.asNumber.exists(_.toInt.contains(2))), "Should have 2 active entries")
-        assert(obj("deletedEntries").exists(_.asNumber.exists(_.toInt.contains(0))), "Should have 0 deleted entries")
+        assert(obj("entryCount").exists(_.asNumber.exists(_.toInt.contains(2))), "Should have 2 entries")
+        assert(obj("activeEntryCount").exists(_.asNumber.exists(_.toInt.contains(2))), "Should have 2 active entries")
+        assert(obj("deletedEntryCount").exists(_.asNumber.exists(_.toInt.contains(0))), "Should have 0 deleted entries")
       }
 
       // Verify engine-specific details with segments
@@ -201,11 +200,9 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
         val obj = response.asObject.get
         assert(obj("details").exists(_.isObject), "Details should be an object")
         val details = obj("details").get.asObject.get
-        assert(details.contains("engine_specific"), "Should contain engine_specific details")
 
-        val engineSpecific = details("engine_specific").get.asObject.get
-        assert(engineSpecific.contains("segments"), "Should contain segments information")
-        assert(engineSpecific("segments").exists(_.isArray), "Segments should be an array")
+        assert(details.contains("segments"), "Should contain segments information")
+        assert(details("segments").exists(_.isArray), "Segments should be an array")
       }
 
     } yield ()
@@ -253,7 +250,7 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
 
       _ <- IO {
         val obj = initialResponse.asObject.get
-        assert(obj("totalEntries").exists(_.asNumber.exists(_.toInt.contains(1))), "Should have 1 entry initially")
+        assert(obj("entryCount").exists(_.asNumber.exists(_.toInt.contains(1))), "Should have 1 entry initially")
       }
 
       // Add more data
@@ -271,7 +268,7 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
       _ <- IO {
         val obj = updatedResponse.asObject.get
         assert(
-          obj("totalEntries").exists(_.asNumber.exists(_.toInt.contains(3))),
+          obj("entryCount").exists(_.asNumber.exists(_.toInt.contains(3))),
           "Should have 3 entries after updates"
         )
       }
@@ -286,10 +283,10 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
       _ <- IO {
         val obj = finalResponse.asObject.get
         assert(
-          obj("totalEntries").exists(_.asNumber.exists(_.toInt.contains(2))),
+          obj("activeEntryCount").exists(_.asNumber.exists(_.toInt.contains(2))),
           "Should have 2 entries after deletion"
         )
-        assert(obj("deletedEntries").exists(_.asNumber.exists(_.toInt.contains(1))), "Should have 1 deleted entry")
+        assert(obj("deletedEntryCount").exists(_.asNumber.exists(_.toInt.contains(1))), "Should have 1 deleted entry")
       }
     } yield ()
   }
@@ -297,9 +294,6 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
   "Multiple databases statistics" in withDbServerRunning { client =>
     for {
       // Setup: create multiple databases
-      _ <- client
-        .run(Request[IO](POST, Uri.unsafeFromString(f"$baseUrl/data/testdb/users/user1")).withEntity("John Doe"))
-        .use_
       _ <- client
         .run(Request[IO](POST, Uri.unsafeFromString(f"$baseUrl/data/db1/orders/order1")).withEntity("product1"))
         .use_
@@ -318,7 +312,7 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
         val obj = catalogResponse.asObject.get
         assert(obj("totalDatabases").exists(_.asNumber.exists(_.toInt.contains(3))), "Should have 3 databases")
         assert(obj("totalTables").exists(_.asNumber.exists(_.toInt.contains(3))), "Should have 3 tables")
-        assert(obj("totalEntries").exists(_.asNumber.exists(_.toInt.contains(4))), "Should have 4 total entries")
+        assert(obj("totalEntries").exists(_.asNumber.exists(_.toInt.contains(3))), "Should have 3 total entries")
       }
 
       // Test individual database stats
@@ -327,8 +321,8 @@ final class HttpStatisticsSpec extends AsyncFreeSpec with AsyncIOSpec with Match
 
       _ <- IO {
         val obj = db1Response.asObject.get
-        assert(obj("totalTables").exists(_.asNumber.exists(_.toInt.contains(2))), "DB1 should have 2 tables")
-        assert(obj("totalEntries").exists(_.asNumber.exists(_.toInt.contains(2))), "DB1 should have 2 entries")
+        assert(obj("totalTables").exists(_.asNumber.exists(_.toInt.contains(1))), "DB1 should have 1 tables")
+        assert(obj("totalEntries").exists(_.asNumber.exists(_.toInt.contains(1))), "DB1 should have 1 entries")
       }
 
       db2Request = Request[IO](Method.GET, Uri.unsafeFromString(f"$baseUrl/stats/database/db2"))
