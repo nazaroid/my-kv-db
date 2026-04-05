@@ -56,10 +56,13 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
   - ввести конфиг `durability: Relaxed | FsyncPerSegment | FsyncPerBatchвести конфиг `durability: Relaxed | FsyncPerSegment | FsyncPerBatch
   - длины ключей считаются в символах, а не в байтах UTF-8
 
-- (TODO) рефакторинг: 
-  - В операции write не используется схема данных StorageConfig.dataSchema. 
-    Схема данных используется косвенно из-за чего возможно расхождение.
-    Попробуй произвести рефакторинг, чтобы все операции в StorageManager использовали свою схему данных
+* (TODO) добавить типы
+  Blob / Byte Array - базовый тип для хранения
+      Bitcask Engine: возвращает Byte Array
+      Serialization/Codec Layer: работает поверх engine и производит преобразования
+  String (Строка): Основной тип для ключей. Позволяет организовывать пространство имен (например, user:123:profile) и выполнять поиск по маскам.
+  Integer (Целое число): Необходим для реализации атомарных счетчиков и инкрементальных операций без полной перезаписи значения.
+  Boolean (Логический тип): Часто используется для флагов состояния, так как занимает минимум места.
 
 - (TODO) подготовить для OpenSource
 
@@ -71,10 +74,10 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
 * (TODO) (проектирование/реализация) добавить bloom filter
     * спроектировать сценарии использования
     * реализовать
+  
 * (TODO) поддержи GRPC
   - при grpc уметь получать статистику по grpc
 
-grafana + prometheus
-https://github.com/gvolpe/trading/blob/main/docker-compose.yml
+
 
 потом прикрутить SQL
