@@ -1,4 +1,4 @@
-.PHONY: help build run stop clean logs status test grafana-setup populate-db
+.PHONY: help build run stop clean logs status test grafana-setup populate-db show-stats
 
 # Default target
 help:
@@ -18,7 +18,7 @@ help:
 	@echo "  populate-db - Populate database with test data (100 users)"
 	@echo "  populate-db-custom - Populate with custom number of records"
 	@echo "  cleanup-test-data - Clean up test data"
-	@echo "  db-stats   - Show database statistics"
+	@echo "  show-stats - Show database statistics (formatted JSON)"
 	@echo ""
 
 # Build the application
@@ -116,9 +116,9 @@ cleanup-test-data:
 	./scripts/populate-db.sh -c
 
 # Show database statistics
-db-stats:
+show-stats:
 	@echo "Showing database statistics..."
-	./scripts/populate-db.sh -s
+	./scripts/show-stats.sh
 
 # Run API tests
 test:
