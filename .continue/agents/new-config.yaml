@@ -1,0 +1,50 @@
+# This is an example configuration file
+# To learn more, see the full config.yaml reference: https://continue.dev
+
+name: My Config
+version: 1.0.0
+schema: v1
+
+# Модели
+models:
+  - name: "gemini-3-flash-preview"
+    provider: gemini
+    model: gemini-3-flash-preview
+    apiKey: AIzaSyDH70SCPufGhgj0IuXdFDZEjmOvtGKR1yM
+  - name: "OLLAMA:qwen2.5-coder:7b"
+    provider: "ollama"
+    model: "qwen2.5-coder:7b"
+    apiBase: "http://localhost:11434" # БЕЗ /v1 для провайдера ollama
+    capabilities:
+        - "tools" 
+  - name: "OLLAMA:qwen2.5-coder:32b-instruct-q3_K_M"
+    provider: "ollama"
+    model: "qwen2.5-coder:32b-instruct-q3_K_M"
+    apiBase: "http://localhost:11434" # БЕЗ /v1 для провайдера ollama
+    capabilities:
+        - "tools" 
+  - name: "OLLAMA:deepseek-coder-v2:16b"
+    provider: "ollama"
+    model: "deepseek-coder-v2:16b"
+    apiBase: "http://localhost:11434" # БЕЗ /v1 для провайдера ollama
+    capabilities:
+        - "tools" 
+
+# ВАЖНО: Добавьте это, чтобы поиск @Codebase заработал
+# Перед этим выполните в терминале: ollama pull nomic-embed-text
+embeddingsProvider:
+  provider: ollama
+  model: nomic-embed-text
+
+# MCP Servers (инструменты)
+mcpServers:
+  - uses: anthropic/memory-mcp
+
+# Провайдеры контекста (те самые команды через @)
+contextProviders:
+  - name: "codebase"
+  - name: "folder"
+  - name: "diff"
+  - name: "open"
+  - name: "terminal"
+  - name: "docs"

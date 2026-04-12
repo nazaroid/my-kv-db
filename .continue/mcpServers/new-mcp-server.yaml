@@ -1,0 +1,23 @@
+name: mcp-atlassian
+version: 0.0.1
+schema: v1
+mcpServers:
+  - name: mcp-atlassian
+    command: docker
+    args:
+      - run
+      - "--rm"
+      - "-i"
+      - "--add-host"
+      - "://uzum.com.34.246.37"
+      - "--add-host"
+      - "://uzum.com.34.246.37"
+      - "ghcr.io/sooperset/mcp-atlassian:latest"
+    env:
+      CONFLUENCE_URL: "https://uzum.com"
+      CONFLUENCE_PERSONAL_TOKEN: "NDg0MzIzODM2MzUyOp9Dq6rSQurjOj7WlHRS+v+3gxeb"
+      CONFLUENCE_SSL_VERIFY: "false"
+      JIRA_URL: "https://uzum.com"
+      JIRA_PERSONAL_TOKEN: "MzkzMzQxNTEzNzA0OhWHQHWwEAHIVdKrJ4shxzPhsOtO"
+      JIRA_SSL_VERIFY: "false"
+      PYTHONHTTPSVERIFY: "0"
