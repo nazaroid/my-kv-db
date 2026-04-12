@@ -25,6 +25,8 @@ final class ServerModule[F[_]: Async: Files: Logger: Parallel: Network](commonMo
           io.prometheus.client.CollectorRegistry.defaultRegistry
         )
         .toResource
+      _ <- Resource.eval(statisticsService.registerMetrics())
+      _ <- Resource.eval(statisticsService.startMonitoring())
     } yield {
       config.server match {
         case httpConf: ServerConfig.Http =>
