@@ -3,6 +3,8 @@ import com.typesafe.sbt.SbtNativePackager.Docker
 import sbt.Keys.*
 import sbt.{Def, *}
 import sbtassembly.AssemblyKeys.*
+import sbtassembly.AssemblyPlugin.autoImport.ShadeRule
+import sbtassembly.{MergeStrategy, PathList}
 
 object BuildSettings {
   val javaVersion = "1.8"
@@ -64,4 +66,12 @@ object BuildSettings {
     semanticdbEnabled := true
   )
 
+  lazy val assemblyMergeSetting = Seq(
+    assembly / assemblyMergeStrategy := {
+      case x if x.endsWith("module-info.class") => MergeStrategy.discard
+      case PathList("META-INF", "services", _*) => MergeStrategy.concat
+      case PathList("META-INF", _*) => MergeStrategy.discard
+      case x => MergeStrategy.defaultMergeStrategy(x)
+    }
+  )
 }

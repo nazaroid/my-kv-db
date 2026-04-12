@@ -13,7 +13,7 @@ import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.metrics.prometheus.Prometheus
 import org.http4s.server.Router
 import org.http4s.server.middleware.Metrics
-import org.http4s.{HttpRoutes, Request, Response, Status, Uri}
+import org.http4s.{HttpRoutes, Request, Response, Uri}
 import org.nazaroid.kvdb.core.*
 import org.nazaroid.kvdb.srv.ServerConfig
 import org.nazaroid.kvdb.srv.http.middlewares.Err
