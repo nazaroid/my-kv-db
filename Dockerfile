@@ -1,5 +1,5 @@
 # Build stage
-FROM amazoncorretto:21-al2023 AS builder
+FROM amazoncorretto:17-al2023 AS builder
 
 RUN yum update -y && \
     yum install -y gzip tar ca-certificates && \
@@ -19,9 +19,11 @@ RUN ARCH=$(uname -m) && \
 WORKDIR /app
 COPY . .
 
-RUN cs launch sbt:1.9.6 -- "project service" assembly
+RUN ls .
 
-FROM amazoncorretto:21-al2023
+RUN cs launch sbt:1.9.6 -- "service/assembly"
+
+FROM amazoncorretto:17-al2023
 
 RUN yum install -y shadow-utils curl-minimal && \
     yum clean all

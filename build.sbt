@@ -149,7 +149,7 @@ lazy val `service` = (project in file("codebase/service"))
     inConfig(Integration)(Defaults.testSettings),
     Integration / testOptions += Tests
       .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/service/integration-tests-html-report"),
-    dockerBaseImage      := "amazoncorretto:21-al2023 ",
+    dockerBaseImage      := "amazoncorretto:17-al2023 ",
     Docker / packageName := "org/nazaroid/kvdb/server",
     Docker / version     := version.value,
     envVars += (sys.props.get("config") match {

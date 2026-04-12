@@ -1,6 +1,5 @@
 # Build artifacts
 target/
-project/
 target-2.13/
 
 # IDE files
@@ -49,8 +48,6 @@ application.conf
 
 # SBT files
 .sbt/
-build.sbt
-project/
 
 # Scala files
 *.scala~
