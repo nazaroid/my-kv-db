@@ -25,7 +25,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "\${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -38,10 +38,6 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
@@ -71,12 +67,11 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.0.0",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "\${DS_PROMETHEUS}"
           },
           "expr": "bitcask_databases_total",
           "refId": "A"
@@ -88,7 +83,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "\${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -101,10 +96,6 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
@@ -134,12 +125,11 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.0.0",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "\${DS_PROMETHEUS}"
           },
           "expr": "bitcask_tables_total",
           "refId": "A"
@@ -151,7 +141,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "\${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -164,10 +154,6 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
@@ -197,12 +183,11 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.0.0",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "\${DS_PROMETHEUS}"
           },
           "expr": "bitcask_entries_total",
           "refId": "A"
@@ -214,7 +199,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "\${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -227,10 +212,6 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
@@ -260,12 +241,11 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.0.0",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "\${DS_PROMETHEUS}"
           },
           "expr": "bitcask_data_size_bytes",
           "refId": "A"
@@ -277,7 +257,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "\${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -347,7 +327,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "\${DS_PROMETHEUS}"
           },
           "expr": "bitcask_entries_active_total",
           "refId": "A"
@@ -355,7 +335,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "\${DS_PROMETHEUS}"
           },
           "expr": "bitcask_entries_deleted_total",
           "refId": "B"
@@ -367,7 +347,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "\${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -437,7 +417,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "\${DS_PROMETHEUS}"
           },
           "expr": "bitcask_data_size_bytes",
           "refId": "A"
@@ -455,7 +435,26 @@
     "bitcask"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "Prometheus",
+          "value": "Prometheus"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Datasource",
+        "multi": false,
+        "name": "DS_PROMETHEUS",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      }
+    ]
   },
   "time": {
     "from": "now-1h",
@@ -463,8 +462,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "KV Database Working Dashboard",
-  "uid": "kvdb-working",
+  "title": "KV Database Dashboard",
+  "uid": "kvdb-template",
   "version": 1,
   "weekStart": ""
 }

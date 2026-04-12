@@ -14,7 +14,7 @@ help:
 	@echo "  test      - Run API tests"
 	@echo "  health    - Check health of all services"
 	@echo "  metrics   - Show available metrics"
-	@echo "  grafana-setup - Setup Grafana dashboards (dynamic UID)"
+	@echo "  grafana-setup - Setup Grafana dashboards (template variables)"
 	@echo "  populate-db - Populate database with test data (100 users)"
 	@echo "  populate-db-custom - Populate with custom number of records"
 	@echo "  cleanup-test-data - Clean up test data"
@@ -95,9 +95,9 @@ metrics:
 	@echo "=== Prometheus Metrics ==="
 	@curl -s http://localhost:9090/metrics | grep "prometheus_" | head -10
 
-# Setup Grafana dashboards (dynamic UID)
+# Setup Grafana dashboards (template variables)
 grafana-setup:
-	@echo "Setting up Grafana dashboards with dynamic UID..."
+	@echo "Setting up Grafana dashboards with template variables..."
 	./scripts/setup-grafana.sh
 
 # Populate database with test data

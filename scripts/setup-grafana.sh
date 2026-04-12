@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "=== Dynamic Grafana Dashboard Setup ==="
+echo "=== Template Grafana Dashboard Setup ==="
 
 # Configuration
 GRAFANA_URL="http://localhost:3000"
@@ -34,16 +34,13 @@ done
 
 log_info "Grafana is ready!"
 
-# Get Prometheus datasource UID dynamically
-log_info "Getting Prometheus datasource UID..."
-DATASOURCE_UID=$(curl -s -u "$GRAFANA_USER:$GRAFANA_PASS" \
-    "$GRAFANA_URL/api/datasources/name/Prometheus" | jq -r '.uid' 2>/dev/null)
+# Check if Prometheus datasource exists, create if not
+log_info "Checking Prometheus datasource..."
+datasource_check=$(curl -s -u "$GRAFANA_USER:$GRAFANA_PASS" \
+    "$GRAFANA_URL/api/datasources/name/Prometheus" | jq -r '.message // "exists"')
 
-if [ -z "$DATASOURCE_UID" ] || [ "$DATASOURCE_UID" = "null" ]; then
-    log_error "Could not get Prometheus datasource UID"
-    log_error "Creating Prometheus datasource..."
-    
-    # Create Prometheus datasource
+if [ "$datasource_check" != "exists" ]; then
+    log_warn "Prometheus datasource not found, creating..."
     response=$(curl -s -u "$GRAFANA_USER:$GRAFANA_PASS" -X POST \
         "$GRAFANA_URL/api/datasources" \
         -H "Content-Type: application/json" \
@@ -55,298 +52,40 @@ if [ -z "$DATASOURCE_UID" ] || [ "$DATASOURCE_UID" = "null" ]; then
             "isDefault": true
         }')
     
-    DATASOURCE_UID=$(echo "$response" | jq -r '.uid' 2>/dev/null)
-    
-    if [ -z "$DATASOURCE_UID" ] || [ "$DATASOURCE_UID" = "null" ]; then
+    if echo "$response" | jq -e '.datasource' > /dev/null 2>&1; then
+        log_info "Prometheus datasource created successfully!"
+    else
         log_error "Failed to create Prometheus datasource"
+        log_error "Response: $response"
         exit 1
     fi
+else
+    log_info "Prometheus datasource already exists!"
 fi
 
-log_info "Prometheus datasource UID: $DATASOURCE_UID"
-
-# Create dashboard with dynamic UID
-log_info "Creating dashboard with dynamic datasource UID..."
-
-# Create dashboard JSON with dynamic UID
-cat > /tmp/kvdb-dynamic-dashboard.json << EOF
-{
-  "dashboard": {
-    "id": null,
-    "title": "KV Database Dashboard",
-    "tags": ["kvdb", "bitcask", "database"],
-    "timezone": "browser",
-    "panels": [
-      {
-        "datasource": {
-          "type": "prometheus",
-          "uid": "$DATASOURCE_UID"
-        },
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "thresholds"
-            },
-            "mappings": [],
-            "thresholds": {
-              "steps": [
-                {
-                  "color": "green",
-                  "value": null
-                }
-              ]
-            },
-            "unit": "short"
-          },
-          "overrides": []
-        },
-        "gridPos": {
-          "h": 8,
-          "w": 6,
-          "x": 0,
-          "y": 0
-        },
-        "id": 1,
-        "options": {
-          "colorMode": "value",
-          "graphMode": "area",
-          "justifyMode": "auto",
-          "orientation": "auto",
-          "reduceOptions": {
-            "values": false,
-            "calcs": [
-              "lastNotNull"
-            ],
-            "fields": ""
-          },
-          "text": {},
-          "textMode": "auto"
-        },
-        "targets": [
-          {
-            "datasource": {
-              "type": "prometheus",
-              "uid": "$DATASOURCE_UID"
-            },
-            "expr": "bitcask_databases_total",
-            "refId": "A"
-          }
-        ],
-        "title": "Total Databases",
-        "type": "stat"
-      },
-      {
-        "datasource": {
-          "type": "prometheus",
-          "uid": "$DATASOURCE_UID"
-        },
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "thresholds"
-            },
-            "mappings": [],
-            "thresholds": {
-              "steps": [
-                {
-                  "color": "green",
-                  "value": null
-                }
-              ]
-            },
-            "unit": "short"
-          },
-          "overrides": []
-        },
-        "gridPos": {
-          "h": 8,
-          "w": 6,
-          "x": 6,
-          "y": 0
-        },
-        "id": 2,
-        "options": {
-          "colorMode": "value",
-          "graphMode": "area",
-          "justifyMode": "auto",
-          "orientation": "auto",
-          "reduceOptions": {
-            "values": false,
-            "calcs": [
-              "lastNotNull"
-            ],
-            "fields": ""
-          },
-          "text": {},
-          "textMode": "auto"
-        },
-        "targets": [
-          {
-            "datasource": {
-              "type": "prometheus",
-              "uid": "$DATASOURCE_UID"
-            },
-            "expr": "bitcask_tables_total",
-            "refId": "A"
-          }
-        ],
-        "title": "Total Tables",
-        "type": "stat"
-      },
-      {
-        "datasource": {
-          "type": "prometheus",
-          "uid": "$DATASOURCE_UID"
-        },
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "thresholds"
-            },
-            "mappings": [],
-            "thresholds": {
-              "steps": [
-                {
-                  "color": "green",
-                  "value": null
-                }
-              ]
-            },
-            "unit": "short"
-          },
-          "overrides": []
-        },
-        "gridPos": {
-          "h": 8,
-          "w": 6,
-          "x": 12,
-          "y": 0
-        },
-        "id": 3,
-        "options": {
-          "colorMode": "value",
-          "graphMode": "area",
-          "justifyMode": "auto",
-          "orientation": "auto",
-          "reduceOptions": {
-            "values": false,
-            "calcs": [
-              "lastNotNull"
-            ],
-            "fields": ""
-          },
-          "text": {},
-          "textMode": "auto"
-        },
-        "targets": [
-          {
-            "datasource": {
-              "type": "prometheus",
-              "uid": "$DATASOURCE_UID"
-            },
-            "expr": "bitcask_entries_total",
-            "refId": "A"
-          }
-        ],
-        "title": "Total Entries",
-        "type": "stat"
-      },
-      {
-        "datasource": {
-          "type": "prometheus",
-          "uid": "$DATASOURCE_UID"
-        },
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "thresholds"
-            },
-            "mappings": [],
-            "thresholds": {
-              "steps": [
-                {
-                  "color": "green",
-                  "value": null
-                }
-              ]
-            },
-            "unit": "bytes"
-          },
-          "overrides": []
-        },
-        "gridPos": {
-          "h": 8,
-          "w": 6,
-          "x": 18,
-          "y": 0
-        },
-        "id": 4,
-        "options": {
-          "colorMode": "value",
-          "graphMode": "area",
-          "justifyMode": "auto",
-          "orientation": "auto",
-          "reduceOptions": {
-            "values": false,
-            "calcs": [
-              "lastNotNull"
-            ],
-            "fields": ""
-          },
-          "text": {},
-          "textMode": "auto"
-        },
-        "targets": [
-          {
-            "datasource": {
-              "type": "prometheus",
-              "uid": "$DATASOURCE_UID"
-            },
-            "expr": "bitcask_data_size_bytes",
-            "refId": "A"
-          }
-        ],
-        "title": "Data Size (Bytes)",
-        "type": "stat"
-      }
-    ],
-    "refresh": "10s",
-    "schemaVersion": 36,
-    "style": "dark",
-    "time": {
-      "from": "now-1h",
-      "to": "now"
-    },
-    "timepicker": {},
-    "timezone": "",
-    "templating": {
-      "list": []
-    }
-  },
-  "overwrite": true
-}
-EOF
-
-# Import dashboard
-log_info "Importing dashboard..."
+# Import template dashboard
+log_info "Importing template dashboard..."
 response=$(curl -s -u "$GRAFANA_USER:$GRAFANA_PASS" -X POST \
     "$GRAFANA_URL/api/dashboards/db" \
     -H "Content-Type: application/json" \
-    -d @/tmp/kvdb-dynamic-dashboard.json)
+    -d @monitoring/grafana/dashboards/kvdb-dashboard.json)
 
 if echo "$response" | jq -e '.status == "success"' > /dev/null 2>&1; then
     dashboard_url=$(echo "$response" | jq -r '.url')
-    log_info "Dashboard created successfully!"
+    dashboard_id=$(echo "$response" | jq -r '.id')
+    log_info "Template dashboard imported successfully!"
+    log_info "Dashboard ID: $dashboard_id"
     log_info "Access at: $GRAFANA_URL$dashboard_url"
+    log_info ""
+    log_info "The dashboard uses DS_PROMETHEUS variable that automatically"
+    log_info "resolves to the Prometheus datasource, so it will work"
+    log_info "regardless of the datasource UID!"
 else
-    log_error "Failed to create dashboard"
+    log_error "Failed to import template dashboard"
     log_error "Response: $response"
     exit 1
 fi
 
-# Clean up temporary file
-rm -f /tmp/kvdb-dynamic-dashboard.json
-
-log_info "Dynamic dashboard setup completed!"
+log_info "Template dashboard setup completed!"
 log_info "Access Grafana at: $GRAFANA_URL"
 log_info "Login: $GRAFANA_USER / $GRAFANA_PASS"
