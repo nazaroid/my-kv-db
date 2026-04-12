@@ -1,4 +1,4 @@
-.PHONY: help build run stop clean logs status test
+.PHONY: help build run stop clean logs status test grafana-setup populate-db
 
 # Default target
 help:
@@ -14,6 +14,11 @@ help:
 	@echo "  test      - Run API tests"
 	@echo "  health    - Check health of all services"
 	@echo "  metrics   - Show available metrics"
+	@echo "  grafana-setup - Setup Grafana dashboards"
+	@echo "  populate-db - Populate database with test data (100 users)"
+	@echo "  populate-db-custom - Populate with custom number of records"
+	@echo "  cleanup-test-data - Clean up test data"
+	@echo "  db-stats   - Show database statistics"
 	@echo ""
 
 # Build the application
@@ -89,6 +94,31 @@ metrics:
 	@echo ""
 	@echo "=== Prometheus Metrics ==="
 	@curl -s http://localhost:9090/metrics | grep "prometheus_" | head -10
+
+# Setup Grafana dashboards
+grafana-setup:
+	@echo "Setting up Grafana dashboards..."
+	./scripts/setup-grafana.sh
+
+# Populate database with test data
+populate-db:
+	@echo "Populating database with test data..."
+	./scripts/populate-db.sh
+
+# Populate with custom number of records
+populate-db-custom:
+	@read -p "Enter number of records to create: " num; \
+	./scripts/populate-db.sh -n $$num -v
+
+# Clean up test data
+cleanup-test-data:
+	@echo "Cleaning up test data..."
+	./scripts/populate-db.sh -c
+
+# Show database statistics
+db-stats:
+	@echo "Showing database statistics..."
+	./scripts/populate-db.sh -s
 
 # Run API tests
 test:
