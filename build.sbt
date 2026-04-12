@@ -13,6 +13,7 @@ lazy val root = (project in file("."))
     `core`,
     `server`
   )
+  .disablePlugins(AssemblyPlugin)
   .settings(
     commonSettings,
     name                                   := "kvdb",
@@ -135,10 +136,10 @@ lazy val `service` = (project in file("codebase/service"))
   .dependsOn(`metrics` % "compile->compile;test->test;it->it")
   .dependsOn(`server` % "compile->compile;test->test;it->it")
   .enablePlugins(DockerPlugin, JavaAppPackaging)
-  .disablePlugins(AssemblyPlugin)
   .configs(Integration)
   .settings(
     commonSettings,
+    assemblyMergeSetting,
     name    := "service",
     version := GLOBAL_VERSION,
     libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Http4s.all ++ Logging.all ++ Prometheus.all ++ Testing.all,
@@ -148,7 +149,7 @@ lazy val `service` = (project in file("codebase/service"))
     inConfig(Integration)(Defaults.testSettings),
     Integration / testOptions += Tests
       .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/service/integration-tests-html-report"),
-    dockerBaseImage      := "openjdk:25-oraclelinux8",
+    dockerBaseImage      := "amazoncorretto:21-al2023 ",
     Docker / packageName := "org/nazaroid/kvdb/server",
     Docker / version     := version.value,
     envVars += (sys.props.get("config") match {
