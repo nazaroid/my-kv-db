@@ -4,6 +4,8 @@ import cats.effect.{Async, Resource}
 import cats.implicits.given
 import com.comcast.ip4s.{Ipv4Address, Port}
 import fs2.io.net.Network
+import io.circe.generic.auto.*
+import io.circe.syntax.*
 import io.prometheus.client.CollectorRegistry
 import org.http4s.Uri.Path.Root
 import org.http4s.dsl.Http4sDsl
@@ -11,13 +13,16 @@ import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.metrics.prometheus.Prometheus
 import org.http4s.server.Router
 import org.http4s.server.middleware.Metrics
-import org.http4s.{HttpRoutes, Request, Response, Status, Uri}
-import org.nazaroid.kvdb.ServerConfig
-import org.nazaroid.kvdb.algebra.{Engine, Server}
+import org.http4s.{HttpRoutes, Request, Response, Uri}
+import org.nazaroid.kvdb.core.*
+import org.nazaroid.kvdb.srv.ServerConfig
 import org.nazaroid.kvdb.srv.http.middlewares.Err
 import org.typelevel.log4cats.Logger
 
-final class HttpServer[F[_]: Async: Logger: Network](conf: ServerConfig.Http, engine: Engine[F])
+final class HttpServer[F[_]: Async: Logger: Network](
+  conf:              ServerConfig.Http,
+  engine:            Engine[F],
+  statisticsService: StatisticsService[F])
     extends Server[F]
     with Err[F] {
 
@@ -49,9 +54,11 @@ final class HttpServer[F[_]: Async: Logger: Network](conf: ServerConfig.Http, en
     for {
       data   <- DataController(engine)
       health <- HealthController()
+      stats  <- StatisticsController(statisticsService)
     } yield Router(
       "/data"   -> data,
-      "/health" -> health
+      "/health" -> health,
+      "/stats"  -> stats
     )
 
   // noinspection ScalaStyle
@@ -68,8 +75,8 @@ final class HttpServer[F[_]: Async: Logger: Network](conf: ServerConfig.Http, en
               vOpt <- engine.get(dbName, tblName, key)
             } yield {
               vOpt match {
-                case Some(v) => Status.Ok(v)
-                case None    => Status.NotFound()
+                case Some(v) => Ok(v)
+                case None    => NotFound("Value not found")
               }
             }
           }.flatten
@@ -121,6 +128,40 @@ final class HttpServer[F[_]: Async: Logger: Network](conf: ServerConfig.Http, en
         healthServiceMetrics <- Prometheus
           .metricsOps[F](CollectorRegistry.defaultRegistry, "health")
       } yield Metrics[F](healthServiceMetrics)(withErrorLogging(healthService))
+    }
+  }
+
+  private object StatisticsController {
+    import org.http4s.circe.CirceEntityCodec.*
+
+    def apply(statisticsService: StatisticsService[F]): Resource[F, HttpRoutes[F]] = {
+      val statsService: HttpRoutes[F] = HttpRoutes.of[F] {
+
+        // Get whole catalog stats
+        case GET -> Root / "catalog" =>
+          statisticsService.getStats.flatMap { stats =>
+            Ok(stats.asJson)
+          }
+
+        // Get specific database stats
+        case GET -> Root / "database" / dbName =>
+          statisticsService.getDatabaseStats(dbName).flatMap {
+            case Some(dbStats) => Ok(dbStats.asJson)
+            case None          => NotFound(s"Database $dbName not found")
+          }
+
+        // Get specific table stats
+        case GET -> Root / "table" / dbName / tableName =>
+          statisticsService.getTableStats(dbName, tableName).flatMap {
+            case Some(tableStats) => Ok(tableStats.asJson)
+            case None             => NotFound(s"Table $tableName not found in database $dbName")
+          }
+
+      }
+      for {
+        statsServiceMetrics <- Prometheus
+          .metricsOps[F](CollectorRegistry.defaultRegistry, "stats")
+      } yield Metrics[F](statsServiceMetrics)(withErrorLogging(statsService))
     }
   }
 }

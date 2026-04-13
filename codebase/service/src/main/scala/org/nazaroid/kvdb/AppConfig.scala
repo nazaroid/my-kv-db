@@ -1,5 +1,6 @@
 package org.nazaroid.kvdb
 
+import org.nazaroid.kvdb.srv.DbInstanceConfig
 import pureconfig.*
 import pureconfig.generic.derivation.default.*
 

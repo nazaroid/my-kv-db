@@ -7,6 +7,7 @@ import cats.implicits.*
 import com.typesafe.config.ConfigFactory
 import fs2.io.file.Files
 import fs2.io.net.Network
+import org.nazaroid.kvdb.srv.DbInstance
 import org.nazaroid.kvdb.utils.metrics.MetricExporter
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger

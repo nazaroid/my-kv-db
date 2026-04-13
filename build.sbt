@@ -10,8 +10,10 @@ lazy val root = (project in file("."))
     `prometheus`,
     `bin-file-io`,
     `bitcask`,
+    `core`,
     `server`
   )
+  .disablePlugins(AssemblyPlugin)
   .settings(
     commonSettings,
     name                                   := "kvdb",
@@ -77,6 +79,7 @@ lazy val `bin-file-io` = (project in file("codebase/modules/bin-file-io"))
 
 lazy val `bitcask` = (project in file("codebase/modules/bitcask"))
   .dependsOn(`bin-file-io` % "compile->compile;test->test;it->it")
+  .dependsOn(`core` % "compile->compile;test->test;it->it")
   .enablePlugins(DockerPlugin, JavaAppPackaging)
   .disablePlugins(AssemblyPlugin)
   .configs(Integration)
@@ -91,6 +94,23 @@ lazy val `bitcask` = (project in file("codebase/modules/bitcask"))
     inConfig(Integration)(Defaults.testSettings),
     Integration / testOptions += Tests
       .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/bitcask/integration-tests-html-report")
+  )
+
+lazy val `core` = (project in file("codebase/modules/core"))
+  .enablePlugins(DockerPlugin, JavaAppPackaging)
+  .disablePlugins(AssemblyPlugin)
+  .configs(Integration)
+  .settings(
+    commonSettings,
+    name    := "core",
+    version := GLOBAL_VERSION,
+    libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Logging.all ++ Testing.all,
+    excludeDependencies -= ExclusionRule("log4j", "log4j"),
+    Test / testOptions += Tests
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/database/unit-tests-html-report"),
+    inConfig(Integration)(Defaults.testSettings),
+    Integration / testOptions += Tests
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/database/integration-tests-html-report")
   )
 
 lazy val `server` = (project in file("codebase/modules/server"))
@@ -116,10 +136,10 @@ lazy val `service` = (project in file("codebase/service"))
   .dependsOn(`metrics` % "compile->compile;test->test;it->it")
   .dependsOn(`server` % "compile->compile;test->test;it->it")
   .enablePlugins(DockerPlugin, JavaAppPackaging)
-  .disablePlugins(AssemblyPlugin)
   .configs(Integration)
   .settings(
     commonSettings,
+    assemblyMergeSetting,
     name    := "service",
     version := GLOBAL_VERSION,
     libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Http4s.all ++ Logging.all ++ Prometheus.all ++ Testing.all,
@@ -129,7 +149,7 @@ lazy val `service` = (project in file("codebase/service"))
     inConfig(Integration)(Defaults.testSettings),
     Integration / testOptions += Tests
       .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/service/integration-tests-html-report"),
-    dockerBaseImage      := "openjdk:25-oraclelinux8",
+    dockerBaseImage      := "amazoncorretto:17-al2023 ",
     Docker / packageName := "org/nazaroid/kvdb/server",
     Docker / version     := version.value,
     envVars += (sys.props.get("config") match {

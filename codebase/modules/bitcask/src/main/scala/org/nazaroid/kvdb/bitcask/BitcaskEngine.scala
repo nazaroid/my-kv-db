@@ -1,19 +1,18 @@
-package org.nazaroid.kvdb.engine
+package org.nazaroid.kvdb.bitcask
 
+import cats.data.OptionT
 import cats.effect.Async
 import cats.effect.kernel.Resource
 import cats.implicits.given
-import fs2.io.file.{Files, Path}
-import org.nazaroid.kvdb.EngineConfig
-import org.nazaroid.kvdb.algebra.Engine
+import fs2.io.file.Files
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType}
-import org.nazaroid.kvdb.bitcask.catalog.Catalog
-import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
+import org.nazaroid.kvdb.bitcask.lib.BitcaskTableConfig
+import org.nazaroid.kvdb.core.{DatabaseManager, Engine}
 import org.typelevel.log4cats.Logger
 
 object BitcaskEngine {
 
-  def init[F[_]: Async: Files: Logger](conf: EngineConfig): Resource[F, Engine[F]] = {
+  def init[F[_]: Async: Files: Logger](conf: BitcaskEngineConfig): Resource[F, Engine[F]] = {
     // Data files use CRC, segment and table - no
     val dataSchema = List(
       FieldDef("valueSize", FieldType.Int32),
@@ -40,7 +39,7 @@ object BitcaskEngine {
       // No CRC for table
     )
 
-    val storageConfig = StorageConfig(
+    val tableConfig = BitcaskTableConfig(
       folder          = conf.rootDir,
       maxSegmentSize  = conf.maxSegmentSize,
       maxSegmentCount = conf.maxSegmentCount,
@@ -48,24 +47,28 @@ object BitcaskEngine {
       segmentSchema   = segmentSchema,
       tableSchema     = tableSchema
     )
+
     for {
-      c <- Catalog.init(Path(conf.rootDir), storageConfig, conf.fileWriteBufferSize, conf.fileWriteParallelism)
-    } yield BitcaskEngine(c)
+      databaseManager <- BitcaskDatabaseManager.create[F](conf.rootDir, tableConfig)
+    } yield BitcaskEngine(databaseManager)
   }
 }
 
-final class BitcaskEngine[F[_]: Async: Logger](c: Catalog[F]) extends Engine[F] {
+final class BitcaskEngine[F[_]: Async: Logger](
+  databaseManager: BitcaskDatabaseManager[F])
+    extends Engine[F] {
+
+  override def dbManager: DatabaseManager[F] = databaseManager
 
   override def createDbIfNotExists(name: String): F[Unit] = {
-    for {
-      _ <- c.database(name)
-    } yield ()
+    databaseManager.createDatabase(name).void
   }
 
   override def createTableIfNotExists(baseName: String, tblName: String): F[Unit] = {
     for {
-      db <- c.database(baseName)
-      _  <- db.table(tblName)
+      db <- OptionT(databaseManager.getDatabase(baseName))
+        .getOrElseF(databaseManager.createDatabase(baseName))
+      _ <- OptionT(db.getTable(tblName)).getOrElseF(db.createTable(tblName))
     } yield ()
   }
 
@@ -74,11 +77,11 @@ final class BitcaskEngine[F[_]: Async: Logger](c: Catalog[F]) extends Engine[F] 
     tblName:  String,
     key:      String
   ): F[Option[String]] = {
-    for {
-      db   <- c.database(baseName)
-      tbl  <- db.table(tblName)
-      vOpt <- tbl.read(key)
-    } yield vOpt
+    (for {
+      db  <- OptionT(databaseManager.getDatabase(baseName))
+      tbl <- OptionT(db.getTable(tblName))
+      v   <- OptionT(tbl.get(key))
+    } yield v).value
   }
 
   override def set(
@@ -88,15 +91,10 @@ final class BitcaskEngine[F[_]: Async: Logger](c: Catalog[F]) extends Engine[F] 
     value:    String
   ): F[Unit] = {
     for {
-      db     <- c.database(baseName)
-      tbl    <- db.table(tblName)
-      result <- tbl.write(key, value)
-      _ <- result match {
-        case Right(()) => Async[F].unit
-        case Left(error) =>
-          Logger[F].error(s"Failed to set key $key in table $tblName: $error") *>
-            Async[F].raiseError(new RuntimeException(s"Write operation failed: $error"))
-      }
+      db <- OptionT(databaseManager.getDatabase(baseName))
+        .getOrElseF(databaseManager.createDatabase(baseName))
+      tbl <- OptionT(db.getTable(tblName)).getOrElseF(db.createTable(tblName))
+      _   <- tbl.set(key, value)
     } yield ()
   }
 
@@ -105,10 +103,11 @@ final class BitcaskEngine[F[_]: Async: Logger](c: Catalog[F]) extends Engine[F] 
     tblName:  String,
     key:      String
   ): F[Unit] = {
-    for {
-      db  <- c.database(baseName)
-      tbl <- db.table(tblName)
-      _   <- tbl.delete(key)
-    } yield ()
+    (for {
+      db  <- OptionT(databaseManager.getDatabase(baseName))
+      tbl <- OptionT(db.getTable(tblName))
+      _   <- OptionT.liftF(tbl.delete(key))
+    } yield ()).value >> ().pure[F]
   }
+
 }

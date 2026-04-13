@@ -1,4 +1,4 @@
-package org.nazaroid.kvdb.bitcask.storage
+package org.nazaroid.kvdb.bitcask.lib
 
 import cats.effect.{Async, Deferred, Ref}
 import cats.implicits.given
@@ -20,7 +20,7 @@ enum CacheEntry {
   case Deleted
 }
 
-case class StorageConfig(
+case class BitcaskTableConfig(
   folder:          String,
   maxSegmentSize:  Long,
   maxSegmentCount: Int,
@@ -29,7 +29,7 @@ case class StorageConfig(
   tableSchema:     List[FieldDef],
   maxRetries:      Int = 3)
 
-class BaseStorage[F[_]: Async: Files](
+class BinFileStorage[F[_]: Async: Files](
   val filePath: String,
   val schema:   List[FieldDef],
   val queue:    Channel[F, WriteTask[F]]) {
@@ -42,12 +42,13 @@ class BaseStorage[F[_]: Async: Files](
     } yield offset
 }
 
-sealed class StorageManager[F[_]: Async: Files: Logger](
-  val currentData:       Ref[F, BaseStorage[F]],
-  val currentSegmentIdx: Ref[F, BaseStorage[F]],
-  val tableStorage:      BaseStorage[F],
+sealed class BitcaskTable[F[_]: Async: Files: Logger](
+  val name:              String,
+  val currentData:       Ref[F, BinFileStorage[F]],
+  val currentSegmentIdx: Ref[F, BinFileStorage[F]],
+  val tableStorage:      BinFileStorage[F],
   val cache:             Ref[F, Map[String, CacheEntry]],
-  val config:            StorageConfig,
+  val config:            BitcaskTableConfig,
   val writeQueue:        Channel[F, WriteTask[F]]) {
 
   /** WRITE: Data -> Segment -> Table -> Cache */
@@ -150,7 +151,7 @@ sealed class StorageManager[F[_]: Async: Files: Logger](
 
   /** Helper method for retry logic */
   private def attemptWriteWithRetry(
-    storage: BaseStorage[F],
+    storage: BinFileStorage[F],
     key:     String,
     row:     Row
   ): F[Either[String, Long]] = {
@@ -261,10 +262,10 @@ sealed class StorageManager[F[_]: Async: Files: Logger](
     } yield ()
   }
 
-  private def rotate(): F[BaseStorage[F]] = {
+  private def rotate(): F[BinFileStorage[F]] = {
     val name = s"seg_${System.currentTimeMillis()}"
-    val nDS = new BaseStorage(s"${config.folder}/$name.bin", config.dataSchema, writeQueue)
-    val nSS = new BaseStorage(s"${config.folder}/$name.idx", config.segmentSchema, writeQueue)
+    val nDS = new BinFileStorage(s"${config.folder}/$name.bin", config.dataSchema, writeQueue)
+    val nSS = new BinFileStorage(s"${config.folder}/$name.idx", config.segmentSchema, writeQueue)
     currentData.set(nDS) *> currentSegmentIdx.set(nSS) *> Async[F].pure(nDS)
   }
 
@@ -282,9 +283,111 @@ sealed class StorageManager[F[_]: Async: Files: Logger](
     segmentCount.flatMap { count =>
       Async[F].whenA(count > config.maxSegmentCount)(compact())
     }
+
+  /** Get segment statistics */
+  private def getSegmentStats: F[List[SegmentStats]] = {
+    for {
+      files <- Files[F]
+        .list(Path(config.folder))
+        .map(_.fileName.toString)
+        .filter(_.endsWith(".bin"))
+        .compile
+        .toList
+
+      segmentStats <- files.traverse { fileName =>
+        val segmentName = fileName.replace(".bin", "")
+        val filePath = Path(s"${config.folder}/$fileName")
+
+        for {
+          fileSize <- Files[F].size(filePath)
+          isActive <- currentData.get.map(_.filePath == filePath.toString)
+
+          // Calculate stale data ratio (simplified)
+          staleRatio <-
+            if (isActive) {
+              Async[F].pure(0.0) // Active segments have no stale data
+            } else {
+              // For inactive segments, estimate stale ratio based on file age
+              Async[F].delay {
+                val fileAge =
+                  System.currentTimeMillis() - segmentName.split("_").lastOption.flatMap(_.toLongOption).getOrElse(0L)
+                val maxAge = 24 * 60 * 60 * 1000 // 24 hours
+                math.min(fileAge.toDouble / maxAge, 1.0)
+              }
+            }
+
+          // Count entries in segment (simplified)
+          entryCount <- countSegmentEntries(filePath)
+
+        } yield SegmentStats(
+          name           = segmentName,
+          fileSize       = fileSize,
+          isActive       = isActive,
+          staleDataRatio = staleRatio,
+          entryCount     = entryCount
+        )
+      }
+
+    } yield segmentStats
+  }
+
+  /** Count entries in a segment file */
+  private def countSegmentEntries(segmentFile: Path): F[Int] = {
+    // Simplified implementation - would need to parse binary format
+    for {
+      fileSize <- Files[F].size(segmentFile)
+      // Assume average entry size of 100 bytes
+      entryCount = (fileSize / 100).toInt
+    } yield entryCount
+  }
+
+  /** Get table statistics (StorageManager manages ONE table) */
+  def getStats: F[BitcaskTableStats] = {
+    for {
+      cacheSnapshot <- cache.get
+
+      // Single pass to calculate entries and data size
+      (activeEntries, deletedEntries, totalDataSize) = cacheSnapshot.values.foldLeft((0, 0, 0)) {
+        case ((active, deleted, size), entry) =>
+          entry match {
+            case CacheEntry.Pending(row) =>
+              val rowSize = encode(row, config.dataSchema).size
+              (active + 1, deleted, size + rowSize)
+            case CacheEntry.Persistent(row, _, _) =>
+              val rowSize = encode(row, config.dataSchema).size
+              (active + 1, deleted, size + rowSize)
+
+            case CacheEntry.Deleted =>
+              (active, deleted + 1, size)
+          }
+      }
+
+      // Group keys by table name (for this single table)
+      tableKeys = cacheSnapshot.keys.toList
+      tableKeysCount = tableKeys.size
+      tableActiveCount = tableKeys.count { key =>
+        cacheSnapshot.get(key).exists {
+          case CacheEntry.Pending(_) | CacheEntry.Persistent(_, _, _) => true
+          case CacheEntry.Deleted                                     => false
+        }
+      }
+
+      segmentStats <- getSegmentStats
+
+    } yield BitcaskTableStats(
+      name               = config.folder.split("/").lastOption.getOrElse("unknown"),
+      totalEntries       = tableKeysCount,
+      activeEntries      = tableActiveCount,
+      deletedEntries     = deletedEntries,
+      totalDataSize      = totalDataSize,
+      segmentCount       = segmentStats.size,
+      activeSegmentCount = segmentStats.count(_.isActive),
+      segments           = segmentStats
+    )
+  }
 }
 
-object StorageManager {
+object BitcaskTable {
 
   private def findLastOffsetInSegment[F[_]: Async: Files](
     targetKey: String,
@@ -299,9 +402,10 @@ object StorageManager {
   }
 
   def initialize[F[_]: Async: Files: Logger](
-    config:     StorageConfig,
+    name:       String,
+    config:     BitcaskTableConfig,
     writeQueue: Channel[F, WriteTask[F]]
-  ): F[StorageManager[F]] = {
+  ): F[BitcaskTable[F]] = {
 
     val tableIndexPath = s"${config.folder}/table.idx"
 
@@ -353,13 +457,13 @@ object StorageManager {
       // 4. Prepare the current active segment
       currentSegName <- Async[F].delay(s"seg_${System.currentTimeMillis()}")
 
-      dataStorage = new BaseStorage(s"${config.folder}/$currentSegName.bin", config.dataSchema, writeQueue)
-      segStorage = new BaseStorage(s"${config.folder}/$currentSegName.idx", config.segmentSchema, writeQueue)
-      tableStorage = new BaseStorage(tableIndexPath, config.tableSchema, writeQueue)
+      dataStorage = new BinFileStorage(s"${config.folder}/$currentSegName.bin", config.dataSchema, writeQueue)
+      segStorage = new BinFileStorage(s"${config.folder}/$currentSegName.idx", config.segmentSchema, writeQueue)
+      tableStorage = new BinFileStorage(tableIndexPath, config.tableSchema, writeQueue)
 
-      dsRef <- Ref.of[F, BaseStorage[F]](dataStorage)
-      ssRef <- Ref.of[F, BaseStorage[F]](segStorage)
+      dsRef <- Ref.of[F, BinFileStorage[F]](dataStorage)
+      ssRef <- Ref.of[F, BinFileStorage[F]](segStorage)
 
-    } yield new StorageManager(dsRef, ssRef, tableStorage, cacheRef, config, writeQueue)
+    } yield new BitcaskTable(name, dsRef, ssRef, tableStorage, cacheRef, config, writeQueue)
   }
 }

@@ -5,7 +5,7 @@ import cats.effect.{IO, Resource}
 import fs2.concurrent.Channel
 import fs2.io.file.{Files, Path}
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType, WriteTask, writeBinary}
-import org.nazaroid.kvdb.bitcask.storage.{StorageConfig, StorageManager}
+import org.nazaroid.kvdb.bitcask.lib.{BitcaskTable, BitcaskTableConfig}
 import org.scalatest.FutureOutcome
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -16,7 +16,7 @@ import java.nio.file.Paths
 import scala.concurrent.duration.DurationInt
 import scala.reflect.io.Directory
 
-final class StorageManagerOperationSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
+final class BitcaskTableOperationSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
   override def withFixture(test: NoArgAsyncTest): FutureOutcome = {
     java.nio.file.Files.createDirectories(testDir)
@@ -31,9 +31,9 @@ final class StorageManagerOperationSpec extends AsyncFreeSpec with AsyncIOSpec w
 
   private val testDir = Paths.get("./testFolder")
 
-  private val config = StorageConfig(
-    folder         = testDir.toString,
-    maxSegmentSize = 1024, // Small size for rotation testing (1KB)
+  private val config = BitcaskTableConfig(
+    folder          = testDir.toString,
+    maxSegmentSize  = 1024, // Small size for rotation testing (1KB)
     maxSegmentCount = 10,
     dataSchema = List(
       FieldDef("valueSize", FieldType.Int32),
@@ -59,43 +59,43 @@ final class StorageManagerOperationSpec extends AsyncFreeSpec with AsyncIOSpec w
   )
 
   // Resource for running the manager in tests
-  private val storageResource: Resource[IO, StorageManager[IO]] = for {
+  private val tableResource: Resource[IO, BitcaskTable[IO]] = for {
     given Logger[IO] <- Resource.eval(Slf4jLogger.create[IO])
-    _     <- Resource.eval(Files[IO].createDirectories(Path(testDir.toString)).handleError(_ => ()))
-    queue <- Channel.bounded[IO, WriteTask[IO]](100).toResource
+    _                <- Resource.eval(Files[IO].createDirectories(Path(testDir.toString)).handleError(_ => ()))
+    queue            <- Channel.bounded[IO, WriteTask[IO]](100).toResource
     // Run the background binary write worker
-    _       <- writeBinary(queue.stream, parallelism = 1).compile.drain.background
-    manager <- Resource.eval(StorageManager.initialize[IO](config, queue))
-  } yield manager
+    _     <- writeBinary(queue.stream, parallelism = 1).compile.drain.background
+    table <- Resource.eval(BitcaskTable.initialize[IO]("testTable", config, queue))
+  } yield table
 
   "Write and Read: written value should be accessible" in {
-    storageResource.use { sm =>
+    tableResource.use { t =>
       for {
-        _   <- sm.write("user:1", "hello stratum")
-        res <- sm.read("user:1")
+        _   <- t.write("user:1", "hello stratum")
+        res <- t.read("user:1")
       } yield assert(res.contains("hello stratum"))
     }
   }
 
   "Delete: deleted value should return None" in {
-    storageResource.use { sm =>
+    tableResource.use { t =>
       for {
-        _   <- sm.write("user:2", "to be deleted")
-        _   <- sm.delete("user:2")
-        res <- sm.read("user:2")
+        _   <- t.write("user:2", "to be deleted")
+        _   <- t.delete("user:2")
+        res <- t.read("user:2")
       } yield assert(res.isEmpty)
     }
   }
 
   "Rotation: new segment should be created when limit is exceeded" in {
-    storageResource.use { sm =>
+    tableResource.use { t =>
       for {
         // Write enough data to trigger rotation (1KB limit)
-        _    <- sm.write("k1", "a" * 1025)
-        seg1 <- sm.currentData.get.map(_.filePath)
+        _    <- t.write("k1", "a" * 1025)
+        seg1 <- t.currentData.get.map(_.filePath)
 
-        _    <- sm.write("k2", "b" * 600)
-        seg2 <- sm.currentData.get.map(_.filePath)
+        _    <- t.write("k2", "b" * 600)
+        seg2 <- t.currentData.get.map(_.filePath)
 
         _ <- IO.sleep(100.millis) // Allow time for file system operations
 
@@ -103,24 +103,24 @@ final class StorageManagerOperationSpec extends AsyncFreeSpec with AsyncIOSpec w
         _ <- IO.blocking(assert(seg1 != seg2, s"Segment should have rotated: $seg1 vs $seg2"))
 
         // Data from the old segment should still be accessible
-        val1 <- sm.read("k1")
+        val1 <- t.read("k1")
       } yield assert(val1.contains("a" * 1025))
     }
   }
 
   "Compaction & Cleanup: old files should be removed after compaction" in {
-    storageResource.use { sm =>
+    tableResource.use { t =>
       for {
-        _ <- sm.write("temp", "data")
-        _ <- sm.delete("temp") // Create "garbage"
-        _ <- sm.write("permanent", "keep me")
+        _ <- t.write("temp", "data")
+        _ <- t.delete("temp") // Create "garbage"
+        _ <- t.write("permanent", "keep me")
 
         // Trigger compaction
-        _ <- sm.compact()
+        _ <- t.compact()
         _ <- IO.sleep(200.millis)
 
         // Verify live data is still present
-        res <- sm.read("permanent")
+        res <- t.read("permanent")
         _   <- IO.blocking(assert(res.contains("keep me")))
 
         // Verify physical file existence via Files.list
@@ -133,21 +133,21 @@ final class StorageManagerOperationSpec extends AsyncFreeSpec with AsyncIOSpec w
   "Segment threshold: compaction should run when segment count exceeds limit" in {
     val compactConfig = config.copy(maxSegmentSize = 200, maxSegmentCount = 1)
 
-    val compactResource: Resource[IO, StorageManager[IO]] = for {
+    val compactResource: Resource[IO, BitcaskTable[IO]] = for {
       given Logger[IO] <- Resource.eval(Slf4jLogger.create[IO])
-      _     <- Resource.eval(Files[IO].createDirectories(Path(testDir.toString)).handleError(_ => ()))
-      queue <- Channel.bounded[IO, WriteTask[IO]](100).toResource
-      _       <- writeBinary(queue.stream, parallelism = 1).compile.drain.background
-      manager <- Resource.eval(StorageManager.initialize[IO](compactConfig, queue))
-    } yield manager
+      _                <- Resource.eval(Files[IO].createDirectories(Path(testDir.toString)).handleError(_ => ()))
+      queue            <- Channel.bounded[IO, WriteTask[IO]](100).toResource
+      _                <- writeBinary(queue.stream, parallelism = 1).compile.drain.background
+      table            <- Resource.eval(BitcaskTable.initialize[IO]("testTable", compactConfig, queue))
+    } yield table
 
-    compactResource.use { sm =>
+    compactResource.use { t =>
       for {
-        _ <- sm.write("k1", "a" * 500)
-        _ <- sm.write("k2", "b" * 500)
-        _ <- IO.sleep(300.millis)
-        v1 <- sm.read("k1")
-        v2 <- sm.read("k2")
+        _     <- t.write("k1", "a" * 500)
+        _     <- t.write("k2", "b" * 500)
+        _     <- IO.sleep(300.millis)
+        v1    <- t.read("k1")
+        v2    <- t.read("k2")
         files <- Files[IO].list(Path(testDir.toString)).map(_.fileName.toString).compile.toList
         binCount = files.count(_.endsWith(".bin"))
       } yield {
@@ -164,12 +164,12 @@ final class StorageManagerOperationSpec extends AsyncFreeSpec with AsyncIOSpec w
     val value = "{\"data\": \"important\"}"
 
     // 1. First session: write data and shutdown
-    val session1 = storageResource.use { sm =>
+    val session1 = tableResource.use { sm =>
       sm.write(key, value) *> IO.sleep(100.millis) // Wait for disk write completion
     }
 
     // 2. Second session: reopen storage and read
-    val session2 = storageResource.use { sm =>
+    val session2 = tableResource.use { sm =>
       sm.read(key).map { recoveredValue =>
         assert(recoveredValue.contains(value), "Data should be recovered from disk indexes")
       }
@@ -183,20 +183,20 @@ final class StorageManagerOperationSpec extends AsyncFreeSpec with AsyncIOSpec w
 
     val scenario = for {
       // Step 1: Write two keys, delete one
-      _ <- storageResource.use { sm =>
+      _ <- tableResource.use { t =>
         for {
-          _ <- sm.write(keyToKeep, "value1")
-          _ <- sm.write(keyToDelete, "value2")
-          _ <- sm.delete(keyToDelete)
+          _ <- t.write(keyToKeep, "value1")
+          _ <- t.write(keyToDelete, "value2")
+          _ <- t.delete(keyToDelete)
           _ <- IO.sleep(100.millis)
         } yield ()
       }
 
       // Step 2: Restart and verify state
-      _ <- storageResource.use { sm =>
+      _ <- tableResource.use { t =>
         for {
-          val1 <- sm.read(keyToKeep)
-          val2 <- sm.read(keyToDelete)
+          val1 <- t.read(keyToKeep)
+          val2 <- t.read(keyToDelete)
           _    <- IO.pure(assert(val1.contains("value1")))
           _    <- IO.pure(assert(val2.isEmpty, "Deleted key should not be recovered"))
         } yield ()

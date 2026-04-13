@@ -36,11 +36,13 @@ object Dependencies {
   object Http4s {
     val Http4sVersion   = "0.23.27"
     val smithy4sVersion = "0.19.0-41-91762fb"
+    val circleVersion = "0.14.9"
 
     val all: Seq[ModuleID] = Seq(
       "org.http4s"                   %% "http4s-ember-server" % Http4sVersion,
       "org.http4s"                   %% "http4s-ember-client" % Http4sVersion,
       "org.http4s"                   %% "http4s-circe"        % Http4sVersion,
+      "io.circe"                     %% "circe-generic"       % circleVersion,
       "org.http4s"                   %% "http4s-dsl"          % Http4sVersion,
       "com.disneystreaming.smithy4s" %% "smithy4s-http4s"     % smithy4sVersion excludeAll (
         ExclusionRule("org.scala-lang.modules")
