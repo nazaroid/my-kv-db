@@ -18,24 +18,6 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
 
 (cv CrudSpec)
 
-
-- (IN PROGRESS) добавить операции по статистике:
-  список баз/таблиц/размер(диск, озу)/кол-во записей
-  статистику по сегментам: кол-во, фрагментация (Коэффициент фрагментации (Stale Data Ratio): Отношение объема неактуальных данных (старых версий ключей) к общему размеру файлов)
-  экспортировать для прометеуса
-  + все тесты должны проходить
-  - функциональное тестирование: 
-    + storage
-    + статистика
-    - прометеус метрики и статистика (сделать docker compose и сборку образа для сервиса)
-    - в Makefile избавиться от зависимости к sbt
-      - как вариант оставить только docker
-      - либо вынести путь к sbt в переменную
-      - !!! либо сделать через shell.nix
-        - https://www.google.com/search?q=%D0%BA%D0%B0%D0%BA+%D0%BD%D0%B0%D0%B7%D1%8B%D0%B2%D0%B0%D0%B5%D1%82%D1%81%D1%8F+%D1%84%D1%83%D0%BD%D0%BA%D1%86%D0%B8%D0%BE%D0%BD%D0%B0%D0%BB%D1%8C%D0%BD%D1%8B%D0%B9+environment+%D0%B4%D0%BB%D1%8F+%D0%B8%D0%B7%D0%BE%D0%BB%D1%8F%D1%86%D0%B8%D0%B8+%D0%BE%D0%BA%D1%80%D1%83%D0%B6%D0%B5%D0%BD%D0%B8%D1%8F&rlz=1C5GCCM_en&gs_lcrp=EgZjaHJvbWUyBggAEEUYOdIBCTE5NTU0ajBqN6gCALACAA&sourceid=chrome&ie=UTF-8&fbs=ADc_l-ZNYiECt50Q2Di4dBBBAYOL5VvBLfqib0fcrHkoXQatSbIDceDitUN2yBmRBnPF3dLZFvzxdUCyeyFgb8g-C7QnWWyqKrsvydZVFihJH8-paNLU3s2KIzlmyPCEKt_qKyItBExdb157ipDm0KJWFbjKIQTEQma0h1wkSM6O3Y8P3PFcgsurT7qLEGvDUtzvNjxS--NOZIq3gatjhavMGkooUuY3jWwkAn60NF1apvVIK1EHTI56niM3lFtCX_Mgte7-tWd_y8haL2Fh6GvGyEbghhIWTQ&ved=2ahUKEwjLyI-AruqTAxVoHBAIHYO7FSsQ0NsOegQIAxAB&aep=10&ntc=1&mstk=AUtExfCCvfK8QKUjXjbJH424CKz8moRV_-aKiEG_Dyq8IRIbse9ai8ita39Tg9M1sXBPY5o4jbcwlm9WfzdTKllXnGAWk2-YllnSxYLmUTaNCokxN3dCdQ7eCDlg7BJQvMZjdt2Q93Xqf7LcbMZTqTOdKVA7cDUXv9XuxHNF4UWfUNiEPShWVzrDOUyTRLIoK6e1r1LUKVVor_LgE4RrxQclSdBQApO5WUxSNSmP2oqUa4ZosvWDyukPKml3Mg&csuir=1&udm=50
-  - провести ревью и рефакторинг
-
-    
 - (TODO) добавить метрики по скорости запись/чтение
   экспортер для прометеуса
   набросок в AI:
@@ -71,6 +53,8 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
   Boolean (Логический тип): Часто используется для флагов состояния, так как занимает минимум места.
 
 - (TODO) подготовить для OpenSource
+  - README.md
+  - провести Code Review и провести рефакторинги
 
 - (TODO) MVP: попробовать переделать на DSL + Free (можно только AppL и ServiceL)
   (AppL (run),
