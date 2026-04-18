@@ -54,6 +54,8 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
 
 - (TODO) подготовить для OpenSource
   - README.md
+    - дополнить ссылкой на docs
+    - логотип
   - провести Code Review и провести рефакторинги
 
 - (TODO) MVP: попробовать переделать на DSL + Free (можно только AppL и ServiceL)
