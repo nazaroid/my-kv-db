@@ -15,6 +15,14 @@ The project is designed as a learning-oriented, modular codebase that explores h
 - HTTP access for CRUD and statistics
 - Prometheus metrics and Grafana playground
 
+## Documentation
+
+Extended project documentation lives in the [`docs/`](./docs/) directory.
+
+- [`docs/index.md`](./docs/index.md) - documentation entry point and document map
+
+Use this `README.md` as the project overview and continue with [`docs/index.md`](./docs/index.md) for architecture notes, playground setup, and internal supporting documents.
+
 ## Problem It Solves
 
 The project targets a simple but useful scenario: persistent key-value storage for small services, prototypes, and infrastructure experiments where clarity of implementation matters as much as raw throughput.

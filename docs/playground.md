@@ -1,5 +1,7 @@
 # KV Database Docker Compose Setup
 
+Related documents: [Documentation Index](./index.md) | [Architecture](./architecture.md)
+
 This setup provides a complete monitoring stack for the KV Database service with Prometheus and Grafana.
 
 ## Architecture
