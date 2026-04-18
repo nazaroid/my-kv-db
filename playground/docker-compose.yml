@@ -14,7 +14,7 @@ services:
       - config=docker.conf
     volumes:
       - kvdb_data:/catalog
-      - ./codebase/service/src/main/resources/docker.conf:/app/docker.conf:ro
+      - ./playground/codebase/service/src/main/resources/docker.conf:/app/docker.conf:ro
     networks:
       - kvdb-network
     restart: unless-stopped
@@ -34,7 +34,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./playground/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -60,8 +60,8 @@ services:
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./playground/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./playground/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
       - kvdb-network
     restart: unless-stopped

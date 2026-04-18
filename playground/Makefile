@@ -1,4 +1,5 @@
 .PHONY: help build run stop clean logs status test grafana-setup populate-db show-stats
+DOCKER_COMPOSE := docker-compose -f docker-compose.yml --project-directory ..
 
 # Default target
 help:
@@ -24,7 +25,7 @@ help:
 # Build and start all services
 run: build
 	@echo "Starting all services..."
-	docker-compose up -d
+	$(DOCKER_COMPOSE) up -d
 	@echo "Services started!"
 	@echo "KV Database API: http://localhost:9000"
 	@echo "Prometheus: http://localhost:9090"
@@ -48,22 +49,22 @@ clean:
 
 # Show logs from all services
 logs:
-	docker-compose logs -f
+	$(DOCKER_COMPOSE) logs -f
 
 # Show logs from specific service
 logs-kvdb:
-	docker-compose logs -f kvdb
+	$(DOCKER_COMPOSE) logs -f kvdb
 
 logs-prometheus:
-	docker-compose logs -f prometheus
+	$(DOCKER_COMPOSE) logs -f prometheus
 
 logs-grafana:
-	docker-compose logs -f grafana
+	$(DOCKER_COMPOSE) logs -f grafana
 
 # Show status of all services
 status:
 	@echo "=== Service Status ==="
-	docker-compose ps
+	$(DOCKER_COMPOSE) ps
 	@echo ""
 	@echo "=== Health Checks ==="
 	@curl -s http://localhost:9000/health || echo "KV Database: DOWN"
