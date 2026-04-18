@@ -1,6 +1,6 @@
 # Architecture Notes
 
-[Doc Index](./index.md)
+[Return to Index](./index.md)
 
 Вот резюме текущей архитектуры нашей библиотеки хранения данных:
 

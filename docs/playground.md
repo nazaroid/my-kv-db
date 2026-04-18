@@ -1,6 +1,6 @@
 # KV Database Docker Compose Setup
 
-[Doc Index](./index.md)
+[Return to Index](./index.md)
 
 This setup provides a complete monitoring stack for the KV Database service with Prometheus and Grafana.
 
