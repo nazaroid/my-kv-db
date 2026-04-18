@@ -1,6 +1,6 @@
 # Architecture Notes
 
-Related documents: [Documentation Index](./index.md) | [Playground](./playground.md)
+[Doc Index](./index.md)
 
 Вот резюме текущей архитектуры нашей библиотеки хранения данных:
 
