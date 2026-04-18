@@ -1,4 +1,4 @@
-# `my-kv-db` Doc Index
+# 📚 `my-kv-db` Documentation
 
 - [`playground.md`](./playground.md) - local playground, Docker Compose setup, Prometheus, Grafana, and API usage examples
 

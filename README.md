@@ -1,4 +1,4 @@
-# my-kv-db One-Pager
+# my-kv-db
 
 ## Overview
 
