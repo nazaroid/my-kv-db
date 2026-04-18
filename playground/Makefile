@@ -15,6 +15,7 @@ help:
 	@echo "  health    - Check health of all services"
 	@echo "  metrics   - Show available metrics"
 	@echo "  grafana-setup - Setup Grafana dashboards (template variables)"
+	@echo "  demo - Show playground capabilities
 	@echo "  populate-db - Populate database with test data (100 users)"
 	@echo "  populate-db-custom - Populate with custom number of records"
 	@echo "  cleanup-test-data - Clean up test data"
