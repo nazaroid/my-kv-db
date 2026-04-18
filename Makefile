@@ -4,7 +4,6 @@
 help:
 	@echo "KV Database Docker Compose Commands:"
 	@echo ""
-	@echo "  build     - Build the application JAR"
 	@echo "  run       - Build and start all services"
 	@echo "  stop      - Stop all services"
 	@echo "  restart   - Restart all services"
@@ -21,11 +20,6 @@ help:
 	@echo "  show-stats - Show database statistics (formatted JSON)"
 	@echo ""
 
-# Build the application
-build:
-	@echo "Building KV Database..."
-	sbt assembly
-	@echo "Build completed!"
 
 # Build and start all services
 run: build
@@ -153,13 +147,6 @@ demo: run
 	@echo "  - KV Database: http://localhost:9000"
 	@echo "  - Prometheus: http://localhost:9090"
 	@echo "  - Grafana: http://localhost:3000 (admin/admin123)"
-
-# Development commands
-dev-build:
-	sbt "project service" assembly
-
-dev-run:
-	sbt "project service" run
 
 # Monitoring commands
 prometheus-reload:
