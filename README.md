@@ -1,89 +1,140 @@
-# my-kv-db
+# my-kv-db One-Pager
 
-## refs
+## Overview
 
-https://drive.google.com/drive/u/1/folders/1BpJo8j4xkWuLI-9Zls8dZNmtWIdH_zwQ
-https://docs.google.com/document/d/1sww6oOqIgJuGDw4UU746usO1lyFgargHtrjEj3av__k/edit?tab=t.0
-https://app.diagrams.net/?libs=general;citrix#
+`my-kv-db` is a small experimental key-value database built in Scala 3.
+It combines a Bitcask-inspired storage engine with a simple HTTP API and built-in observability.
+The codebase is written in a functional style, with Cats, Cats Effect, and FS2 used as core building blocks.
 
-https://www.youtube.com/watch?v=NITGB4SH-j8&t=335s
-https://github.com/itmo-java-basics-2021/lab-base-code/tree/master/src/main/java/com/itmo/java
+The project is designed as a learning-oriented, modular codebase that explores how a storage engine can evolve from binary file primitives into a usable service:
 
-crc - Циклический избыточный код (англ. Cyclic redundancy check[нет в источнике], CRC[1]) — алгоритм нахождения
-контрольной суммы, предназначенный для проверки целостности данных[2].
-https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B8%D0%B9_%D0%B8%D0%B7%D0%B1%D1%8B%D1%82%D0%BE%D1%87%D0%BD%D1%8B%D0%B9_%D0%BA%D0%BE%D0%B4
-в bitcast считается для каждой строки (см bitcask-intro.pdf на google диске)
+- append-only persistence
+- per-segment indexing
+- in-memory cache for fast reads
+- database and table abstraction
+- HTTP access for CRUD and statistics
+- Prometheus metrics and Grafana playground
 
-## TODO
+## Problem It Solves
 
-(cv CrudSpec)
+The project targets a simple but useful scenario: persistent key-value storage for small services, prototypes, and infrastructure experiments where clarity of implementation matters as much as raw throughput.
 
+Instead of starting from a large production-grade database, `my-kv-db` focuses on a transparent architecture that is easy to read, extend, test, and discuss in public.
+It also serves as a compact example of applying functional programming patterns to storage and service design in Scala.
 
-- (IN PROGRESS) добавить операции по статистике:
-  список баз/таблиц/размер(диск, озу)/кол-во записей
-  статистику по сегментам: кол-во, фрагментация (Коэффициент фрагментации (Stale Data Ratio): Отношение объема неактуальных данных (старых версий ключей) к общему размеру файлов)
-  экспортировать для прометеуса
-  + все тесты должны проходить
-  - функциональное тестирование: 
-    + storage
-    + статистика
-    - прометеус метрики и статистика (сделать docker compose и сборку образа для сервиса)
-    - в Makefile избавиться от зависимости к sbt
-      - как вариант оставить только docker
-      - либо вынести путь к sbt в переменную
-      - !!! либо сделать через shell.nix
-        - https://www.google.com/search?q=%D0%BA%D0%B0%D0%BA+%D0%BD%D0%B0%D0%B7%D1%8B%D0%B2%D0%B0%D0%B5%D1%82%D1%81%D1%8F+%D1%84%D1%83%D0%BD%D0%BA%D1%86%D0%B8%D0%BE%D0%BD%D0%B0%D0%BB%D1%8C%D0%BD%D1%8B%D0%B9+environment+%D0%B4%D0%BB%D1%8F+%D0%B8%D0%B7%D0%BE%D0%BB%D1%8F%D1%86%D0%B8%D0%B8+%D0%BE%D0%BA%D1%80%D1%83%D0%B6%D0%B5%D0%BD%D0%B8%D1%8F&rlz=1C5GCCM_en&gs_lcrp=EgZjaHJvbWUyBggAEEUYOdIBCTE5NTU0ajBqN6gCALACAA&sourceid=chrome&ie=UTF-8&fbs=ADc_l-ZNYiECt50Q2Di4dBBBAYOL5VvBLfqib0fcrHkoXQatSbIDceDitUN2yBmRBnPF3dLZFvzxdUCyeyFgb8g-C7QnWWyqKrsvydZVFihJH8-paNLU3s2KIzlmyPCEKt_qKyItBExdb157ipDm0KJWFbjKIQTEQma0h1wkSM6O3Y8P3PFcgsurT7qLEGvDUtzvNjxS--NOZIq3gatjhavMGkooUuY3jWwkAn60NF1apvVIK1EHTI56niM3lFtCX_Mgte7-tWd_y8haL2Fh6GvGyEbghhIWTQ&ved=2ahUKEwjLyI-AruqTAxVoHBAIHYO7FSsQ0NsOegQIAxAB&aep=10&ntc=1&mstk=AUtExfCCvfK8QKUjXjbJH424CKz8moRV_-aKiEG_Dyq8IRIbse9ai8ita39Tg9M1sXBPY5o4jbcwlm9WfzdTKllXnGAWk2-YllnSxYLmUTaNCokxN3dCdQ7eCDlg7BJQvMZjdt2Q93Xqf7LcbMZTqTOdKVA7cDUXv9XuxHNF4UWfUNiEPShWVzrDOUyTRLIoK6e1r1LUKVVor_LgE4RrxQclSdBQApO5WUxSNSmP2oqUa4ZosvWDyukPKml3Mg&csuir=1&udm=50
-  - провести ревью и рефакторинг
+## Architecture Snapshot
 
-    
-- (TODO) добавить метрики по скорости запись/чтение
-  экспортер для прометеуса
-  набросок в AI:
-  https://www.google.com/search?sourceid=chrome&udm=50&aep=42&q=%D0%AF+%D1%80%D0%B0%D0%B7%D1%80%D0%B0%D0%B1%D0%B0%D1%82%D1%8B%D0%B2%D0%B0%D1%8E+%D0%BF%D1%80%D0%BE%D1%81%D1%82%D0%B5%D0%BD%D1%8C%D0%BA%D1%83%D1%8E+kv-%D0%B1%D0%B0%D0%B7%D1%83+%D0%B4%D0%B0%D0%BD%D1%8B%D1%85+%D1%81+%D0%B4%D0%B2%D0%B8%D0%B6%D0%BA%D0%BE%D0%BC+bitcask.%0A%D0%A3+%D0%BC%D0%B5%D0%BD%D1%8F+%D0%BE%D0%BF%D0%B5%D1%80%D0%B0%D1%86%D0%B8%D0%B8+%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B8+%D0%B8+%D1%87%D1%82%D0%B5%D0%BD%D0%B8%D1%8F%2C+%D0%BD%D0%BE+%D0%BD%D0%B5%D1%82+%D0%BD%D0%B8%D0%BA%D0%B0%D0%BA%D0%BE%D0%B9+%D1%81%D1%82%D0%B0%D1%82%D0%B8%D1%81%D1%82%D0%B8%D0%BA%D0%B8.+%D0%9F%D1%80%D0%B5%D0%B4%D0%BB%D0%BE%D0%B6%D0%B8+%D0%BA%D0%B0%D0%BA+%D0%B8%D1%81%D0%BF%D1%80%D0%B0%D0%B2%D0%B8%D1%82%D1%8C+%D1%81%D0%B8%D1%82%D1%83%D0%B0%D1%86%D0%B8%D1%8E&mstk=AUtExfBFmzELB1g_0ahRd1paz1U43w31fV6fGYPUJbiKTcJNgHlD191coevSJ0LcKsdnD8NJPjYuZGxg1Xha6mUpQWXk2mg3RQ2sgLx52ePnmCcf5BeTtd8g_8SpskKt3LQ0KDTCkQLg4BFd-2xyCkcYDwveSWNwTMoaqJEj4ERSZtuLT4IDp0ed8vmMwcrnR7s0wmVupLg3NvIKFZS3_kcuO85FwL14TSD2xs8rpjt5Rmc0GBcehnZYwKyLAw&csuir=1
+The current design follows a three-level storage model:
 
-- (TODO) нужно лучше декомпозировать проект на модули
-  - выделить два основных компонента и слои: 
-    - storage:
-      - server
-      - engine
-      - statistics
-    - shared
-      - utils
-    - node
-  - разделить утилиты: для инстанса DB не нужен [metrics](codebase/modules/utils/metrics)
-  - нужен только для http-сервера: [prometheus](codebase/modules/utils/third_party/prometheus)
+1. `*.bin` data files store raw values in append-only format.
+2. `*.idx` segment indexes map keys to offsets inside a segment.
+3. `table.idx` stores the latest segment reference for each key and is used during recovery.
 
-- (TODO) оптимизировать: size <- Files[F].size(Path(ds.filePath)).handleError(_ => 0L)
-  - вроде уже оптимизировано
+Core write path:
 
-- (TODO) проработать результаты CODE_REVIEW (особенно исправить баг по длинне ключей)
-  - конкуретная запись на уровне сегментов
-  - избавиться от `encoding` бросает `throw`
-  - ввести конфиг `durability: Relaxed | FsyncPerSegment | FsyncPerBatchвести конфиг `durability: Relaxed | FsyncPerSegment | FsyncPerBatch
-  - длины ключей считаются в символах, а не в байтах UTF-8
+1. Append value to the data file.
+2. Append key-to-offset mapping to the segment index.
+3. Append key-to-segment mapping to the table index.
+4. Update the in-memory cache after durable writes complete.
 
-* (TODO) добавить типы
-  Blob / Byte Array - базовый тип для хранения
-      Bitcask Engine: возвращает Byte Array
-      Serialization/Codec Layer: работает поверх engine и производит преобразования
-  String (Строка): Основной тип для ключей. Позволяет организовывать пространство имен (например, user:123:profile) и выполнять поиск по маскам.
-  Integer (Целое число): Необходим для реализации атомарных счетчиков и инкрементальных операций без полной перезаписи значения.
-  Boolean (Логический тип): Часто используется для флагов состояния, так как занимает минимум места.
+Core read path:
 
-- (TODO) подготовить для OpenSource
+1. Resolve the key from the in-memory cache.
+2. Return the cached live value or treat the key as absent.
 
-- (TODO) MVP: попробовать переделать на DSL + Free (можно только AppL и ServiceL)
-  (AppL (run),
-  ServiceL (startEndpoint httpCfg | grpcCfg)
-  DbSrvL (create, createDb))
+Delete path:
 
-* (TODO) (проектирование/реализация) добавить bloom filter
-    * спроектировать сценарии использования
-    * реализовать
-  
-* (TODO) поддержи GRPC
-  - при grpc уметь получать статистику по grpc
+1. Write a tombstone into the indexes.
+2. Mark the key as deleted in memory.
+3. Leave physical cleanup to compaction and segment maintenance.
 
+The implementation also includes:
 
+- segment rotation by size
+- recovery on startup from persisted indexes
+- compaction when segment count grows beyond configured limits
+- statistics aggregation on catalog, database, table, and segment levels
 
-потом прикрутить SQL
+## Module Layout
+
+The repository is split into focused modules:
+
+- `codebase/modules/core` - storage and statistics abstractions
+- `codebase/modules/bin-file-io` - binary encoding, CRC, row read/write primitives
+- `codebase/modules/bitcask` - Bitcask-style engine, database manager, table logic, stats adapter
+- `codebase/modules/server` - HTTP server, routing, dependency composition
+- `codebase/service` - runnable application entrypoint and config loading
+- `codebase/modules/utils/metrics` - metrics exporter
+
+This layout makes it possible to evolve the engine, transport layer, and tooling independently.
+
+## Public API
+
+The HTTP layer currently exposes:
+
+- `POST /data/{db}` - create a database
+- `POST /data/{db}/{table}` - create a table
+- `POST /data/{db}/{table}/{key}` - store a value
+- `GET /data/{db}/{table}/{key}` - read a value
+- `DELETE /data/{db}/{table}/{key}` - delete a value
+- `GET /health` - health check
+- `GET /stats/catalog` - global statistics
+- `GET /stats/database/{db}` - database statistics
+- `GET /stats/table/{db}/{table}` - table statistics
+
+The current public data model is intentionally simple: string keys and string values.
+
+## Observability
+
+`my-kv-db` is not only a storage experiment, but also an observability experiment.
+
+The service exports Prometheus-compatible metrics and includes a local playground with:
+
+- Prometheus scraping
+- Grafana dashboards
+- Docker Compose-based demo environment
+
+This makes the project useful both as a storage prototype and as an example of how to instrument a stateful service.
+
+## Current Status
+
+The project is best described as an early open-source storage prototype:
+
+- the Bitcask-inspired engine is implemented
+- CRUD over HTTP is implemented
+- statistics and metrics are implemented
+- module boundaries are already visible
+- the codebase still contains active TODOs around hardening, cleanup, and open-source packaging
+
+That positioning is intentional: the repository is already useful for experimentation, design review, and contribution, while still being open to architectural improvement.
+
+## Why Open Source
+
+`my-kv-db` is a good open-source candidate because it sits at the intersection of several topics that are valuable to contributors:
+
+- storage engine design
+- binary file formats and indexes
+- functional programming in Scala with Cats, Cats Effect, and FS2
+- HTTP services with http4s
+- service monitoring with Prometheus and Grafana
+
+It is small enough to understand, but rich enough to discuss real trade-offs in durability, recovery, compaction, modularization, and API design.
+
+## Contribution Themes
+
+Good areas for public iteration include:
+
+- durability modes and write guarantees
+- recovery and snapshot optimization
+- storage format validation and edge cases
+- better module decomposition
+- richer value types and serialization layers
+- more transport options such as gRPC
+
+## Summary
+
+`my-kv-db` is a modular, Bitcask-inspired KV database project for Scala 3 that already demonstrates the full path from binary persistence to an observable HTTP service.
+It is implemented in a functional style and uses the Cats ecosystem as a foundation for effects, composition, and concurrency.
+
+It is not presented as a finished production database.
+It is presented as a serious, readable, and extensible foundation for open-source collaboration.
