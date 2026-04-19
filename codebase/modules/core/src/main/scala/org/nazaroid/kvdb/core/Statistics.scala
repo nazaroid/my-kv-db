@@ -5,55 +5,56 @@ import cats.effect.{Async, Ref}
 import cats.implicits.given
 import fs2.Stream
 import fs2.io.file.Files
+import io.circe.Json
 import org.nazaroid.kvdb.core.*
 import org.typelevel.log4cats.Logger
-import io.circe.Json
+
 import scala.concurrent.duration.*
 
 /** Database statistics for multiple databases
- */
+  */
 case class CatalogStats(
-                         totalDatabases: Int,
-                         totalTables:    Int,
-                         totalEntries:   Int,
-                         activeEntries:  Int,
-                         deletedEntries: Int,
-                         totalDataSize:  Long,
-                         // Heterogeneous collection for engine-specific details
-                         details: Map[String, Json] = Map.empty)
+  totalDatabases: Int,
+  totalTables:    Int,
+  totalEntries:   Int,
+  activeEntries:  Int,
+  deletedEntries: Int,
+  totalDataSize:  Long,
+  // Heterogeneous collection for engine-specific details
+  details: Map[String, Json] = Map.empty)
 
 /** Database information for single database
- */
+  */
 case class DatabaseInfo(
-                         name:           String,
-                         totalTables:    Int,
-                         totalEntries:   Int,
-                         activeEntries:  Int,
-                         deletedEntries: Int,
-                         totalDataSize:  Long,
-                         // Engine-specific details
-                         details: Map[String, Json] = Map.empty)
+  name:           String,
+  totalTables:    Int,
+  totalEntries:   Int,
+  activeEntries:  Int,
+  deletedEntries: Int,
+  totalDataSize:  Long,
+  // Engine-specific details
+  details: Map[String, Json] = Map.empty)
 
 /** Table information
- */
+  */
 case class TableInfo(
-                      name:              String,
-                      entryCount:        Int,
-                      activeEntryCount:  Int,
-                      deletedEntryCount: Int,
-                      totalDataSize:     Long,
-                      // Engine-specific details
-                      details: Map[String, Json] = Map.empty)
+  name:              String,
+  entryCount:        Int,
+  activeEntryCount:  Int,
+  deletedEntryCount: Int,
+  totalDataSize:     Long,
+  // Engine-specific details
+  details: Map[String, Json] = Map.empty)
 
 /** Segment information (for storage-like engines)
- */
+  */
 case class SegmentInfo(
-                        name:       String,
-                        fileSize:   Long,
-                        isActive:   Boolean,
-                        entryCount: Int,
-                        // Engine-specific details
-                        details: Map[String, Json] = Map.empty)
+  name:       String,
+  fileSize:   Long,
+  isActive:   Boolean,
+  entryCount: Int,
+  // Engine-specific details
+  details: Map[String, Json] = Map.empty)
 
 /** Background process for monitoring segments and fragmentation */
 trait StatisticsService[F[_]] {
