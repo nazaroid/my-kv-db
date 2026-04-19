@@ -45,7 +45,7 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
 - (TODO): /refact/ пересмотреть связи между StatisticsService <-> DatabaseManager[F] <-> Engine
   - сейчас внедрение DatabaseManager в StatisticsService через engine.dbManager
   - как можно переделать: DatabaseManager трансформировать в Catalog, т.к это аналог BitcaskCatalog (его нужно переименовать так из Catalog) и сделать его враппером над BitcaskCatalog
-
+  
 - (TODO): вынести в конфиг
   - c <- Catalog.init(Path(rootPath), configTemplate, 1024, 2)
 
