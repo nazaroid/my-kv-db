@@ -14,6 +14,12 @@ crc - Циклический избыточный код (англ. Cyclic redun
 https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B8%D0%B9_%D0%B8%D0%B7%D0%B1%D1%8B%D1%82%D0%BE%D1%87%D0%BD%D1%8B%D0%B9_%D0%BA%D0%BE%D0%B4
 в bitcast считается для каждой строки (см bitcask-intro.pdf на google диске)
 
+## gpt promt
+```
+Я разрабатываю kv-базу даных с движком bitcask на Scala 3 + Cats.
+Чтобы разобраться в структуре проекта изучи документацию, начиная с README.md и документы в папке ./docs .
+```
+
 ## TODO
 
 (cv CrudSpec)
@@ -22,6 +28,11 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
   экспортер для прометеуса
   набросок в AI:
   https://www.google.com/search?sourceid=chrome&udm=50&aep=42&q=%D0%AF+%D1%80%D0%B0%D0%B7%D1%80%D0%B0%D0%B1%D0%B0%D1%82%D1%8B%D0%B2%D0%B0%D1%8E+%D0%BF%D1%80%D0%BE%D1%81%D1%82%D0%B5%D0%BD%D1%8C%D0%BA%D1%83%D1%8E+kv-%D0%B1%D0%B0%D0%B7%D1%83+%D0%B4%D0%B0%D0%BD%D1%8B%D1%85+%D1%81+%D0%B4%D0%B2%D0%B8%D0%B6%D0%BA%D0%BE%D0%BC+bitcask.%0A%D0%A3+%D0%BC%D0%B5%D0%BD%D1%8F+%D0%BE%D0%BF%D0%B5%D1%80%D0%B0%D1%86%D0%B8%D0%B8+%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B8+%D0%B8+%D1%87%D1%82%D0%B5%D0%BD%D0%B8%D1%8F%2C+%D0%BD%D0%BE+%D0%BD%D0%B5%D1%82+%D0%BD%D0%B8%D0%BA%D0%B0%D0%BA%D0%BE%D0%B9+%D1%81%D1%82%D0%B0%D1%82%D0%B8%D1%81%D1%82%D0%B8%D0%BA%D0%B8.+%D0%9F%D1%80%D0%B5%D0%B4%D0%BB%D0%BE%D0%B6%D0%B8+%D0%BA%D0%B0%D0%BA+%D0%B8%D1%81%D0%BF%D1%80%D0%B0%D0%B2%D0%B8%D1%82%D1%8C+%D1%81%D0%B8%D1%82%D1%83%D0%B0%D1%86%D0%B8%D1%8E&mstk=AUtExfBFmzELB1g_0ahRd1paz1U43w31fV6fGYPUJbiKTcJNgHlD191coevSJ0LcKsdnD8NJPjYuZGxg1Xha6mUpQWXk2mg3RQ2sgLx52ePnmCcf5BeTtd8g_8SpskKt3LQ0KDTCkQLg4BFd-2xyCkcYDwveSWNwTMoaqJEj4ERSZtuLT4IDp0ed8vmMwcrnR7s0wmVupLg3NvIKFZS3_kcuO85FwL14TSD2xs8rpjt5Rmc0GBcehnZYwKyLAw&csuir=1
+  Я разрабатываю kv-базу даных с движком bitcask на Scala 3 + Cats.
+  Чтобы разобраться в структуре проекта изучи документацию, начиная с README.md и документы в папке ./docs .
+  У меня операции записи и чтения, но нет метрик на эти операции. 
+  Добавь их поддержку и выведи на дашборд Grafana в playground.
+  
 
 - (TODO): /refact/ декомпозировать на модули
   - выделить два основных компонента и слои: 

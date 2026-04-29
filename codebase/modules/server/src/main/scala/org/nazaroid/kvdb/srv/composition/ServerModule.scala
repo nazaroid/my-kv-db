@@ -17,15 +17,14 @@ final class ServerModule[F[_]: Async: Files: Logger: Parallel: Network](commonMo
 
   def resolve: Resource[F, Server[F]] = {
     for {
-      engine <- BitcaskEngine.init[F](config.engine)
       statisticsService <- BitcaskStatisticsService
         .create[F](
-          engine.dbManager,
           org.nazaroid.kvdb.core.MonitoringConfig(),
           io.prometheus.client.CollectorRegistry.defaultRegistry
         )
         .toResource
-      _ <- Resource.eval(statisticsService.registerMetrics())
+      engine <- BitcaskEngine.init[F](config.engine, Some(statisticsService.metricsAdapter))
+      _ <- Resource.eval(statisticsService.registerMetrics(engine.dbManager))
       _ <- Resource.eval(statisticsService.startMonitoring())
     } yield {
       config.server match {

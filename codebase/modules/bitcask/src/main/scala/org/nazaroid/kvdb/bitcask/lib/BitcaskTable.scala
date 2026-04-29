@@ -49,10 +49,12 @@ sealed class BitcaskTable[F[_]: Async: Files: Logger](
   val tableStorage:      BinFileStorage[F],
   val cache:             Ref[F, Map[String, CacheEntry]],
   val config:            BitcaskTableConfig,
-  val writeQueue:        Channel[F, WriteTask[F]]) {
+  val writeQueue:        Channel[F, WriteTask[F]],
+  val metricsAdapter:    Option[org.nazaroid.kvdb.bitcask.BitcaskPrometheusMetricsAdapter[F]] = None) {
 
   /** WRITE: Data -> Segment -> Table -> Cache */
   def write(key: String, value: String): F[Either[String, Unit]] = {
+    val startTime = System.nanoTime()
     val timestamp = System.currentTimeMillis()
     val status = 1 // Active status
 
@@ -127,26 +129,43 @@ sealed class BitcaskTable[F[_]: Async: Files: Logger](
           cache.update(_ - key).map(_ => Left("Write operation failed"))
         }
       _ <- compactIfNeeded
+      
+      // Record metrics
+      duration = (System.nanoTime() - startTime).toDouble / 1_000_000_000 // Convert to seconds
+      _ <- metricsAdapter.traverse_(adapter => 
+        adapter.recordWriteOperation("unknown", "unknown", finalResult.isRight, duration)
+      )
     } yield finalResult
   }
 
   /** READ: Always from cache (O(1)) */
   def read(key: String): F[Option[String]] = {
-    cache
-      .get
-      .map(_.get(key).flatMap {
-        case CacheEntry.Pending(row) => // Check record status
-          row.get("status") match {
-            case Some(1) => row.get("value").map(_.toString) // Active
-            case _       => None                             // Not active
-          }
-        case CacheEntry.Persistent(row, _, _) =>
-          row.get("status") match {
-            case Some(1) => row.get("value").map(_.toString) // Active
-            case _       => None                             // Not active
-          }
-        case CacheEntry.Deleted => None
-      })
+    val startTime = System.nanoTime()
+    
+    for {
+      result <- cache
+        .get
+        .map(_.get(key).flatMap {
+          case CacheEntry.Pending(row) => // Check record status
+            row.get("status") match {
+              case Some(1) => row.get("value").map(_.toString) // Active
+              case _       => None                             // Not active
+            }
+          case CacheEntry.Persistent(row, _, _) =>
+            row.get("status") match {
+              case Some(1) => row.get("value").map(_.toString) // Active
+              case _       => None                             // Not active
+            }
+          case CacheEntry.Deleted => None
+        })
+      
+      // Record metrics
+      duration = (System.nanoTime() - startTime).toDouble / 1_000_000_000 // Convert to seconds
+      _ <- metricsAdapter.traverse_(adapter => 
+        adapter.recordReadOperation("unknown", "unknown", result.isDefined, duration)
+      )
+      
+    } yield result
   }
 
   /** Helper method for retry logic */
@@ -173,6 +192,8 @@ sealed class BitcaskTable[F[_]: Async: Files: Logger](
 
   /** DELETE: Write a Tombstone record */
   def delete(key: String): F[Unit] = {
+    val startTime = System.nanoTime()
+    
     for {
       _ <- cache.update(_ + (key -> CacheEntry.Deleted))
       tRow = Map(
@@ -184,6 +205,12 @@ sealed class BitcaskTable[F[_]: Async: Files: Logger](
         "status"          -> 0 // Deleted status
       )
       _ <- tableStorage.append(key, tRow)
+      
+      // Record metrics
+      duration = (System.nanoTime() - startTime).toDouble / 1_000_000_000 // Convert to seconds
+      _ <- metricsAdapter.traverse_(adapter => 
+        adapter.recordDeleteOperation("unknown", "unknown", duration)
+      )
     } yield ()
   }
 
@@ -402,9 +429,10 @@ object BitcaskTable {
   }
 
   def initialize[F[_]: Async: Files: Logger](
-    name:       String,
-    config:     BitcaskTableConfig,
-    writeQueue: Channel[F, WriteTask[F]]
+    name:          String,
+    config:        BitcaskTableConfig,
+    writeQueue:    Channel[F, WriteTask[F]],
+    metricsAdapter: Option[org.nazaroid.kvdb.bitcask.BitcaskPrometheusMetricsAdapter[F]] = None
   ): F[BitcaskTable[F]] = {
 
     val tableIndexPath = s"${config.folder}/table.idx"
@@ -464,6 +492,6 @@ object BitcaskTable {
       dsRef <- Ref.of[F, BinFileStorage[F]](dataStorage)
       ssRef <- Ref.of[F, BinFileStorage[F]](segStorage)
 
-    } yield new BitcaskTable(name, dsRef, ssRef, tableStorage, cacheRef, config, writeQueue)
+    } yield new BitcaskTable(name, dsRef, ssRef, tableStorage, cacheRef, config, writeQueue, metricsAdapter)
   }
 }

@@ -1,50 +1,86 @@
-# This is an example configuration file
-# To learn more, see the full config.yaml reference: https://continue.dev
-
-name: My Config
+name: Vibe Coding Config
 version: 1.0.0
 schema: v1
 
-# Модели
 models:
-  - name: "gemini-3-flash-preview"
-    provider: gemini
-    model: gemini-3-flash-preview
-    apiKey: AIzaSyDH70SCPufGhgj0IuXdFDZEjmOvtGKR1yM
-  - name: "OLLAMA:qwen2.5-coder:7b"
-    provider: "ollama"
-    model: "qwen2.5-coder:7b"
-    apiBase: "http://localhost:11434" # БЕЗ /v1 для провайдера ollama
-    capabilities:
-        - "tools" 
-  - name: "OLLAMA:qwen2.5-coder:32b-instruct-q3_K_M"
-    provider: "ollama"
-    model: "qwen2.5-coder:32b-instruct-q3_K_M"
-    apiBase: "http://localhost:11434" # БЕЗ /v1 для провайдера ollama
-    capabilities:
-        - "tools" 
+  # --- ДОБАВЛЕНО: Клод через OpenRouter (Лучший выбор для Scala 3) ---
+  - name: "Claude 3.5 Sonnet (OpenRouter)"
+    provider: "openai"
+    model: "anthropic/claude-3.5-sonnet"
+    apiBase: "https://openrouter.ai"
+    apiKey: "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" # Замените на реальный ключ
+    systemMessage: "You are an elite Scala 3 developer. Use tools to edit files directly. No yapping, just code."
+  
   - name: "OLLAMA:deepseek-coder-v2:16b"
     provider: "ollama"
     model: "deepseek-coder-v2:16b"
-    apiBase: "http://localhost:11434" # БЕЗ /v1 для провайдера ollama
+    apiBase: "http://localhost:11434"
     capabilities:
-        - "tools" 
+      - "tools"
+    systemMessage: "You are a 'vibe coding' agent. Don't explain, don't plan. Use tools to edit files directly. Stop talking, start coding."
 
-# ВАЖНО: Добавьте это, чтобы поиск @Codebase заработал
-# Перед этим выполните в терминале: ollama pull nomic-embed-text
+  - name: "gemini-3-flash-preview"
+    provider: "gemini"
+    model: "gemini-3-flash-preview"
+    apiKey: "AIzaSyDH70SCPufGhgj0IuXdFDZEjmOvtGKR1yM"
+    systemMessage: "Directly apply changes to files using tools. No yapping."
+
+  - name: "OLLAMA:qwen2.5-coder:32b-instruct-q3_K_M"
+    provider: "ollama"
+    model: "qwen2.5-coder:32b-instruct-q3_K_M"
+    apiBase: "http://localhost:11434"
+    capabilities:
+      - "tools"
+    systemMessage: "Directly apply changes to files using tools. No yapping."
+
+experimental:
+  readResponseFromFirstToolCall: true
+  modelUsesSystemMessageForTools: true
+
+customInstructions: |
+  You are an expert Scala 3 developer using Cats Effect. 
+  Always prefer 'edit_file' over explaining steps. 
+  If you see a bug, fix it. If I ask for a feature, write the code for it.
+  Use quiet syntax (indentation-based) for Scala 3.
+
 embeddingsProvider:
-  provider: ollama
-  model: nomic-embed-text
+  provider: "ollama"
+  model: "nomic-embed-text"
 
-# MCP Servers (инструменты)
-mcpServers:
-  - uses: anthropic/memory-mcp
-
-# Провайдеры контекста (те самые команды через @)
 contextProviders:
   - name: "codebase"
+    params:
+      useToolCalling: false
   - name: "folder"
   - name: "diff"
   - name: "open"
   - name: "terminal"
   - name: "docs"
+
+mcpServers:
+  - uses: anthropic/memory-mcp
+  - name: "mcp-atlassian"
+    command: "docker"
+    args:
+      - "run"
+      - "--rm"
+      - "-i"
+      - "--add-host"
+      - "jira.uzum.com:194.34.246.37"
+      - "--add-host"
+      - "confluence.uzum.com:194.34.246.37"
+      - "-e"
+      - "CONFLUENCE_URL=https://confluence.uzum.com"
+      - "-e"
+      - "CONFLUENCE_PERSONAL_TOKEN=NDg0MzIzODM2MzUyOp9Dq6rSQurjOj7WlHRS+v+3gxeb"
+      - "-e"
+      - "CONFLUENCE_SSL_VERIFY=false"
+      - "-e"
+      - "JIRA_URL=https://jira.uzum.com"
+      - "-e"
+      - "JIRA_PERSONAL_TOKEN=MzkzMzQxNTEzNzA0OhWHQHWwEAHIVdKrJ4shxzPhsOtO"
+      - "-e"
+      - "JIRA_SSL_VERIFY=false"
+      - "-e"
+      - "PYTHONHTTPSVERIFY=0"
+      - "ghcr.io/sooperset/mcp-atlassian:latest"

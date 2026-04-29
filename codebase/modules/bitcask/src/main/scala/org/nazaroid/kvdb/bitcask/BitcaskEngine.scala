@@ -12,7 +12,10 @@ import org.typelevel.log4cats.Logger
 
 object BitcaskEngine {
 
-  def init[F[_]: Async: Files: Logger](conf: BitcaskEngineConfig): Resource[F, Engine[F]] = {
+  def init[F[_]: Async: Files: Logger](
+    conf: BitcaskEngineConfig,
+    metricsAdapter: Option[org.nazaroid.kvdb.bitcask.BitcaskPrometheusMetricsAdapter[F]] = None
+  ): Resource[F, Engine[F]] = {
     // Data files use CRC, segment and table - no
     val dataSchema = List(
       FieldDef("valueSize", FieldType.Int32),
@@ -49,7 +52,7 @@ object BitcaskEngine {
     )
 
     for {
-      databaseManager <- BitcaskDatabaseManager.create[F](conf.rootDir, tableConfig)
+      databaseManager <- BitcaskDatabaseManager.create[F](conf.rootDir, tableConfig, metricsAdapter)
     } yield BitcaskEngine(databaseManager)
   }
 }

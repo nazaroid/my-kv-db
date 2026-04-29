@@ -12,7 +12,8 @@ final class BitcaskDatabase[F[_]: Async: Files: Logger](
   val path:           Path,
   val writeQueue:     Channel[F, WriteTask[F]],
   val configTemplate: BitcaskTableConfig,
-  val tables:         Ref[F, Map[String, BitcaskTable[F]]]) {
+  val tables:         Ref[F, Map[String, BitcaskTable[F]]],
+  val metricsAdapter: Option[org.nazaroid.kvdb.bitcask.BitcaskPrometheusMetricsAdapter[F]] = None) {
 
   def getTable(tableName: String): F[Option[BitcaskTable[F]]] = {
     tables.get.map { _.get(tableName) }
@@ -28,7 +29,7 @@ final class BitcaskDatabase[F[_]: Async: Files: Logger](
           // Configure storage settings specifically for this table's directory
           tableConfig = configTemplate.copy(folder = tablePath.toString)
           // Initialize storage manager (including recovery from existing files)
-          sm <- BitcaskTable.initialize[F](tableName, tableConfig, writeQueue)
+          sm <- BitcaskTable.initialize[F](tableName, tableConfig, writeQueue, metricsAdapter)
           _  <- tables.update(_ + (tableName -> sm))
         } yield sm
     }
@@ -111,7 +112,7 @@ final class BitcaskDatabase[F[_]: Async: Files: Logger](
       tableConfig = configTemplate.copy(folder = tablePath.toString)
       
       // Initialize table with existing data (segments will be loaded by BitcaskTable.initialize)
-      table <- BitcaskTable.initialize[F](tableName, tableConfig, writeQueue)
+      table <- BitcaskTable.initialize[F](tableName, tableConfig, writeQueue, metricsAdapter)
       
       // Register table
       _ <- tables.update(_ + (tableName -> table))

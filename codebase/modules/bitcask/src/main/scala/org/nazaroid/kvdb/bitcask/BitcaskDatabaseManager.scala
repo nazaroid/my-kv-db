@@ -226,9 +226,10 @@ object BitcaskDatabaseManager {
 
   def create[F[_]: Async: Files: Logger](
     rootPath:       String,
-    configTemplate: BitcaskTableConfig
+    configTemplate: BitcaskTableConfig,
+    metricsAdapter: Option[org.nazaroid.kvdb.bitcask.BitcaskPrometheusMetricsAdapter[F]] = None
   ): Resource[F, BitcaskDatabaseManager[F]] =
     for {
-      c <- Catalog.init(Path(rootPath), configTemplate, 1024, 2)
+      c <- Catalog.init(Path(rootPath), configTemplate, 1024, 2, metricsAdapter)
     } yield new BitcaskDatabaseManager[F](c)
 }

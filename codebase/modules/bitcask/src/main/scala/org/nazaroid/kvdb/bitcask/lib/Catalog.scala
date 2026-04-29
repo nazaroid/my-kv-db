@@ -13,7 +13,8 @@ final class Catalog[F[_]: Async: Files: Logger](
   val rootPath:       Path,
   val writeQueue:     Channel[F, WriteTask[F]],
   val configTemplate: BitcaskTableConfig,
-  val databases:      Ref[F, Map[String, BitcaskDatabase[F]]]) {
+  val databases:      Ref[F, Map[String, BitcaskDatabase[F]]],
+  val metricsAdapter: Option[org.nazaroid.kvdb.bitcask.BitcaskPrometheusMetricsAdapter[F]] = None) {
 
   def getDatabase(dbName: String): F[Option[BitcaskDatabase[F]]] = {
     databases.get.map(_.get(dbName))
@@ -27,7 +28,7 @@ final class Catalog[F[_]: Async: Files: Logger](
         for {
           _         <- Files[F].createDirectories(dbPath).handleError(_ => ())
           tablesRef <- Ref.of[F, Map[String, BitcaskTable[F]]](Map.empty)
-          db = new BitcaskDatabase(dbName, dbPath, writeQueue, configTemplate, tablesRef)
+          db = new BitcaskDatabase(dbName, dbPath, writeQueue, configTemplate, tablesRef, metricsAdapter)
           _ <- databases.update(_ + (dbName -> db))
         } yield db
     }
@@ -144,7 +145,8 @@ object Catalog {
     rootPath:       Path,
     configTemplate: BitcaskTableConfig,
     queueSize:      Int = 10000,
-    parallelism:    Int = 10
+    parallelism:    Int = 10,
+    metricsAdapter: Option[org.nazaroid.kvdb.bitcask.BitcaskPrometheusMetricsAdapter[F]] = None
   ): Resource[F, Catalog[F]] = {
     for {
       _ <- Logger[F].info(f"catalog reading: $rootPath").toResource
@@ -167,7 +169,8 @@ object Catalog {
           rootPath       = rootPath,
           writeQueue     = writeQueue,
           configTemplate = configTemplate,
-          databases      = activeDbs
+          databases      = activeDbs,
+          metricsAdapter = metricsAdapter
         ).loadExistingDatabases
       )
 

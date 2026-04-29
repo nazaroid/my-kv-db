@@ -141,6 +141,49 @@ class BitcaskPrometheusMetricsAdapter[F[_]: Async: Logger](reg: CollectorRegistr
     .labelNames("database", "table", "segment")
     .register(reg)
 
+  // Operation metrics
+  private val writeOperationsCounter = Counter
+    .build()
+    .name("bitcask_write_operations_total")
+    .help("Total number of write operations")
+    .labelNames("database", "table", "status")
+    .register(reg)
+
+  private val writeOperationDuration = Histogram
+    .build()
+    .name("bitcask_write_operation_duration_seconds")
+    .help("Duration of write operations in seconds")
+    .labelNames("database", "table")
+    .register(reg)
+
+  private val readOperationsCounter = Counter
+    .build()
+    .name("bitcask_read_operations_total")
+    .help("Total number of read operations")
+    .labelNames("database", "table", "status")
+    .register(reg)
+
+  private val readOperationDuration = Histogram
+    .build()
+    .name("bitcask_read_operation_duration_seconds")
+    .help("Duration of read operations in seconds")
+    .labelNames("database", "table")
+    .register(reg)
+
+  private val deleteOperationsCounter = Counter
+    .build()
+    .name("bitcask_delete_operations_total")
+    .help("Total number of delete operations")
+    .labelNames("database", "table")
+    .register(reg)
+
+  private val deleteOperationDuration = Histogram
+    .build()
+    .name("bitcask_delete_operation_duration_seconds")
+    .help("Duration of delete operations in seconds")
+    .labelNames("database", "table")
+    .register(reg)
+
   override def registerMetrics(): F[Unit] = {
     Logger[F].info("Bitcask Prometheus metrics registered")
   }
@@ -225,6 +268,43 @@ class BitcaskPrometheusMetricsAdapter[F[_]: Async: Logger](reg: CollectorRegistr
         }
       case None => List.empty
     }
+  }
+
+  // Operation metrics recording methods
+  def recordWriteOperation(database: String, table: String, success: Boolean, duration: Double): F[Unit] = {
+    Async[F].delay {
+      val status = if (success) "success" else "failure"
+      writeOperationsCounter.labels(database, table, status).inc()
+      writeOperationDuration.labels(database, table).observe(duration)
+    }
+  }
+
+  def recordReadOperation(database: String, table: String, found: Boolean, duration: Double): F[Unit] = {
+    Async[F].delay {
+      val status = if (found) "hit" else "miss"
+      readOperationsCounter.labels(database, table, status).inc()
+      readOperationDuration.labels(database, table).observe(duration)
+    }
+  }
+
+  def recordDeleteOperation(database: String, table: String, duration: Double): F[Unit] = {
+    Async[F].delay {
+      deleteOperationsCounter.labels(database, table).inc()
+      deleteOperationDuration.labels(database, table).observe(duration)
+    }
+  }
+
+  // Convenience methods for operations without explicit database/table names
+  def recordWriteOperation(success: Boolean, duration: Double): F[Unit] = {
+    recordWriteOperation("unknown", "unknown", success, duration)
+  }
+
+  def recordReadOperation(found: Boolean, duration: Double): F[Unit] = {
+    recordReadOperation("unknown", "unknown", found, duration)
+  }
+
+  def recordDeleteOperation(duration: Double): F[Unit] = {
+    recordDeleteOperation("unknown", "unknown", duration)
   }
 }
 
