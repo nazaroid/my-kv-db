@@ -34,7 +34,13 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
   Код kv-базы находится в папке codebase. А в папке playground тестовая среда для обкатки.
   У меня имеются операции get, set и delete в codebase/modules/bitcask/src/main/scala/org/nazaroid/kvdb/bitcask/BitcaskEngine.scala, но нет метрик на эти операции.
   Добавь их поддержку для BitcaskEngine и выведи на дашборд Grafana в playground
-
+  
+  Агент сделал не в тему еще один PrometheusMetricsAdapter и унаследовал от MetricsAdapter. Нужно сделать рефакторинг:
+    - MetricsAdapter -> StatisticsMetrics
+      - BitcaskPrometheusMetricsAdapter -> BitcaskStatisticsMetrics
+    - и переименовать PrometheusMetricsAdapter -> BitcaskPerformanceMetrics
+      - придумать PerformanceMetrics интерфейс и куда встраивать. Может в StatisticsService или создать PerformanceService
+    
   
 
 - (TODO): /refact/ декомпозировать на модули
