@@ -227,7 +227,7 @@ object BitcaskCatalogMetricRecorder {
 
   def create[F[_]: Async: Logger](reg: CollectorRegistry): F[BitcaskCatalogMetricRecorder[F]] = {
     for {
-      _ <- Logger[F].info("сreating Bitcask Catalog metric recorder")
+      _ <- Logger[F].info("Creating Bitcask Catalog metric recorder")
       adapter = new BitcaskCatalogMetricRecorder[F](reg: CollectorRegistry)
     } yield adapter
   }

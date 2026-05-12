@@ -100,7 +100,7 @@ sealed class BitcaskPerformanceMetricRecorder[F[_]: Async: Logger](reg: Collecto
 object BitcaskPerformanceMetricRecorder {
 
   def create[F[_]: Async: Logger](reg: CollectorRegistry): F[PerformanceMetricRecorder[F]] = {
-    Logger[F].info("сreating Bitcask Performance metric recorder") >> Async[F].delay(
+    Logger[F].info("Creating Bitcask Performance metric recorder") >> Async[F].delay(
       new BitcaskPerformanceMetricRecorder[F](reg)
     )
   }
