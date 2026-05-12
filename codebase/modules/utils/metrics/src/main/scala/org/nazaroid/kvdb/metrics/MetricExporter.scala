@@ -1,4 +1,4 @@
-package org.nazaroid.kvdb.utils.metrics
+package org.nazaroid.kvdb.metrics
 
 import cats.effect.Async
 import cats.implicits.given

@@ -11,9 +11,8 @@ import io.prometheus.client.CollectorRegistry
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType}
 import org.nazaroid.kvdb.bitcask.lib.BitcaskTableConfig
 import org.nazaroid.kvdb.core.{DatabaseManager, Engine, PerformanceMetricRecorder}
+import org.nazaroid.kvdb.metrics.recordTo
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.duration.FiniteDuration
 
 object BitcaskEngine {
 
@@ -86,57 +85,45 @@ final class BitcaskEngine[F[_]: Async: Logger](
     baseName: String,
     tblName:  String,
     key:      String
-  ): F[Option[String]] = {
-    val operation = (for {
+  ): F[Option[String]] =
+    (for {
       db  <- OptionT(databaseManager.getDatabase(baseName))
       tbl <- OptionT(db.getTable(tblName))
       v   <- OptionT(tbl.get(key))
-    } yield v).value
-
-    for {
-      timedResult <- operation.timed
-      (duration, result) = timedResult
-      _ <- metricRecorder.recordGetOperation(duration)
-    } yield result
-  }
+    } yield v)
+      .value
+      .timed
+      .recordTo(metricRecorder.recordGetOperation)
 
   override def set(
     baseName: String,
     tblName:  String,
     key:      String,
     value:    String
-  ): F[Unit] = {
-    val operation = for {
-      db <- databaseManager.getDatabase(baseName).flatMap {
-        case Some(d) => d.pure[F]
-        case None    => databaseManager.createDatabase(baseName)
+  ): F[Unit] =
+    databaseManager
+      .getDatabase(baseName)
+      .flatMap(_.fold(databaseManager.createDatabase(baseName))(_.pure[F]))
+      .flatMap { db =>
+        db.getTable(tblName).flatMap(_.fold(db.createTable(tblName))(_.pure[F]))
       }
-      tbl <- db.getTable(tblName).flatMap {
-        case Some(t) => t.pure[F]
-        case None    => db.createTable(tblName)
-      }
-      _ <- tbl.set(key, value)
-    } yield ()
-
-    operation.timed.flatMap { case (duration, _) =>
-      metricRecorder.recordSetOperation(duration)
-    }
-  }
+      .flatMap(_.set(key, value))
+      .timed
+      .recordTo(metricRecorder.recordSetOperation)
 
   override def delete(
     baseName: String,
     tblName:  String,
     key:      String
-  ): F[Unit] = {
-    val operation = (for {
+  ): F[Unit] =
+    (for {
       db  <- OptionT(databaseManager.getDatabase(baseName))
       tbl <- OptionT(db.getTable(tblName))
       _   <- OptionT.liftF(tbl.delete(key))
-    } yield ()).value.void
-
-    operation.timed.flatMap { case (duration, _) =>
-      metricRecorder.recordDeleteOperation(duration)
-    }
-  }
+    } yield ())
+      .value
+      .void
+      .timed
+      .recordTo(metricRecorder.recordDeleteOperation)
 
 }
