@@ -4,7 +4,7 @@ import cats.effect.Async
 import cats.implicits.given
 import fs2.io.file.Files
 import io.prometheus.client.CollectorRegistry
-import org.nazaroid.kvdb.core.{DatabaseManager, MetricsAdapter, MonitoringConfig, StatisticsService}
+import org.nazaroid.kvdb.core.{DatabaseManager, CatalogMetricRecorder, MonitoringConfig, StatisticsService}
 import org.typelevel.log4cats.Logger
 
 object BitcaskStatisticsService {
@@ -17,7 +17,7 @@ object BitcaskStatisticsService {
     StatisticsService.createWithAdapter(
       databaseManager,
       config,
-      BitcaskPrometheusMetricsAdapter.create(reg).map(_.asInstanceOf[MetricsAdapter[F]])
+      BitcaskCatalogMetricRecorder.create(reg).map(_.asInstanceOf[CatalogMetricRecorder[F]])
     )
   }
 }

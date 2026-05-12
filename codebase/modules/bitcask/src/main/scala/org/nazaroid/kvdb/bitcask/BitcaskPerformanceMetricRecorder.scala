@@ -2,12 +2,12 @@ package org.nazaroid.kvdb.bitcask
 
 import cats.effect.Async
 import cats.implicits.given
-import io.prometheus.client.{Counter, Histogram, Summary}
-import org.nazaroid.kvdb.core.{CatalogStats, MetricsAdapter}
+import io.prometheus.client.{CollectorRegistry, Counter, Histogram, Summary}
+import org.nazaroid.kvdb.core.PerformanceMetricRecorder
 import org.typelevel.log4cats.Logger
 
-/** Prometheus metrics adapter for Bitcask engine operations and statistics */
-class PrometheusMetricsAdapter[F[_]: Async: Logger] extends MetricsAdapter[F] {
+sealed class BitcaskPerformanceMetricRecorder[F[_]: Async: Logger](reg: CollectorRegistry)
+    extends PerformanceMetricRecorder[F] {
 
   // Operation counters
   private val getCounter: Counter = Counter
@@ -66,61 +66,6 @@ class PrometheusMetricsAdapter[F[_]: Async: Logger] extends MetricsAdapter[F] {
     .help("DELETE operation summary statistics in seconds")
     .register()
 
-  // Statistics gauges
-  private val databasesGauge: Summary = Summary
-    .build()
-    .name("bitcask_databases_total")
-    .help("Total number of databases")
-    .register()
-
-  private val tablesGauge: Summary = Summary
-    .build()
-    .name("bitcask_tables_total")
-    .help("Total number of tables")
-    .register()
-
-  private val entriesGauge: Summary = Summary
-    .build()
-    .name("bitcask_entries_total")
-    .help("Total number of entries")
-    .register()
-
-  private val activeEntriesGauge: Summary = Summary
-    .build()
-    .name("bitcask_entries_active_total")
-    .help("Total number of active entries")
-    .register()
-
-  private val deletedEntriesGauge: Summary = Summary
-    .build()
-    .name("bitcask_entries_deleted_total")
-    .help("Total number of deleted entries")
-    .register()
-
-  private val dataSizeGauge: Summary = Summary
-    .build()
-    .name("bitcask_data_size_bytes")
-    .help("Total data size in bytes")
-    .register()
-
-  override def registerMetrics(): F[Unit] = {
-    Logger[F].info("Registering Prometheus metrics for Bitcask engine")
-  }
-
-  override def updateMetrics(stats: CatalogStats): F[Unit] = {
-    for {
-      _ <- Logger[F].debug("Updating Prometheus metrics with catalog stats")
-      _ <- Async[F].delay {
-        databasesGauge.observe(stats.totalDatabases.toDouble)
-        tablesGauge.observe(stats.totalTables.toDouble)
-        entriesGauge.observe(stats.totalEntries.toDouble)
-        activeEntriesGauge.observe(stats.activeEntries.toDouble)
-        deletedEntriesGauge.observe(stats.deletedEntries.toDouble)
-        dataSizeGauge.observe(stats.totalDataSize.toDouble)
-      }
-    } yield ()
-  }
-
   // Methods to record operation metrics
   def recordGetOperation(durationSeconds: Double): F[Unit] = {
     Async[F].delay {
@@ -147,8 +92,11 @@ class PrometheusMetricsAdapter[F[_]: Async: Logger] extends MetricsAdapter[F] {
   }
 }
 
-object PrometheusMetricsAdapter {
-  def create[F[_]: Async: Logger](): F[PrometheusMetricsAdapter[F]] = {
-    Async[F].delay(new PrometheusMetricsAdapter[F]())
+object BitcaskPerformanceMetricRecorder {
+
+  def create[F[_]: Async: Logger](reg: CollectorRegistry): F[PerformanceMetricRecorder[F]] = {
+    Logger[F].info("сreating Bitcask Performance metric recorder") >> Async[F].delay(
+      new BitcaskPerformanceMetricRecorder[F](reg)
+    )
   }
 }

@@ -5,12 +5,11 @@ import cats.implicits.given
 import io.circe.*
 import io.prometheus.client.*
 import org.nazaroid.kvdb.bitcask.lib.BitcaskDatabaseStats
-import org.nazaroid.kvdb.core.{CatalogStats, MetricsAdapter}
+import org.nazaroid.kvdb.core.{CatalogMetricRecorder, CatalogStats}
 import org.typelevel.log4cats.Logger
 
-/** Prometheus-based MetricsAdapter for Bitcask
-  */
-class BitcaskPrometheusMetricsAdapter[F[_]: Async: Logger](reg: CollectorRegistry) extends MetricsAdapter[F] {
+sealed class BitcaskCatalogMetricRecorder[F[_]: Async: Logger](reg: CollectorRegistry)
+    extends CatalogMetricRecorder[F] {
 
   // Catalog-level metrics
   private val totalDatabasesGauge = Gauge
@@ -141,11 +140,7 @@ class BitcaskPrometheusMetricsAdapter[F[_]: Async: Logger](reg: CollectorRegistr
     .labelNames("database", "table", "segment")
     .register(reg)
 
-  override def registerMetrics(): F[Unit] = {
-    Logger[F].info("Bitcask Prometheus metrics registered")
-  }
-
-  override def updateMetrics(stats: CatalogStats): F[Unit] = {
+  override def recordMetrics(stats: CatalogStats): F[Unit] = {
     for {
       _ <- Logger[F].debug(
         s"Updating metrics from CatalogStats: ${stats.totalDatabases} databases, ${stats.totalTables} tables"
@@ -228,12 +223,12 @@ class BitcaskPrometheusMetricsAdapter[F[_]: Async: Logger](reg: CollectorRegistr
   }
 }
 
-object BitcaskPrometheusMetricsAdapter {
+object BitcaskCatalogMetricRecorder {
 
-  def create[F[_]: Async: Logger](reg: CollectorRegistry): F[BitcaskPrometheusMetricsAdapter[F]] = {
+  def create[F[_]: Async: Logger](reg: CollectorRegistry): F[BitcaskCatalogMetricRecorder[F]] = {
     for {
-      _ <- Logger[F].info("Creating Bitcask Prometheus metrics adapter")
-      adapter = new BitcaskPrometheusMetricsAdapter[F](reg: CollectorRegistry)
+      _ <- Logger[F].info("сreating Bitcask Catalog metric recorder")
+      adapter = new BitcaskCatalogMetricRecorder[F](reg: CollectorRegistry)
     } yield adapter
   }
 }

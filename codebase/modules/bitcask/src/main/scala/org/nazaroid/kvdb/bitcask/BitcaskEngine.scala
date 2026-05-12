@@ -1,20 +1,23 @@
 package org.nazaroid.kvdb.bitcask
 
 import cats.data.OptionT
+import cats.effect
 import cats.effect.Async
 import cats.effect.kernel.Resource
 import cats.implicits.given
 import fs2.io.file.Files
+import io.prometheus.client.CollectorRegistry
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType}
 import org.nazaroid.kvdb.bitcask.lib.BitcaskTableConfig
-import org.nazaroid.kvdb.core.{DatabaseManager, Engine}
+import org.nazaroid.kvdb.core.{DatabaseManager, Engine, PerformanceMetricRecorder}
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.duration.*
 
 object BitcaskEngine {
 
-  def init[F[_]: Async: Files: Logger](conf: BitcaskEngineConfig): Resource[F, Engine[F]] = {
+  def init[F[_]: Async: Files: Logger](
+    conf:           BitcaskEngineConfig,
+    metricRegistry: CollectorRegistry
+  ): Resource[F, Engine[F]] = {
     // Data files use CRC, segment and table - no
     val dataSchema = List(
       FieldDef("valueSize", FieldType.Int32),
@@ -52,14 +55,14 @@ object BitcaskEngine {
 
     for {
       databaseManager <- BitcaskDatabaseManager.create[F](conf.rootDir, tableConfig)
-      metricsAdapter  <- PrometheusMetricsAdapter.create[F]()
-    } yield BitcaskEngine(databaseManager, metricsAdapter)
+      metricRecorder  <- effect.Resource.eval(BitcaskPerformanceMetricRecorder.create[F](metricRegistry))
+    } yield BitcaskEngine(databaseManager, metricRecorder)
   }
 }
 
 final class BitcaskEngine[F[_]: Async: Logger](
   databaseManager: BitcaskDatabaseManager[F],
-  metricsAdapter: PrometheusMetricsAdapter[F])
+  metricRecorder:  PerformanceMetricRecorder[F])
     extends Engine[F] {
 
   override def dbManager: DatabaseManager[F] = databaseManager
@@ -83,14 +86,14 @@ final class BitcaskEngine[F[_]: Async: Logger](
   ): F[Option[String]] = {
     for {
       startTime <- Async[F].delay(System.nanoTime())
-      result    <- (for {
+      result <- (for {
         db  <- OptionT(databaseManager.getDatabase(baseName))
         tbl <- OptionT(db.getTable(tblName))
         v   <- OptionT(tbl.get(key))
       } yield v).value
-      endTime   <- Async[F].delay(System.nanoTime())
-      duration   = (endTime - startTime).toDouble / 1_000_000_000.0 // Convert to seconds
-      _        <- metricsAdapter.recordGetOperation(duration)
+      endTime <- Async[F].delay(System.nanoTime())
+      duration = (endTime - startTime).toDouble / 1_000_000_000.0 // Convert to seconds
+      _ <- metricRecorder.recordGetOperation(duration)
     } yield result
   }
 
@@ -102,15 +105,15 @@ final class BitcaskEngine[F[_]: Async: Logger](
   ): F[Unit] = {
     for {
       startTime <- Async[F].delay(System.nanoTime())
-      result    <- for {
-        db  <- OptionT(databaseManager.getDatabase(baseName))
+      result <- for {
+        db <- OptionT(databaseManager.getDatabase(baseName))
           .getOrElseF(databaseManager.createDatabase(baseName))
         tbl <- OptionT(db.getTable(tblName)).getOrElseF(db.createTable(tblName))
         _   <- tbl.set(key, value)
       } yield ()
-      endTime   <- Async[F].delay(System.nanoTime())
-      duration   = (endTime - startTime).toDouble / 1_000_000_000.0 // Convert to seconds
-      _        <- metricsAdapter.recordSetOperation(duration)
+      endTime <- Async[F].delay(System.nanoTime())
+      duration = (endTime - startTime).toDouble / 1_000_000_000.0 // Convert to seconds
+      _ <- metricRecorder.recordSetOperation(duration)
     } yield result
   }
 
@@ -121,14 +124,14 @@ final class BitcaskEngine[F[_]: Async: Logger](
   ): F[Unit] = {
     for {
       startTime <- Async[F].delay(System.nanoTime())
-      result    <- (for {
+      result <- (for {
         db  <- OptionT(databaseManager.getDatabase(baseName))
         tbl <- OptionT(db.getTable(tblName))
         _   <- OptionT.liftF(tbl.delete(key))
       } yield ()).value
-      endTime   <- Async[F].delay(System.nanoTime())
-      duration   = (endTime - startTime).toDouble / 1_000_000_000.0 // Convert to seconds
-      _        <- metricsAdapter.recordDeleteOperation(duration)
+      endTime <- Async[F].delay(System.nanoTime())
+      duration = (endTime - startTime).toDouble / 1_000_000_000.0 // Convert to seconds
+      _ <- metricRecorder.recordDeleteOperation(duration)
     } yield ()
   }
 

@@ -61,16 +61,10 @@ trait StatisticsService[F[_]] {
   def startMonitoring(): F[Unit]
   def stopMonitoring():  F[Unit]
   def getDatabases:      F[List[DatabaseInfo]]
-  def registerMetrics(): F[Unit]
 
   def getStats:                                         F[CatalogStats]
   def getDatabaseStats(dbName: String):                 F[Option[DatabaseInfo]]
   def getTableStats(dbName: String, tableName: String): F[Option[TableInfo]]
-}
-
-trait MetricsAdapter[F[_]] {
-  def registerMetrics():                  F[Unit]
-  def updateMetrics(stats: CatalogStats): F[Unit]
 }
 
 case class MonitoringConfig(
@@ -83,18 +77,8 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
   databaseManager: DatabaseManager[F],
   config:          MonitoringConfig,
   monitoringRef:   Ref[F, Boolean],
-  metricsAdapter:  MetricsAdapter[F])
+  metricsAdapter:  CatalogMetricRecorder[F])
     extends StatisticsService[F] {
-
-  override def registerMetrics(): F[Unit] = {
-    for {
-      _ <- Logger[F].info("Registering metrics with adapter")
-      _ <- metricsAdapter.registerMetrics()
-      // Initial update with current values
-      stats <- getStats
-      _     <- metricsAdapter.updateMetrics(stats)
-    } yield ()
-  }
 
   override def startMonitoring(): F[Unit] = {
     if (config.enableBackgroundMonitoring) {
@@ -131,7 +115,7 @@ class StatisticsServiceImpl[F[_]: Async: Files: Logger](
   private def updateAdapterMetrics(): F[Unit] = {
     for {
       stats <- getStats
-      _     <- metricsAdapter.updateMetrics(stats)
+      _     <- metricsAdapter.recordMetrics(stats)
     } yield ()
   }
 
@@ -161,7 +145,7 @@ object StatisticsService {
   def createWithAdapter[F[_]: Async: Files: Logger](
     databaseManager: DatabaseManager[F],
     config:          MonitoringConfig,
-    adapter:         F[MetricsAdapter[F]]
+    adapter:         F[CatalogMetricRecorder[F]]
   ): F[StatisticsService[F]] = {
     for {
       metricsAdapter <- adapter
