@@ -11,7 +11,6 @@ import io.prometheus.client.CollectorRegistry
 import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType}
 import org.nazaroid.kvdb.bitcask.lib.BitcaskTableConfig
 import org.nazaroid.kvdb.core.{DatabaseManager, Engine, PerformanceMetricRecorder}
-import org.nazaroid.kvdb.metrics.recordTo
 import org.typelevel.log4cats.Logger
 
 object BitcaskEngine {
@@ -93,7 +92,10 @@ final class BitcaskEngine[F[_]: Async: Logger](
     } yield v)
       .value
       .timed
-      .recordTo(metricRecorder.recordGetOperation)
+      .flatTap { (duration, result) =>
+        metricRecorder.recordGetOperation(duration)
+      }
+      .map { (duration, result) => result }
 
   override def set(
     baseName: String,
@@ -109,7 +111,10 @@ final class BitcaskEngine[F[_]: Async: Logger](
       }
       .flatMap(_.set(key, value))
       .timed
-      .recordTo(metricRecorder.recordSetOperation)
+      .flatTap { (duration, result) =>
+        metricRecorder.recordSetOperation(duration)
+      }
+      .map { (duration, result) => result }
 
   override def delete(
     baseName: String,
@@ -124,6 +129,9 @@ final class BitcaskEngine[F[_]: Async: Logger](
       .value
       .void
       .timed
-      .recordTo(metricRecorder.recordDeleteOperation)
+      .flatTap { (duration, result) =>
+        metricRecorder.recordDeleteOperation(duration)
+      }
+      .map { (duration, result) => result }
 
 }
