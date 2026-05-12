@@ -3,6 +3,7 @@ package org.nazaroid.kvdb.bitcask
 import cats.data.OptionT
 import cats.effect
 import cats.effect.Async
+import cats.effect.implicits.clockOps
 import cats.effect.kernel.Resource
 import cats.implicits.given
 import fs2.io.file.Files
@@ -11,6 +12,8 @@ import org.nazaroid.kvdb.binfileio.{FieldDef, FieldType}
 import org.nazaroid.kvdb.bitcask.lib.BitcaskTableConfig
 import org.nazaroid.kvdb.core.{DatabaseManager, Engine, PerformanceMetricRecorder}
 import org.typelevel.log4cats.Logger
+
+import scala.concurrent.duration.FiniteDuration
 
 object BitcaskEngine {
 
@@ -84,15 +87,15 @@ final class BitcaskEngine[F[_]: Async: Logger](
     tblName:  String,
     key:      String
   ): F[Option[String]] = {
+    val operation = (for {
+      db  <- OptionT(databaseManager.getDatabase(baseName))
+      tbl <- OptionT(db.getTable(tblName))
+      v   <- OptionT(tbl.get(key))
+    } yield v).value
+
     for {
-      startTime <- Async[F].delay(System.nanoTime())
-      result <- (for {
-        db  <- OptionT(databaseManager.getDatabase(baseName))
-        tbl <- OptionT(db.getTable(tblName))
-        v   <- OptionT(tbl.get(key))
-      } yield v).value
-      endTime <- Async[F].delay(System.nanoTime())
-      duration = (endTime - startTime).toDouble / 1_000_000_000.0 // Convert to seconds
+      timedResult <- operation.timed
+      (duration, result) = timedResult
       _ <- metricRecorder.recordGetOperation(duration)
     } yield result
   }
@@ -103,18 +106,21 @@ final class BitcaskEngine[F[_]: Async: Logger](
     key:      String,
     value:    String
   ): F[Unit] = {
-    for {
-      startTime <- Async[F].delay(System.nanoTime())
-      result <- for {
-        db <- OptionT(databaseManager.getDatabase(baseName))
-          .getOrElseF(databaseManager.createDatabase(baseName))
-        tbl <- OptionT(db.getTable(tblName)).getOrElseF(db.createTable(tblName))
-        _   <- tbl.set(key, value)
-      } yield ()
-      endTime <- Async[F].delay(System.nanoTime())
-      duration = (endTime - startTime).toDouble / 1_000_000_000.0 // Convert to seconds
-      _ <- metricRecorder.recordSetOperation(duration)
-    } yield result
+    val operation = for {
+      db <- databaseManager.getDatabase(baseName).flatMap {
+        case Some(d) => d.pure[F]
+        case None    => databaseManager.createDatabase(baseName)
+      }
+      tbl <- db.getTable(tblName).flatMap {
+        case Some(t) => t.pure[F]
+        case None    => db.createTable(tblName)
+      }
+      _ <- tbl.set(key, value)
+    } yield ()
+
+    operation.timed.flatMap { case (duration, _) =>
+      metricRecorder.recordSetOperation(duration)
+    }
   }
 
   override def delete(
@@ -122,17 +128,15 @@ final class BitcaskEngine[F[_]: Async: Logger](
     tblName:  String,
     key:      String
   ): F[Unit] = {
-    for {
-      startTime <- Async[F].delay(System.nanoTime())
-      result <- (for {
-        db  <- OptionT(databaseManager.getDatabase(baseName))
-        tbl <- OptionT(db.getTable(tblName))
-        _   <- OptionT.liftF(tbl.delete(key))
-      } yield ()).value
-      endTime <- Async[F].delay(System.nanoTime())
-      duration = (endTime - startTime).toDouble / 1_000_000_000.0 // Convert to seconds
-      _ <- metricRecorder.recordDeleteOperation(duration)
-    } yield ()
+    val operation = (for {
+      db  <- OptionT(databaseManager.getDatabase(baseName))
+      tbl <- OptionT(db.getTable(tblName))
+      _   <- OptionT.liftF(tbl.delete(key))
+    } yield ()).value.void
+
+    operation.timed.flatMap { case (duration, _) =>
+      metricRecorder.recordDeleteOperation(duration)
+    }
   }
 
 }

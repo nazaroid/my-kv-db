@@ -6,6 +6,9 @@ import io.prometheus.client.{CollectorRegistry, Counter, Histogram, Summary}
 import org.nazaroid.kvdb.core.PerformanceMetricRecorder
 import org.typelevel.log4cats.Logger
 
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.FiniteDuration
+
 sealed class BitcaskPerformanceMetricRecorder[F[_]: Async: Logger](reg: CollectorRegistry)
     extends PerformanceMetricRecorder[F] {
 
@@ -66,28 +69,30 @@ sealed class BitcaskPerformanceMetricRecorder[F[_]: Async: Logger](reg: Collecto
     .help("DELETE operation summary statistics in seconds")
     .register()
 
-  // Methods to record operation metrics
-  def recordGetOperation(durationSeconds: Double): F[Unit] = {
+  def recordGetOperation(duration: FiniteDuration): F[Unit] = {
+    val durationSec = duration.toUnit(TimeUnit.SECONDS)
     Async[F].delay {
       getCounter.inc()
-      getHistogram.observe(durationSeconds)
-      getSummary.observe(durationSeconds)
+      getHistogram.observe(durationSec)
+      getSummary.observe(durationSec)
     }
   }
 
-  def recordSetOperation(durationSeconds: Double): F[Unit] = {
+  def recordSetOperation(duration: FiniteDuration): F[Unit] = {
+    val durationSec = duration.toUnit(TimeUnit.SECONDS)
     Async[F].delay {
       setCounter.inc()
-      setHistogram.observe(durationSeconds)
-      setSummary.observe(durationSeconds)
+      setHistogram.observe(durationSec)
+      setSummary.observe(durationSec)
     }
   }
 
-  def recordDeleteOperation(durationSeconds: Double): F[Unit] = {
+  def recordDeleteOperation(duration: FiniteDuration): F[Unit] = {
+    val durationSec = duration.toUnit(TimeUnit.SECONDS)
     Async[F].delay {
       deleteCounter.inc()
-      deleteHistogram.observe(durationSeconds)
-      deleteSummary.observe(durationSeconds)
+      deleteHistogram.observe(durationSec)
+      deleteSummary.observe(durationSec)
     }
   }
 }
