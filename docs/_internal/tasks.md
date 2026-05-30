@@ -34,27 +34,13 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
   Код kv-базы находится в папке codebase. А в папке playground тестовая среда для обкатки.
   У меня имеются операции get, set и delete в codebase/modules/bitcask/src/main/scala/org/nazaroid/kvdb/bitcask/BitcaskEngine.scala, но нет метрик на эти операции.
   Добавь их поддержку для BitcaskEngine и выведи на дашборд Grafana в playground
-  
 
-- (TODO): /refact/ декомпозировать на модули
-  - выделить два основных компонента и слои: 
-    - storage:
-      - server
-      - engine
-      - statistics
-    - shared
-      - utils
-    - node
 
 - (TODO): /refact/ выделить MonitoringService
   - StatisticsService: выделить MonitoringService 
     - рассмотреть как можно было бы сделать событийную модель. Например, передавать два Action (регистрация и обновление) в startMonitoring
     - metricsAdapter.registerMetrics() ничего не делает. Можно выделить метрики в case class и в registerMetrics его устаналивать в состояие
   
-- (TODO): /refact/ разделить утилиты
-  - для инстанса DB не нужен [metrics](codebase/modules/utils/metrics)
-    нужен только для http-сервера: [prometheus](codebase/modules/utils/third_party/prometheus)
-
 - (TODO): /refact/ пересмотреть связи между StatisticsService <-> DatabaseManager[F] <-> Engine
   - сейчас внедрение DatabaseManager в StatisticsService через engine.dbManager
   - как можно переделать: DatabaseManager трансформировать в Catalog, т.к это аналог BitcaskCatalog (его нужно переименовать так из Catalog) и сделать его враппером над BitcaskCatalog
@@ -97,6 +83,5 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
 * (TODO) поддержи GRPC
   - при grpc уметь получать статистику по grpc
 
-
-
+  
 потом прикрутить SQL
