@@ -5,7 +5,7 @@ val GLOBAL_VERSION = "25.2.1.0"
 
 lazy val root = (project in file("."))
   .aggregate(
-    `service`,
+    `daemon`,
     `metrics`,
     `prometheus`,
     `bin-file-io`,
@@ -132,7 +132,7 @@ lazy val `server` = (project in file("codebase/modules/server"))
       .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/server/integration-tests-html-report")
   )
 
-lazy val `service` = (project in file("codebase/service"))
+lazy val `daemon` = (project in file("codebase/daemon"))
   .dependsOn(`metrics` % "compile->compile;test->test;it->it")
   .dependsOn(`server` % "compile->compile;test->test;it->it")
   .enablePlugins(DockerPlugin, JavaAppPackaging)
@@ -140,15 +140,15 @@ lazy val `service` = (project in file("codebase/service"))
   .settings(
     commonSettings,
     assemblyMergeSetting,
-    name    := "service",
+    name    := "daemon",
     version := GLOBAL_VERSION,
     libraryDependencies ++= CatsEffect.all ++ Fs2.all ++ Http4s.all ++ Logging.all ++ Prometheus.all ++ Testing.all,
     excludeDependencies -= ExclusionRule("log4j", "log4j"),
     Test / testOptions += Tests
-      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/service/unit-tests-html-report"),
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/daemon/unit-tests-html-report"),
     inConfig(Integration)(Defaults.testSettings),
     Integration / testOptions += Tests
-      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/service/integration-tests-html-report"),
+      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/daemon/integration-tests-html-report"),
     dockerBaseImage      := "amazoncorretto:17-al2023 ",
     Docker / packageName := "org/nazaroid/kvdb/server",
     Docker / version     := version.value,
