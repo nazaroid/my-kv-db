@@ -1,5 +1,5 @@
 .PHONY: help build run stop clean logs status test grafana-setup populate-db show-stats
-DOCKER_COMPOSE := docker-compose -f docker-compose.yml --project-directory ..
+DOCKER_COMPOSE := docker-compose -f docker-compose.yml --project-directory .
 
 # Default target
 help:
