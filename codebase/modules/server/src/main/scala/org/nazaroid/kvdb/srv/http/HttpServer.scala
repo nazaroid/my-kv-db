@@ -6,13 +6,10 @@ import com.comcast.ip4s.{Ipv4Address, Port}
 import fs2.io.net.Network
 import io.circe.generic.auto.*
 import io.circe.syntax.*
-import io.prometheus.client.CollectorRegistry
 import org.http4s.Uri.Path.Root
 import org.http4s.dsl.Http4sDsl
 import org.http4s.ember.server.EmberServerBuilder
-import org.http4s.metrics.prometheus.Prometheus
 import org.http4s.server.Router
-import org.http4s.server.middleware.Metrics
 import org.http4s.{HttpRoutes, Request, Response, Uri}
 import org.nazaroid.kvdb.core.*
 import org.nazaroid.kvdb.srv.ServerConfig
@@ -110,10 +107,7 @@ final class HttpServer[F[_]: Async: Logger: Network](
             } yield Ok("OK")
           }.flatten
       }
-      for {
-        dataServiceMetrics <- Prometheus
-          .metricsOps[F](CollectorRegistry.defaultRegistry, "data")
-      } yield Metrics[F](dataServiceMetrics)(withErrorLogging(dataService))
+      Resource.pure(withErrorLogging(dataService))
     }
 
   }
@@ -124,10 +118,7 @@ final class HttpServer[F[_]: Async: Logger: Network](
       val healthService: HttpRoutes[F] = HttpRoutes.of[F] { case GET -> Root =>
         Ok("healthy")
       }
-      for {
-        healthServiceMetrics <- Prometheus
-          .metricsOps[F](CollectorRegistry.defaultRegistry, "health")
-      } yield Metrics[F](healthServiceMetrics)(withErrorLogging(healthService))
+      Resource.pure(withErrorLogging(healthService))
     }
   }
 
@@ -158,10 +149,7 @@ final class HttpServer[F[_]: Async: Logger: Network](
           }
 
       }
-      for {
-        statsServiceMetrics <- Prometheus
-          .metricsOps[F](CollectorRegistry.defaultRegistry, "stats")
-      } yield Metrics[F](statsServiceMetrics)(withErrorLogging(statsService))
+      Resource.pure(withErrorLogging(statsService))
     }
   }
 }

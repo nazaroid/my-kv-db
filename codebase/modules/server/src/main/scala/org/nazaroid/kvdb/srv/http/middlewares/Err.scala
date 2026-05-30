@@ -1,15 +1,14 @@
 package org.nazaroid.kvdb.srv.http.middlewares
 
 import cats.data.OptionT
-import cats.effect.MonadCancelThrow
+import cats.effect.Concurrent
 import org.http4s.HttpRoutes
 import org.http4s.server.middleware.{ErrorAction, ErrorHandling}
 import org.typelevel.log4cats.Logger
 
-trait Err[F[_]: MonadCancelThrow: Logger] {
+trait Err[F[_]: Logger: Concurrent] {
 
-  // noinspection TypeAnnotation,ScalaStyle
-  def withErrorLogging(r: HttpRoutes[F]) =
+  def withErrorLogging(r: HttpRoutes[F]): HttpRoutes[F] =
     ErrorHandling
       .Recover
       .total(

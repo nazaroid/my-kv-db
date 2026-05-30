@@ -7,7 +7,6 @@ lazy val root = (project in file("."))
   .aggregate(
     `daemon`,
     `metrics`,
-    `prometheus`,
     `bin-file-io`,
     `bitcask`,
     `core`,
@@ -27,24 +26,7 @@ lazy val root = (project in file("."))
     publishLocal                           := {}
   )
 
-lazy val `prometheus` = (project in file("codebase/modules/utils/third_party/prometheus"))
-  .enablePlugins(DockerPlugin, JavaAppPackaging)
-  .disablePlugins(AssemblyPlugin)
-  .configs(Integration)
-  .settings(
-    commonSettings,
-    name    := "prometheus",
-    version := GLOBAL_VERSION,
-    excludeDependencies -= ExclusionRule("log4j", "log4j"),
-    Test / testOptions += Tests
-      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/prometheus/unit-tests-html-report"),
-    inConfig(Integration)(Defaults.testSettings),
-    Integration / testOptions += Tests
-      .Argument(TestFrameworks.ScalaTest, "-u", "scalatest/prometheus/integration-tests-html-report")
-  )
-
 lazy val `metrics` = (project in file("codebase/modules/utils/metrics"))
-  .dependsOn(`prometheus` % "compile->compile;test->test;it->it")
   .enablePlugins(DockerPlugin, JavaAppPackaging)
   .disablePlugins(AssemblyPlugin)
   .configs(Integration)
