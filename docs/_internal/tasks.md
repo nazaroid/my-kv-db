@@ -28,22 +28,23 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
 
 ---
 
-- (TODO) проработать последнее замечание CODE_REVIEW
-  - ввести конфиг `durability: Relaxed | FsyncPerSegment | FsyncPerBatch`
-  - удалить потом файл [code_review.md](code_review.md)
+- (TODO) починить it-тесты
+  [error] 	org.nazaroid.kvdb.HttpStatisticsSpec
+  [error] 	org.nazaroid.kvdb.HttpDbServerCrudSpec
+
 
 - (TODO) подготовить для OpenSource
   - README.md
     + дополнить ссылкой на docs
     + логотип
   - провести Code Review и провести рефакторинги
-  + придумать другое имя, переименовть и выложить в github
+  - сделать репо публичным на github
 
 ---
 
 * (TODO) сейчас БД не держит нагрузку
   - {"@timestamp":"2026-07-18T20:12:36.428+00:00","message":"Error servicing request: POST /mydb/mytable/key_5429 from 172.24.0.5","logger_name":"org.nazaroid.kvdb.srv.DbInstance","thread_name":"io-compute-blocker-323","level":"ERROR","stack_trace":"java.nio.file.NoSuchFileException:
-  
+
 * (TODO) добавить типы
   Blob / Byte Array - базовый тип для хранения
   Bitcask Engine: возвращает Byte Array
@@ -51,8 +52,12 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
   String (Строка): Основной тип для ключей. Позволяет организовывать пространство имен (например, user:123:profile) и выполнять поиск по маскам.
   Integer (Целое число): Необходим для реализации атомарных счетчиков и инкрементальных операций без полной перезаписи значения.
   Boolean (Логический тип): Часто используется для флагов состояния, так как занимает минимум места.
-* 
-- (TODO) MVP: попробовать переделать на DSL + Free (можно только AppL и ServiceL)
+
+* (TODO) проработать последнее замечание CODE_REVIEW
+  - ввести конфиг `durability: Relaxed | FsyncPerSegment | FsyncPerBatch`
+  - удалить потом файл [code_review.md](code_review.md)
+
+* (TODO) MVP: попробовать переделать на DSL + Free (можно только AppL и ServiceL)
   (AppL (run),
   ServiceL (startEndpoint httpCfg | grpcCfg)
   DbSrvL (create, createDb))
@@ -64,5 +69,4 @@ https://ru.wikipedia.org/wiki/%D0%A6%D0%B8%D0%BA%D0%BB%D0%B8%D1%87%D0%B5%D1%81%D
 * (TODO) поддержи GRPC
   - при grpc уметь получать статистику по grpc
 
-  
 потом прикрутить SQL
