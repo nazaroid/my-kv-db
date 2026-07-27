@@ -1,0 +1,79 @@
+### Maven ###
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+
+### Intellij ###
+*.iml
+.idea/
+
+### Mac folder preferences ###
+.DS_Store
+
+### Scala ###
+scalastyle-output.xml
+
+### Git ###
+**/git.properties
+
+### Java ###
+*.class
+
+### Other ###
+*.log
+data
+
+### sbt specific ###
+scalatest
+.cache
+.history
+.lib/
+dist/*
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+.bsp
+
+client.js
+
+journal/
+snapshots/
+
+figwheel_server.log
+
+# Python
+__pycache__/
+/lib/
+
+.bloop/
+.metals/
+.vscode/
+project/
+
+### AI Editors & Assistants ###
+# Cursor
+.cursor/
+.cursorrules
+
+# Continue (AI assistant)
+.continue/
+
+# Trae
+.trae/
+
+# Windsurf
+.windsurf/
+
+# IDX (Google Project IDX)
+.idx/
+
+### VS Code (База для многих AI-редакторов) ###
+!.vscode/extensions.json
+*.code-workspace

@@ -1,0 +1,101 @@
+services:
+  # KV Database Service
+  kvdb:
+    build:
+      context: ..
+      dockerfile: ./playground/Dockerfile
+    container_name: kvdb-service
+    ports:
+      - "9000:9000"    # HTTP API port
+      - "9091:9091"    # Metrics port for Prometheus
+    environment:
+      - config=docker.conf
+    volumes:
+      - kvdb_data:/catalog
+      - ./playground/codebase/service/src/main/resources/docker.conf:/app/docker.conf:ro
+    networks:
+      - kvdb-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+      - '--web.enable-remote-write-receiver'
+    networks:
+      - kvdb-network
+    restart: unless-stopped
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - kvdb-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+  # k6 Performance Testing Service
+  k6:
+    image: grafana/k6:latest
+    container_name: k6-bench
+    volumes:
+      # Mount the local scripts folder into the container to pass the test scenario
+      - ./scripts:/scripts:ro
+    # Run the load test and pipe the results directly into Prometheus natively
+    command: run /scripts/perf-test.js --out experimental-prometheus-rw
+    environment:
+      # URL where Prometheus accepts remote write metrics streams
+      - K6_PROMETHEUS_RW_SERVER_URL=http://prometheus:9090/api/v1/write
+      # Optimizes Prometheus data footprint by sending high-precision native histograms
+      - K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM=false
+    networks:
+      - kvdb-network
+    depends_on:
+      # Ensure the benchmark only initiates after the DB passes its internal healthcheck
+      kvdb:
+        condition: service_healthy
+
+volumes:
+  kvdb_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  kvdb-network:
+    driver: bridge
