@@ -12,8 +12,8 @@ import org.typelevel.log4cats.Logger
 final case class BitcaskCatalogConfig(
   rootPath:         String,
   tableConfig:      BitcaskTableConfig,
-  writeBufferSize:  Int = 10000,
-  writeParallelism: Int = 10)
+  writeBufferSize:  Int,
+  writeParallelism: Int)
 
 final class BitcaskCatalog[F[_]: Async: Files: Logger](
   val rootPath:       Path,

@@ -119,7 +119,9 @@ sealed class BitcaskStatisticsServiceSpec extends AsyncFreeSpec with AsyncIOSpec
   ): Resource[IO, BitcaskCatalogAdapter[IO]] = {
     for {
       given Logger[IO] <- Slf4jLogger.create[IO].toResource
-      catalog          <- BitcaskCatalogAdapter.create[IO](BitcaskCatalogConfig(tempDir.toString, bitcaskTableConfig))
+      catalog <- BitcaskCatalogAdapter.create[IO](
+        BitcaskCatalogConfig(tempDir.toString, bitcaskTableConfig, writeBufferSize = 10000, writeParallelism = 10)
+      )
     } yield catalog
   }
 }
