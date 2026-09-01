@@ -6,6 +6,8 @@ import fs2.Stream
 import org.scalatest.FutureOutcome
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jFactory
 
 import java.nio.file.{Files, Paths}
 import scala.concurrent.duration.DurationInt
@@ -26,7 +28,10 @@ final class ReadWriteSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
   private val testDir = Paths.get("./testFolder")
 
+  private given logger: Logger[IO] = Slf4jFactory.create[IO].getLogger
+  
   "should write and read same data" in {
+
     val path = f"$testDir/segment_1.ix"
     val schema = List(
       FieldDef("keySize", FieldType.Int32),

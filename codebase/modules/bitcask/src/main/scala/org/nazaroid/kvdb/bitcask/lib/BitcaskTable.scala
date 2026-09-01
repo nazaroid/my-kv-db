@@ -396,7 +396,7 @@ sealed class BitcaskTable[F[_]: Async: Files: Logger](
 
 object BitcaskTable {
 
-  private def findLastOffsetInSegment[F[_]: Async: Files](
+  private def findLastOffsetInSegment[F[_]: Async: Files: Logger](
     targetKey: String,
     path:      String,
     schema:    List[FieldDef]
