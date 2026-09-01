@@ -1,0 +1,33 @@
+package org.nazaroid.kvdb.srv.composition
+
+import cats.Parallel
+import cats.data.Kleisli
+import cats.effect.std.Dispatcher
+import cats.effect.{Async, Resource}
+import cats.implicits.given
+import fs2.io.file.Files
+import fs2.io.net.Network
+import org.nazaroid.kvdb.core.Server
+import org.nazaroid.kvdb.srv.DbInstanceConfig
+import org.typelevel.log4cats.Logger
+
+class DiContainer[F[_]: Async: Files: Logger: Parallel: Network] {
+
+  def resolveServer(conf: DbInstanceConfig)(using Dispatcher[F]): F[Resource[F, Server[F]]] = {
+    commonModuleK >>> {
+      for {
+        server <- serverK
+      } yield server
+    }
+  }.run(conf)
+
+  private def serverK(using Dispatcher[F]): Kleisli[F, CommonModule[F], Resource[F, Server[F]]] =
+    Kleisli { commonModule => ServerModule(commonModule).resolve.pure[F] }
+
+  private def commonModuleK(using Dispatcher[F]): Kleisli[F, DbInstanceConfig, CommonModule[F]] =
+    Kleisli { (conf: DbInstanceConfig) =>
+      {
+        new CommonModule(conf, summon[Dispatcher[F]]).pure[F]
+      }
+    }
+}

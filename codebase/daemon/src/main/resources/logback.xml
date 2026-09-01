@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <timeZone>UTC</timeZone>
+            <fieldNames>
+                <levelValue>[ignore]</levelValue>
+                <version>[ignore]</version>
+            </fieldNames>
+        </encoder>
+    </appender>
+
+    <logger name="io.netty" level="WARN"/>
+    <logger name="io.grpc" level="WARN"/>
+    <logger name="akka" level="INFO"/>
+    <logger name="net.schmizz" level="ERROR"/>
+    <logger name="org.nazaroid" level="${APP_LOGGING_LEVEL:-DEBUG}"/>
+    <logger name="org.http4s" level="INFO"/>
+
+    <root level="${APP_LOGGING_LEVEL:-DEBUG}">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>
