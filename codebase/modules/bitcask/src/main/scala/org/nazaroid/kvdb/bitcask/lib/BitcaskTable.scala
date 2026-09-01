@@ -417,7 +417,7 @@ object BitcaskTable {
     val tableIndexPath = s"${config.folder}/table.idx"
 
     for {
-      // 1. Read table.idx and build Key -> SegmentName map
+      // Read table.idx and build Key -> SegmentName map
       // Stream guarantees that for duplicate keys, the LAST value persists in the Map
       tableMapping <- Files[F].exists(Path(tableIndexPath)).flatMap {
         case false => Async[F].pure(Map.empty[String, String])
@@ -430,7 +430,7 @@ object BitcaskTable {
             .to(Map)
       }
 
-      // 2. Restore CacheEntries based on the mapping
+      // Restore CacheEntries based on the mapping
       recoveredCache <- tableMapping
         .toList
         .traverse {
@@ -458,10 +458,10 @@ object BitcaskTable {
         }
         .map(_.flatten.toMap)
 
-      // 3. Create Ref for the cache
+      // Create Ref for the cache
       cacheRef <- Ref.of[F, Map[String, CacheEntry]](recoveredCache)
 
-      // 4. Prepare the current active segment
+      // Prepare the current active segment
       currentSegName <- Async[F].delay(s"seg_${System.currentTimeMillis()}")
 
       dataStorage = new BinFileStorage(s"${config.folder}/$currentSegName.bin", config.dataSchema, writeQueue)

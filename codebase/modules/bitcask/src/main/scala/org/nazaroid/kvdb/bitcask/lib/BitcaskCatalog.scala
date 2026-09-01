@@ -111,22 +111,15 @@ final class BitcaskCatalog[F[_]: Async: Files: Logger](
     for {
       _ <- Logger[F].info(s"Loading database: $dbName")
       dbPath = rootPath / dbName
-
-      // Check if database directory exists
       exists <- Files[F].exists(dbPath)
       _ <-
         if (!exists) {
           Logger[F].warn(s"Database directory $dbPath does not exist, skipping")
         } else Async[F].unit
 
-      // Create database instance
       tablesRef <- Ref.of[F, Map[String, BitcaskTable[F]]](Map.empty)
       db = BitcaskDatabase(dbName, dbPath, writeQueue, configTemplate, tablesRef)
-
-      // Load existing tables
       _ <- db.loadExistingTables
-
-      // Register database
       _ <- databases.update(_ + (dbName -> db))
 
     } yield db
@@ -151,21 +144,11 @@ object BitcaskCatalog {
   ): Resource[F, BitcaskCatalog[F]] = {
     val rootPath = Path(config.rootPath)
     for {
-      _ <- Logger[F].info(f"catalog reading: $rootPath").toResource
-      // 1. Create root directory if it doesn't exist
-      _ <- Files[F].createDirectories(rootPath).handleError(_ => ()).toResource
-
-      // 2. Create a unified write queue for the entire catalog
+      _          <- Logger[F].info(f"catalog reading: $rootPath").toResource
+      _          <- Files[F].createDirectories(rootPath).handleError(_ => ()).toResource
       writeQueue <- Channel.bounded[F, WriteTask[F]](config.writeBufferSize).toResource
-
-      // 3. Start background write worker
-      // It will process tasks from all tables across all databases
-      _ <- writeBinary(writeQueue.stream, parallelism = config.writeParallelism).compile.drain.background
-
-      // 4. Initialize the registry for open databases
-      activeDbs <- Ref.of(Map.empty[String, BitcaskDatabase[F]]).toResource
-
-      // 5. Load existing databases and tables
+      _          <- writeBinary(writeQueue.stream, parallelism = config.writeParallelism).compile.drain.background
+      activeDbs  <- Ref.of(Map.empty[String, BitcaskDatabase[F]]).toResource
       catalog <- Resource.eval(
         BitcaskCatalog[F](
           rootPath       = rootPath,

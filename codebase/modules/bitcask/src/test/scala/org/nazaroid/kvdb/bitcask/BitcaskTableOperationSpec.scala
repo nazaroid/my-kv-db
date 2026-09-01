@@ -163,12 +163,12 @@ final class BitcaskTableOperationSpec extends AsyncFreeSpec with AsyncIOSpec wit
     val key = "persistent_user"
     val value = "{\"data\": \"important\"}"
 
-    // 1. First session: write data and shutdown
+    // First session: write data and shutdown
     val session1 = tableResource.use { sm =>
       sm.write(key, value) *> IO.sleep(100.millis) // Wait for disk write completion
     }
 
-    // 2. Second session: reopen storage and read
+    // Second session: reopen storage and read
     val session2 = tableResource.use { sm =>
       sm.read(key).map { recoveredValue =>
         assert(recoveredValue.contains(value), "Data should be recovered from disk indexes")
@@ -198,7 +198,7 @@ final class BitcaskTableOperationSpec extends AsyncFreeSpec with AsyncIOSpec wit
     val keyToDelete = "delete_me"
 
     val scenario = for {
-      // Step 1: Write two keys, delete one
+      // Write two keys, delete one
       _ <- tableResource.use { t =>
         for {
           _ <- t.write(keyToKeep, "value1")
@@ -208,7 +208,7 @@ final class BitcaskTableOperationSpec extends AsyncFreeSpec with AsyncIOSpec wit
         } yield ()
       }
 
-      // Step 2: Restart and verify state
+      // Restart and verify state
       _ <- tableResource.use { t =>
         for {
           val1 <- t.read(keyToKeep)
